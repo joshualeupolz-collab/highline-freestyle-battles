@@ -169,7 +169,8 @@ open ──accept──▶ active ─────────────▶ rev
   counts as a win for the rejecting side (concept §5.6), which updates the ratings immediately.
 - **Goodwill:** a participant can grant the opponent an extra attempt at any time.
 - **Missed deadline:** the side that delivered all videos chooses "count as my win" or "cancel
-  unrated"; if nobody delivered, it can only be cancelled.
+  unrated"; if nobody delivered, it can only be cancelled. If nobody decides within
+  `AUTO_DECIDE_AFTER_DAYS` (7), an hourly cron trigger (`scheduled` in `src/index.ts`) does it.
 - **Rating:** every decided battle runs `services/rating.ts` in the same database batch:
   states and history are written together with the result, or a replay request if the event
   would be out of order.
@@ -185,7 +186,7 @@ open ──accept──▶ active ─────────────▶ rev
 | 2 | D1 schema (migrations 0000 + 0001), Worker skeleton with Hono, local development, seed data (RuleSet v1, launch formats) | done |
 | 3 | Login: sign-up with age confirmation, sessions, approval, admin bootstrap, audit log, password reset codes | done (Google login postponed, see §1) |
 | 4 | Formats and RuleSets (admin) | done |
-| 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines | done (automatic handling of abandoned deadlines open, concept §15.10) |
+| 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines | done |
 | 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | |
 | 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | |
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | |

@@ -82,6 +82,7 @@ A person can hold several roles (e.g. athlete + judge).
 5. **Review** (see section 7).
 6. **Special cases:**
    - Whoever doesn't deliver within the time window loses. The opponent may instead choose "cancelled, unrated".
+     If the side that delivered does not decide within **7 days** after the deadline, the battle counts as their win automatically; if nobody delivered, it is cancelled unrated (hourly background job).
    - If one side wants to cancel, the other decides: count it as a win or cancel without rating.
    - Goodwill: the opponent can grant an extra attempt or more time (e.g. after a mis-tap that can be shown on video).
 
@@ -252,7 +253,6 @@ A person can hold several roles (e.g. athlete + judge).
 2. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
 3. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
 4. Default values: time window, attempts, weight. *Provisional defaults in the app: best of 3 attempts, 7 days, weight 3, 5-point scale (`packages/shared/src/battles.ts`).*
-10. Missed deadline: if the side that delivered never decides (win or unrated), when should the app decide automatically, and how?
 5. Archiving: after how many weeks to Telegram?
 6. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones.
 7. Exchange format for trick list / scoring formula with the other developer.

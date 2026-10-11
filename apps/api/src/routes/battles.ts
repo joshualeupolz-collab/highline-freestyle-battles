@@ -32,7 +32,6 @@ import {
   battleProposals,
   battles,
   formats,
-  formatVersions,
   proposalResponses,
   ratingStates,
   submissions,
@@ -42,14 +41,16 @@ import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
-import { ratingStatements } from '../services/rating';
+import {
+  cancelStatements,
+  decideStatements,
+  requiredSubmissionsPerPerson,
+} from '../services/battles';
 import { latestFormatVersion } from './formats';
 import { currentRuleset, parseRulesetParams } from './rulesets';
 
 export const battleRoutes = new Hono<AppEnv>();
 battleRoutes.use(requireUser({ active: true }));
-
-type BattleRow = typeof battles.$inferSelect;
 
 // ---------------------------------------------------------------------------------------------
 // Loading and response shape
@@ -135,58 +136,6 @@ async function battleResponse(db: Database, battleId: string, now = Date.now()) 
 
 function requireParticipant(participants: Participants, userId: string) {
   if (!participants.some((p) => p.userId === userId)) apiError(403, 'not_a_participant');
-}
-
-// ---------------------------------------------------------------------------------------------
-// Ending a battle
-// ---------------------------------------------------------------------------------------------
-
-/** Statements that decide a battle and update the ratings. */
-async function decideStatements(
-  db: Database,
-  battle: BattleRow,
-  results: { userId: string; score: number }[],
-  reason: 'forfeit' | 'deadline',
-  now: number,
-): Promise<BatchItem<'sqlite'>[]> {
-  return [
-    db
-      .update(battles)
-      .set({ status: 'decided', decidedAt: now, eventAt: now, decisionReason: reason })
-      .where(eq(battles.id, battle.id)),
-    ...results.map((r) =>
-      db
-        .update(battleParticipants)
-        .set({ score: r.score })
-        .where(
-          and(eq(battleParticipants.battleId, battle.id), eq(battleParticipants.userId, r.userId)),
-        ),
-    ),
-    ...(await ratingStatements(
-      db,
-      {
-        id: battle.id,
-        formatId: battle.formatId,
-        level: battle.level,
-        rulesetVersion: battle.rulesetVersion,
-        results,
-      },
-      now,
-    )),
-  ];
-}
-
-function cancelStatements(db: Database, battleId: string, reason: string): BatchItem<'sqlite'>[] {
-  return [
-    db
-      .update(battles)
-      .set({ status: 'cancelled', cancelReason: reason })
-      .where(eq(battles.id, battleId)),
-    db
-      .update(battleProposals)
-      .set({ status: 'withdrawn', resolvedAt: Date.now() })
-      .where(and(eq(battleProposals.battleId, battleId), eq(battleProposals.status, 'pending'))),
-  ];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -625,13 +574,13 @@ battleRoutes.post('/:id/deadline-decision', async (c) => {
   if (battle.status !== 'active') apiError(409, 'battle_not_running');
   if (!isDeadlinePassed(battle, now)) apiError(409, 'deadline_not_passed');
 
-  const version = await latestVersionOfBattle(db, battle);
+  const required = await requiredSubmissionsPerPerson(db, battle);
   const subs = await db
     .select({ userId: submissions.userId })
     .from(submissions)
     .where(eq(submissions.battleId, battle.id));
   const seatOrder = participants.map((p) => p.userId);
-  const { delivered, missing } = deliveryStatus(seatOrder, subs, version.partCount * battle.rounds);
+  const { delivered, missing } = deliveryStatus(seatOrder, subs, required);
 
   if (missing.length === 0) apiError(409, 'everyone_delivered');
   if (delivered.length > 0 && !delivered.includes(user.id))
@@ -645,18 +594,3 @@ battleRoutes.post('/:id/deadline-decision', async (c) => {
   await runBatch(db, statements);
   return c.json(await battleResponse(db, battle.id, now));
 });
-
-async function latestVersionOfBattle(db: Database, battle: BattleRow) {
-  const row = await db
-    .select()
-    .from(formatVersions)
-    .where(
-      and(
-        eq(formatVersions.formatId, battle.formatId),
-        eq(formatVersions.version, battle.formatVersion),
-      ),
-    )
-    .get();
-  if (!row) apiError(500, 'internal_error');
-  return { partCount: (JSON.parse(row.partsJson) as unknown[]).length };
-}

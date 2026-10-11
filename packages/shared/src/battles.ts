@@ -68,3 +68,9 @@ export const proposalResponseSchema = z.object({
 export const deadlineDecisionSchema = z.object({
   choice: z.enum(['claim_win', 'cancel']),
 });
+
+/**
+ * If the side that delivered does not decide within this many days after a missed deadline,
+ * the battle counts as their win automatically; if nobody delivered, it is cancelled unrated.
+ */
+export const AUTO_DECIDE_AFTER_DAYS = 7;

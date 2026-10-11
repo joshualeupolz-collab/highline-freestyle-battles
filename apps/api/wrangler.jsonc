@@ -5,6 +5,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "observability": { "enabled": true },
+  // Hourly background job (src/index.ts → scheduled). Cron triggers are free.
+  "triggers": { "crons": ["17 * * * *"] },
   "d1_databases": [
     {
       "binding": "DB",

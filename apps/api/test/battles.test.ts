@@ -1,5 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { getDb } from '../src/db/client';
+import { resolveAbandonedDeadlines } from '../src/services/battles';
 import { call, register, registerAdmin, registerAthlete } from './helpers';
 
 const BEST_TRICK = '01a12842-5c02-7d6b-bce2-b6212ef6a4df';
@@ -336,6 +338,37 @@ describe('missed deadline', () => {
     const res = await post(anna, `/api/battles/${id}/deadline-decision`, { choice: 'claim_win' });
     expect(res.body.battle).toMatchObject({ status: 'decided', decisionReason: 'deadline' });
     expect((await ratings())[anna.user.id]?.r).toBeGreaterThan(1500);
+  });
+});
+
+describe('abandoned deadline (scheduled job)', () => {
+  const DAY = 24 * HOUR;
+  const setDeadline = (battleId: string, at: number) =>
+    env.DB.prepare('UPDATE battles SET deadline_at = ? WHERE id = ?').bind(at, battleId).run();
+  const status = async (battleId: string) =>
+    (await json<{ battle: Battle }>(call(`/api/battles/${battleId}`, { session: anna.session })))
+      .body.battle;
+
+  it('decides for the delivering side after 7 days, cancels when nobody delivered', async () => {
+    const delivered = await activeBattle();
+    await deliver(delivered, ben.user.id);
+    await setDeadline(delivered, Date.now() - 8 * DAY);
+    const nobody = await activeBattle();
+    await setDeadline(nobody, Date.now() - 8 * DAY);
+    const recent = await activeBattle();
+    await setDeadline(recent, Date.now() - 2 * DAY);
+
+    expect(await resolveAbandonedDeadlines(getDb(env.DB))).toBe(2);
+    expect(await status(delivered)).toMatchObject({
+      status: 'decided',
+      decisionReason: 'deadline',
+    });
+    expect((await ratings())[ben.user.id]?.r).toBeGreaterThan(1500);
+    expect(await status(nobody)).toMatchObject({
+      status: 'cancelled',
+      cancelReason: 'deadline_missed',
+    });
+    expect((await status(recent)).status).toBe('active');
   });
 });
 
