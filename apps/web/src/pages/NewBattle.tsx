@@ -1,4 +1,4 @@
-import { type BattleSettings, DEFAULT_BATTLE_SETTINGS } from '@hfb/shared';
+import { type BattleSettings, defaultBattleSettings } from '@hfb/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -20,7 +20,7 @@ export function NewBattlePage() {
   const [selected, setSelected] = useState<Format | null>(null);
   const [showMore, setShowMore] = useState(false);
   const [opponent, setOpponent] = useState<UserHit | null>(null);
-  const [settings, setSettings] = useState<BattleSettings>(DEFAULT_BATTLE_SETTINGS);
+  const [settings, setSettings] = useState<BattleSettings>(() => defaultBattleSettings());
   const [flexible, setFlexible] = useState(false);
   const settingsRef = useRef<HTMLFormElement>(null);
   const create = useMutation({

@@ -73,7 +73,7 @@ A person can hold several roles (e.g. athlete + judge).
 2. **Settings** (set by the challenger, or marked "flexible" so both agree on them):
    - Format
    - Attempts per video: any number (1–99) or unlimited
-   - Time window: any duration in days and hours (up to 60 days), or no deadline
+   - Deadline: a fixed **end date and time** (not a duration, so time spent waiting for an opponent counts), up to 60 days ahead, or no deadline. Default: in 7 days at **05:00 German time** (Europe/Berlin), so people in the Americas still have the whole previous day. The other side can propose a different deadline. Requests whose deadline passes before anyone accepts expire.
    - Weight 1–5 (1 = fun … 5 = official competition). Levels 1–3 can be chosen freely; 4–5 only after approval by a judge or organizer.
    - Scoring type: win/loss only, or with margin
    - Review mode: Quick (5-point scale) or Detailed (score sheet, later stage)
@@ -255,7 +255,7 @@ A person can hold several roles (e.g. athlete + judge).
 1. Level 1: confirm how s is computed from the two assessments (proposal in 7.5).
 2. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
 3. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
-4. Default values: time window, attempts, weight. *Provisional defaults in the app: best of 3 attempts, 7 days, weight 3, 5-point scale (`packages/shared/src/battles.ts`).*
+4. Default values: time window, attempts, weight. *Provisional defaults in the app: best of 3 attempts, deadline in 7 days at 05:00 German time, weight 3, 5-point scale (`packages/shared/src/battles.ts`, `deadline.ts`).*
 5. Archiving: after how many weeks to Telegram?
 6. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones.
 7. Exchange format for trick list / scoring formula with the other developer.

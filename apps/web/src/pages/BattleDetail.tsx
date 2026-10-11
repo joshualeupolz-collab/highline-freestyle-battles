@@ -293,12 +293,7 @@ function SettingsProposal({
         onSend(changes);
       }}
     >
-      {/* While the battle runs, more time is asked for with "Ask for more time". */}
-      <SettingsFields
-        value={value}
-        onChange={setValue}
-        showTimeWindow={battle.status === 'negotiating'}
-      />
+      <SettingsFields value={value} onChange={setValue} />
       <button type="submit" disabled={Object.keys(changes).length === 0}>
         {t('battle.send')}
       </button>

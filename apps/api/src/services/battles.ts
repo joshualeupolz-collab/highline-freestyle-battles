@@ -96,6 +96,12 @@ export async function requiredSubmissionsPerPerson(
  * Returns how many battles were resolved.
  */
 export async function resolveAbandonedDeadlines(db: Database, now = Date.now()): Promise<number> {
+  // Requests nobody accepted (or agreed on) before their deadline simply expire.
+  await db
+    .update(battles)
+    .set({ status: 'cancelled', cancelReason: 'expired' })
+    .where(and(inArray(battles.status, ['open', 'negotiating']), lt(battles.deadlineAt, now)));
+
   const cutoff = now - AUTO_DECIDE_AFTER_DAYS * 86_400_000;
   const due = await db
     .select()

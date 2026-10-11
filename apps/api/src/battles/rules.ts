@@ -9,16 +9,23 @@ type BattleRow = typeof battles.$inferSelect;
 export function settingsOf(battle: BattleRow): BattleSettings {
   return {
     attemptsPerVideo: battle.attemptsPerVideo as BattleSettings['attemptsPerVideo'],
-    timeWindowHours: battle.timeWindowHours,
+    deadlineAt: battle.deadlineAt,
     level: battle.level,
     scoring: battle.scoring as BattleSettings['scoring'],
     reviewMode: battle.reviewMode as BattleSettings['reviewMode'],
   };
 }
 
-/** Deadline when the battle starts now: the time window counted from the start. */
-export function deadlineFrom(start: number, timeWindowHours: number | null): number | null {
-  return timeWindowHours === null ? null : start + timeWindowHours * 3_600_000;
+/**
+ * Deadline of a battle that starts now. Deadlines are fixed dates; battles created before that
+ * change only stored a time window (`time_window_hours`), counted from the start.
+ */
+export function effectiveDeadline(
+  battle: Pick<BattleRow, 'deadlineAt' | 'timeWindowHours'>,
+  start: number,
+): number | null {
+  if (battle.deadlineAt !== null) return battle.deadlineAt;
+  return battle.timeWindowHours === null ? null : start + battle.timeWindowHours * 3_600_000;
 }
 
 export function isDeadlinePassed(battle: Pick<BattleRow, 'deadlineAt'>, now: number): boolean {

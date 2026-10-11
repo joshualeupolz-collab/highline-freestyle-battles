@@ -3,20 +3,19 @@
  * Default values are provisional (concept section 15, open question 4) and easy to change here.
  */
 import { z } from 'zod';
+import { defaultDeadline } from './deadline';
 
 /** Result types for online battles in stage 1 (points/placements come with on-site results). */
 export const ONLINE_SCORINGS = ['win_loss', 'scale'] as const;
 /** Weight levels anyone may choose; 4–5 need approval by a judge or organizer (stage 2). */
 export const MAX_FREE_LEVEL = 3;
 export const MAX_ATTEMPTS = 99;
-/** Longest time window: 60 days. */
-export const MAX_TIME_WINDOW_HOURS = 60 * 24;
 
 export const battleSettingsSchema = z.object({
   /** Attempts per video: any number up to MAX_ATTEMPTS, or null = unlimited. */
   attemptsPerVideo: z.number().int().min(1).max(MAX_ATTEMPTS).nullable(),
-  /** Hours from acceptance until all videos must be submitted; null = flexible, no deadline. */
-  timeWindowHours: z.number().int().min(1).max(MAX_TIME_WINDOW_HOURS).nullable(),
+  /** When all videos must be submitted (ms since the epoch); null = no deadline. See deadline.ts. */
+  deadlineAt: z.number().int().positive().nullable(),
   /** Weight 1 (fun) … 5 (official competition). */
   level: z.number().int().min(1).max(5),
   scoring: z.enum(ONLINE_SCORINGS),
@@ -25,13 +24,16 @@ export const battleSettingsSchema = z.object({
 });
 export type BattleSettings = z.infer<typeof battleSettingsSchema>;
 
-export const DEFAULT_BATTLE_SETTINGS: BattleSettings = {
-  attemptsPerVideo: 3,
-  timeWindowHours: 7 * 24,
-  level: 3,
-  scoring: 'scale',
-  reviewMode: 'quick',
-};
+/** Default settings; the deadline depends on the current date. */
+export function defaultBattleSettings(now = Date.now()): BattleSettings {
+  return {
+    attemptsPerVideo: 3,
+    deadlineAt: defaultDeadline(now),
+    level: 3,
+    scoring: 'scale',
+    reviewMode: 'quick',
+  };
+}
 
 export const settingsChangeSchema = battleSettingsSchema
   .partial()
@@ -39,7 +41,7 @@ export const settingsChangeSchema = battleSettingsSchema
 
 export const createBattleRequestSchema = z.object({
   formatId: z.string().min(1).max(64),
-  /** Missing values are taken from DEFAULT_BATTLE_SETTINGS. */
+  /** Missing values are taken from defaultBattleSettings(). */
   settings: battleSettingsSchema.partial().default({}),
   /** true = the settings are a suggestion and both sides agree on them after acceptance. */
   settingsFlexible: z.boolean().default(false),

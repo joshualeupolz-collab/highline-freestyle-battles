@@ -7,22 +7,23 @@
  */
 import {
   type BattleSettings,
+  checkDeadline,
   createBattleRequestSchema,
-  DEFAULT_BATTLE_SETTINGS,
   deadlineDecisionSchema,
+  defaultBattleSettings,
   MAX_FREE_LEVEL,
   proposalRequestSchema,
   proposalResponseSchema,
   sendMessageRequestSchema,
 } from '@hfb/shared';
-import { and, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { Hono } from 'hono';
 import { requireUser } from '../auth/middleware';
 import { can } from '../auth/permissions';
 import {
-  deadlineFrom,
   deliveryStatus,
+  effectiveDeadline,
   isDeadlinePassed,
   settingsOf,
   winnerScores,
@@ -171,8 +172,10 @@ battleRoutes.post('/', async (c) => {
   const input = await parseJson(c, createBattleRequestSchema);
   const db = getDb(c.env.DB);
   const now = Date.now();
-  const settings: BattleSettings = { ...DEFAULT_BATTLE_SETTINGS, ...input.settings };
+  const settings: BattleSettings = { ...defaultBattleSettings(now), ...input.settings };
   if (settings.level > MAX_FREE_LEVEL) apiError(400, 'level_requires_approval');
+  const deadlineProblem = checkDeadline(settings.deadlineAt, now);
+  if (deadlineProblem) apiError(400, deadlineProblem);
 
   const format = await db.select().from(formats).where(eq(formats.id, input.formatId)).get();
   if (!format || format.archivedAt !== null || format.approvedAt === null) {
@@ -206,7 +209,7 @@ battleRoutes.post('/', async (c) => {
       scoring: settings.scoring,
       reviewMode: settings.reviewMode,
       attemptsPerVideo: settings.attemptsPerVideo,
-      timeWindowHours: settings.timeWindowHours,
+      deadlineAt: settings.deadlineAt,
       settingsFlexible: input.settingsFlexible,
       invitedUserId: input.invitedUserId ?? null,
       createdBy: user.id,
@@ -245,6 +248,8 @@ battleRoutes.get('/open', async (c) => {
     .where(
       and(
         eq(battles.status, 'open'),
+        // Requests whose deadline has passed can no longer be accepted.
+        or(isNull(battles.deadlineAt), gt(battles.deadlineAt, Date.now())),
         ne(battles.createdBy, user.id),
         or(isNull(battles.invitedUserId), eq(battles.invitedUserId, user.id)),
         formatId ? eq(battles.formatId, formatId) : undefined,
@@ -372,9 +377,11 @@ battleRoutes.post('/:id/accept', async (c) => {
   if (battle.invitedUserId !== null && battle.invitedUserId !== user.id)
     apiError(403, 'not_invited');
 
+  if (battle.deadlineAt !== null && battle.deadlineAt <= now) apiError(409, 'deadline_passed');
+
   const start = battle.settingsFlexible
     ? { status: 'negotiating' as const }
-    : { status: 'active' as const, deadlineAt: deadlineFrom(now, battle.timeWindowHours) };
+    : { status: 'active' as const, deadlineAt: effectiveDeadline(battle, now) };
   try {
     await db.batch([
       db
@@ -414,10 +421,11 @@ battleRoutes.post('/:id/start', async (c) => {
   // The challenger proposed these settings, so the other side's consent completes the agreement.
   const acceptor = participants.find((p) => p.seat === 1);
   if (acceptor?.userId !== user?.id) apiError(403, 'only_the_accepting_side_can_start');
+  if (battle.deadlineAt !== null && battle.deadlineAt <= now) apiError(409, 'deadline_passed');
   await db.batch([
     db
       .update(battles)
-      .set({ status: 'active', deadlineAt: deadlineFrom(now, battle.timeWindowHours) })
+      .set({ status: 'active', deadlineAt: effectiveDeadline(battle, now) })
       .where(eq(battles.id, battle.id)),
     db
       .update(battleProposals)
@@ -450,8 +458,9 @@ battleRoutes.post('/:id/proposals', async (c) => {
 
   if (input.kind === 'settings') {
     if ((input.changes.level ?? 0) > MAX_FREE_LEVEL) apiError(400, 'level_requires_approval');
-    if (battle.status === 'active' && input.changes.timeWindowHours !== undefined) {
-      apiError(400, 'use_extension', 'The battle is running: propose a new deadline instead');
+    if (input.changes.deadlineAt !== undefined) {
+      const problem = checkDeadline(input.changes.deadlineAt, now);
+      if (problem) apiError(400, problem);
     }
   }
   if (input.kind === 'extension') {
@@ -585,16 +594,16 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
     case 'settings': {
       const changes = payload.changes as Partial<BattleSettings>;
       const starts = battle.status === 'negotiating';
-      const timeWindowHours =
-        changes.timeWindowHours !== undefined ? changes.timeWindowHours : battle.timeWindowHours;
       statements.push(
         db
           .update(battles)
           .set({
             ...changes,
-            ...(starts
-              ? { status: 'active' as const, deadlineAt: deadlineFrom(now, timeWindowHours) }
-              : {}),
+            ...(starts && changes.deadlineAt === undefined
+              ? { status: 'active' as const, deadlineAt: effectiveDeadline(battle, now) }
+              : starts
+                ? { status: 'active' as const }
+                : {}),
           })
           .where(eq(battles.id, battle.id)),
       );
