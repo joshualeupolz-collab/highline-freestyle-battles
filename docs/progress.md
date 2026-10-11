@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-11 (end of the third session: step 8, upload and unlocking).
+Last updated: 2026-10-11 (third session: steps 8 and 9, upload, unlocking, review level 1).
 
 ---
 
@@ -14,13 +14,14 @@ free tier, D1 database in Western Europe). Every merge into `main` is published 
 
 **Branch / PRs:** session 1 = PRs #1–#4 (branch `claude/nice-sagan-akpprj`). Session 2 = the video
 prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3 = step 8 on branch
-`claude/serene-cori-tl2ap4`. A new session can start a fresh branch from `main`.
+`claude/serene-cori-tl2ap4` (PR #10 step 8, then step 9). A new session can start a fresh branch from `main`.
 
-**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 92 API tests
+**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 99 API tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
-which play for the opponent (script not committed yet, see next steps).
+which play for the opponent; both vote and the ratings change (script not committed yet, see next steps).
+Step 8 was also tested by the owner on real phones with direct R2 uploads: works.
 
 ### Done (development stage 1)
 
@@ -35,15 +36,15 @@ which play for the opponent (script not committed yet, see next steps).
 | 6 Web app | React PWA: all of the above, Lichess-like format tiles, profiles, rankings, chat |
 | 10 Rankings | pulled forward: format ranking (r − 2·RD) and profiles |
 | 7 Video prototype (part 1) | test page `/lab/video` without login: recording, attempt counter, quality levels, IndexedDB chunks with crash recovery, cutting without re-encoding (own MP4/WebM code), test report. Guide and findings: `docs/video-prototype.md` |
+| 9 Review level 1 | 5-point vote by both athletes, hidden until both voted, changeable; agreement decides and updates the ratings (s = mean of both votes); after 7 days a single vote for one side decides, otherwise unrated; result shows the rating change. Details: `docs/architecture.md` §4c |
 | 8 Upload and unlocking | recording on the battle page (attempt registered at Start, limit checked on phone and server), offline storage + upload queue, cut before upload, visibility/keep per video, R2 storage layer (signed URLs, or through the Worker without access key), choosing the attempt that counts, unlocking when everyone chose (`reviewing`), cut-off video with extra-attempt request, offline copies of battle data. Details: `docs/architecture.md` §4b |
 
 ### Not started yet
 
-Step 7/8 are waiting for results from real phones. Steps 9 (review level 1 → result → rating),
-11 (on-site results), 12 (replay job, account deletion, deleting videos after the battle,
-visibility enforcement for public pages).
-**Right now ratings only change through a forfeit or a missed deadline**: battles where both
-delivered stay in `reviewing` until step 9 exists.
+Steps 11 (on-site results), 12 (replay job, account deletion, deleting videos after the battle,
+visibility enforcement for public pages). iPhone tests of step 7 are still open.
+**UI overhaul:** the owner finds the interface still somewhat confusing; to be reworked at the
+end of stage 1 (owner's wish), e.g. a clear "what to do next" per battle.
 
 ---
 
@@ -82,6 +83,7 @@ delivered stay in `reviewing` until step 9 exists.
 | Step 8: bucket `hfb-videos` and its CORS rules are created by the deploy workflow | One manual step less for the owner; needs R2 permission on the deploy token |
 | Step 8 defaults (owner to confirm): extra attempts are one pool for all parts; the choice can be changed until everyone chose; attempts started before the deadline count when uploaded later; *public* videos are visible to logged-in users until public pages exist | Simple, fair defaults; see `docs/concept.md` section 6 |
 | `newId` (UUIDv7) moved to `@hfb/shared` | The phone creates attempt ids too |
+| Step 9 (owner): on disagreement both may change their vote; no draw in stage 1; after 7 days a single vote for one side decides, otherwise unrated | Level 2 (pool) does not exist yet; whoever takes part is not punished |
 
 ---
 
@@ -90,7 +92,8 @@ delivered stay in `reviewing` until step 9 exists.
 0. **R2 setup (step 8):** check that the deploy step *Video bucket and its CORS rules* passes (if
    not: add *Workers R2 Storage → Edit* to the Cloudflare API token), then create the R2 access
    key and the GitHub secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
-   (`docs/deployment.md`, "Videos"). Confirm the step 8 defaults in section 2.
+   (`docs/deployment.md`, "Videos") – done, R2 direct uploads work. Still to confirm: the step 8
+   defaults in section 2.
 1. Video test results from iPhones (friends of the owner; guide in `docs/video-prototype.md` §1).
    Android (Chrome) is fully tested (`docs/video-prototype.md` §3).
 2. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
@@ -106,8 +109,8 @@ delivered stay in `reviewing` until step 9 exists.
 
 1. **Test step 8 on real phones** (a real battle between two people, one recording without
    connection at the line). Also the iPhone reports of step 7 (`docs/video-prototype.md` §1).
-2. **Review level 1 and rating (step 9):** 5-point votes by both athletes on `reviewing` battles,
-   result → existing `services/rating.ts`.
+2. **On-site results (step 11)** with confirmation by both sides, then step 12. Afterwards the
+   UI overhaul.
 3. **Commit the browser test** (Playwright against a local Worker) so UI flows are checked in CI.
 4. Later in step 12: delete attempts that do not count after the battle (unless kept), *review only*
    videos after the review; multipart upload if large HD uploads fail on mobile connections.

@@ -514,3 +514,9 @@ a.button {
   border-left: 4px solid var(--primary);
   padding-left: 0.5rem;
 }
+
+/* Review vote: the five options stacked, full width on phones (components/Review.tsx). */
+.vote-options {
+  display: grid;
+  gap: 0.5rem;
+}

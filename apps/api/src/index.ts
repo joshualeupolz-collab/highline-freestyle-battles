@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { getDb } from './db/client';
 import type { Env } from './env';
 import { resolveAbandonedDeadlines } from './services/battles';
+import { resolveExpiredReviews } from './services/review';
 import { removeStaleUploads } from './services/videos';
 import { videoStore } from './storage/videoStore';
 
@@ -15,6 +16,9 @@ export default {
     const db = getDb(env.DB);
     ctx.waitUntil(
       resolveAbandonedDeadlines(db).then((n) => console.log(`resolved ${n} abandoned battles`)),
+    );
+    ctx.waitUntil(
+      resolveExpiredReviews(db).then((n) => console.log(`settled ${n} expired reviews`)),
     );
     ctx.waitUntil(
       removeStaleUploads(db, videoStore(env)).then((n) =>

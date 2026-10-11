@@ -94,8 +94,21 @@ const en = {
 
   'battle.deadline': 'Deadline',
   'battle.deadlinePassed': 'The deadline has passed.',
-  'battle.reviewLater':
-    'Everyone has submitted their videos. Voting on the result comes in the next version of the app.',
+  'review.title': 'Who was better?',
+  'review.intro':
+    'Watch both videos above and vote honestly. Your vote stays hidden until your opponent has voted too. If you both pick the same side, the battle is decided and the ratings change.',
+  'review.clearly': '{name} clearly better',
+  'review.somewhat': '{name} somewhat better',
+  'review.undecided': "Can't decide",
+  'review.pleaseVote': 'Please vote.',
+  'review.waiting':
+    'Waiting for the vote of {name}. If {name} does not vote in time, your vote decides.',
+  'review.disagree':
+    'No agreement yet. You: “{mine}” · {name}: “{theirs}”. Talk in the chat and change your vote if you see it differently. A result needs both votes on the same side.',
+  'review.endsAt':
+    'Review open until {date}. Without agreement by then, a single vote for one side decides; otherwise the battle ends without rating.',
+  'review.noAgreement':
+    'The review ended without agreement. The battle does not count for the rating.',
   'battle.accept': 'Accept battle',
   'rules.fixed': 'Fixed rules',
   'rules.flexible': 'Negotiable rules',
@@ -387,6 +400,7 @@ const en = {
   'error.video_too_large': 'The video is too large. Please cut it shorter.',
   'error.recording_empty': 'The recording is empty.',
   'error.upload_incomplete': 'The upload was incomplete.',
+  'error.not_in_review': 'Voting is not possible (any more) for this battle.',
   'error.not_uploaded_yet': 'This video has not been uploaded yet.',
   'error.slug_taken': 'This short id is already used.',
   'error.too_many_open_proposals': 'You already have 5 proposals waiting for review.',

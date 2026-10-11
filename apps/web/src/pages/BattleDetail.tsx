@@ -13,6 +13,7 @@ import {
 } from '../components/BattleVideos';
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
+import { ReviewCard } from '../components/Review';
 import { RatingText, UserLink } from '../components/UserLink';
 import { formatDate, type MessageKey, t } from '../i18n';
 
@@ -136,8 +137,18 @@ export function BattleDetailPage() {
           </div>
         </div>
       )}
-      {battle.status === 'reviewing' && <p className="card notice">{t('battle.reviewLater')}</p>}
       {format && <UnlockedVideos battle={battle} format={format} />}
+      {battle.status === 'reviewing' && mine && (
+        <ReviewCard
+          battle={battle}
+          myId={me.id}
+          busy={action.isPending}
+          onVote={(value) => run('vote', { value })}
+        />
+      )}
+      {battle.status === 'cancelled' && battle.cancelReason === 'no_agreement' && (
+        <p className="card">{t('review.noAgreement')}</p>
+      )}
       {battle.status === 'active' && mine && format && (
         <BattleVideos battle={battle} format={format} myId={me.id} />
       )}
@@ -240,17 +251,30 @@ export function BattleDetailPage() {
 
 function Result({ battle, name }: { battle: Battle; name: (id: string) => string }) {
   if (battle.status !== 'decided') return null;
-  const winner = battle.participants.find((p) => p.score === 1);
+  const winner = battle.participants.find((p) => (p.score ?? 0) > 0.5);
   const reason = battle.decisionReason
     ? t(`battle.reason.${battle.decisionReason}` as MessageKey)
+    : '';
+  // Scores with margin, e.g. 0.875 : 0.125 (concept 7.5).
+  const margin = battle.participants.some((p) => p.score !== 0 && p.score !== 1)
+    ? ` (${battle.participants.map((p) => p.score).join(' : ')})`
     : '';
   return (
     <div className="card">
       <strong>{t('battle.result')}: </strong>
       {winner
         ? t('battle.won', { name: name(winner.userId) })
-        : battle.participants.map((p) => `${p.displayName} ${p.score}`).join(' · ')}{' '}
-      <span className="muted">{reason}</span>
+        : battle.participants.map((p) => `${p.displayName} ${p.score}`).join(' · ')}
+      {margin} <span className="muted">{reason}</span>
+      {battle.ratingChanges.map((r) => {
+        const diff = Math.round(r.after - r.before);
+        return (
+          <div key={r.userId} className="muted">
+            {name(r.userId)}: {Math.round(r.before)} → {Math.round(r.after)} (
+            {diff >= 0 ? `+${diff}` : diff})
+          </div>
+        );
+      })}
     </div>
   );
 }

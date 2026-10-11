@@ -184,6 +184,17 @@ export interface Battle {
   participants: Participant[];
   proposals: Proposal[];
   videos: BattleVideos;
+  /** Review level 1 while reviewing (and after a decision by review). */
+  review: {
+    level: number;
+    endsAt: number | null;
+    /** Who has voted. */
+    voted: string[];
+    /** Votes seen from seat 0; others' votes only once everyone has voted. */
+    votes: { userId: string; value: number }[];
+  } | null;
+  /** Rating before and after, for decided battles. */
+  ratingChanges: { userId: string; before: number; after: number }[];
 }
 
 export interface MyVideo {
@@ -226,7 +237,7 @@ export interface BattleVideos {
 
 export type BattleSummary = Omit<
   Battle,
-  'settingsFlexible' | 'proposals' | 'cancelReason' | 'videos'
+  'settingsFlexible' | 'proposals' | 'cancelReason' | 'videos' | 'review' | 'ratingChanges'
 > & {
   unreadMessages: number;
 };
