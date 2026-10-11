@@ -22,6 +22,7 @@ import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
+import { eventStatement } from '../services/battleEvents';
 import { cancelStatements } from '../services/battles';
 import { battleResponse, loadBattle, requireParticipant } from './battles';
 import { latestFormatVersion } from './formats';
@@ -91,6 +92,13 @@ onsiteRoutes.post('/onsite', async (c) => {
       proposedBy: user.id,
       createdAt: now,
     }),
+    eventStatement(
+      db,
+      id,
+      user.id,
+      { type: 'proposal', kind: 'result', payload: { value: input.value } },
+      now,
+    ),
   ]);
   return c.json(await battleResponse(db, id, user.id, now), 201);
 });
@@ -103,6 +111,9 @@ onsiteRoutes.post('/:id/withdraw-onsite', async (c) => {
   const { battle, participants } = await loadBattle(db, c.req.param('id'));
   requireParticipant(participants, user.id);
   if (battle.mode !== 'onsite' || battle.status !== 'negotiating') apiError(409, 'not_pending');
-  await runBatch(db, cancelStatements(db, battle.id, 'onsite_withdrawn'));
+  await runBatch(db, [
+    ...cancelStatements(db, battle.id, 'onsite_withdrawn'),
+    eventStatement(db, battle.id, user.id, { type: 'onsite_withdrawn' }, Date.now()),
+  ]);
   return c.json(await battleResponse(db, battle.id, user.id));
 });

@@ -33,6 +33,7 @@ import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
+import { eventStatement } from '../services/battleEvents';
 import { requiredSubmissionsPerPerson } from '../services/battles';
 import { mayViewVideo, unlockIfComplete } from '../services/videos';
 import { originalKey, uploadsThroughWorker, videoStore } from '../storage/videoStore';
@@ -142,12 +143,16 @@ battleVideoRoutes.post('/:id/submissions', async (c) => {
       target: [submissions.battleId, submissions.userId, submissions.partIndex, submissions.round],
       set: { videoId: video.id, submittedAt: now },
     });
-  await unlockIfComplete(
-    db,
-    battle,
-    participants.map((p) => p.userId),
-    now,
-  );
+  await eventStatement(db, battle.id, user.id, { type: 'submitted' }, now);
+  if (
+    await unlockIfComplete(
+      db,
+      battle,
+      participants.map((p) => p.userId),
+      now,
+    )
+  )
+    await eventStatement(db, battle.id, user.id, { type: 'unlocked' }, now + 1);
   return c.json(await battleResponse(db, battle.id, user.id, now));
 });
 

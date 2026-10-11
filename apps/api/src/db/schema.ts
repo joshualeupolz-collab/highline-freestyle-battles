@@ -449,6 +449,11 @@ export const battleMessages = sqliteTable(
       .notNull()
       .references(() => users.id),
     body: text('body').notNull(),
+    /**
+     * Set for entries the app writes itself (proposals, answers, extra attempts, …), so the chat
+     * also documents what happened: JSON { type, …details }. `body` is empty then.
+     */
+    eventJson: text('event_json'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [

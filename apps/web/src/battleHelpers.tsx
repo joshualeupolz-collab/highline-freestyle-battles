@@ -10,6 +10,11 @@ import { useQuery } from '@tanstack/react-query';
 import { api, type BattleStatus, type Format } from './api';
 import { formatDate, formatShort, t } from './i18n';
 
+/** The RuleSet that applies now (e.g. the weight factors shown next to weight 1–3). */
+export function useRuleset() {
+  return useQuery({ queryKey: ['ruleset'], queryFn: api.currentRuleset, staleTime: 60 * 60_000 });
+}
+
 export function useFormats() {
   return useQuery({ queryKey: ['formats'], queryFn: api.formats, staleTime: 5 * 60_000 });
 }
@@ -94,6 +99,7 @@ export function SettingsFields({
   value: BattleSettings;
   onChange: (s: BattleSettings) => void;
 }) {
+  const weights = useRuleset().data?.params.weights;
   const unlimited = value.attemptsPerVideo === null;
   const noDeadline = value.deadlineAt === null;
   const inputs = toInputs(value.deadlineAt ?? defaultDeadline());
@@ -137,28 +143,31 @@ export function SettingsFields({
       </fieldset>
       <fieldset className="field">
         <legend>{t('battle.deadline')}</legend>
-        <div className="inline">
-          <input
-            type="date"
-            value={inputs.date}
-            min={today}
-            max={lastDay}
-            disabled={noDeadline}
-            onChange={(e) => setDeadline(e.target.value, inputs.time)}
-            aria-label={t('settings.deadlineDate')}
-          />
-          <input
-            type="time"
-            value={inputs.time}
-            disabled={noDeadline}
-            onChange={(e) => setDeadline(inputs.date, e.target.value)}
-            aria-label={t('settings.deadlineTime')}
-          />
-        </div>
-        {!noDeadline && value.deadlineAt !== null && (
-          <span className="hint">
-            {t('settings.germanTime', { date: germanTime(value.deadlineAt) })}
-          </span>
+        {!noDeadline && (
+          <>
+            <div className="inline">
+              <input
+                type="date"
+                value={inputs.date}
+                min={today}
+                max={lastDay}
+                onChange={(e) => setDeadline(e.target.value, inputs.time)}
+                aria-label={t('settings.deadlineDate')}
+              />
+              <input
+                type="time"
+                value={inputs.time}
+                onChange={(e) => setDeadline(inputs.date, e.target.value)}
+                aria-label={t('settings.deadlineTime')}
+              />
+            </div>
+            {value.deadlineAt !== null && (
+              <span className="hint">
+                {t('settings.yourTime')} ·{' '}
+                {t('settings.germanTime', { date: germanTime(value.deadlineAt) })}
+              </span>
+            )}
+          </>
         )}
         <label className="check">
           <input
@@ -178,9 +187,13 @@ export function SettingsFields({
           value={value.level}
           onChange={(e) => onChange({ ...value, level: Number(e.target.value) })}
         >
-          <option value={1}>{t('settings.level1')}</option>
-          <option value={2}>{t('settings.level2')}</option>
-          <option value={3}>{t('settings.level3')}</option>
+          {[1, 2, 3].map((level) => (
+            <option key={level} value={level}>
+              {t(`settings.level${level}` as 'settings.level1')}
+              {weights?.[level] !== undefined &&
+                ` (${t('settings.factor', { f: weights[level] })})`}
+            </option>
+          ))}
         </select>
       </label>
       <label>
@@ -199,16 +212,28 @@ export function SettingsFields({
   );
 }
 
-/** Compact settings line, e.g. "3 tricks · 3 attempts · until Sun, 18 Oct, 05:00 · weight 3 · with margin". */
-export function compactSettings(settings: BattleSettings, format?: Pick<Format, 'parts'>): string {
+/** The settings as short pieces, e.g. ["3 attempts", "until Sun, 18 Oct, 05:00", "weight 3", …]. */
+export function settingsChips(settings: BattleSettings): string[] {
   const n = settings.attemptsPerVideo;
   return [
-    format ? partsText(format) : '',
     n === null ? t('meta.unlimited') : n === 1 ? t('meta.attempt') : t('meta.attempts', { n }),
     settings.deadlineAt ? t('battles.until', { date: formatShort(settings.deadlineAt) }) : '',
     t('meta.weight', { n: settings.level }),
     settings.scoring === 'scale' ? t('meta.margin') : t('meta.winLoss'),
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  ].filter(Boolean);
+}
+
+/** Compact settings line, e.g. "3 tricks · 3 attempts · until Sun, 18 Oct, 05:00 · weight 3 · with margin". */
+export function compactSettings(settings: BattleSettings, format?: Pick<Format, 'parts'>): string {
+  return [format ? partsText(format) : '', ...settingsChips(settings)].filter(Boolean).join(' · ');
+}
+
+/**
+ * A stable color per format, so a format is recognisable at a glance (list and battle page).
+ * Derived from the id: no stored setting needed.
+ */
+export function formatColor(formatId: string): string {
+  let hash = 0;
+  for (const ch of formatId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${hash % 360} 65% 45%)`;
 }

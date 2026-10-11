@@ -27,6 +27,9 @@ export function ApprovalsPage() {
             </strong>
             <span className="muted">{formatDate(u.createdAt)}</span>
           </div>
+          {!u.questionnaire?.freestyleSince &&
+            !u.questionnaire?.community &&
+            !u.questionnaire?.note && <p className="muted">{t('approvals.noAnswers')}</p>}
           {u.questionnaire && (
             <dl style={{ marginTop: '0.5rem' }}>
               {u.questionnaire.freestyleSince && (
@@ -50,7 +53,14 @@ export function ApprovalsPage() {
             </dl>
           )}
           <div className="actions">
-            <button type="button" onClick={() => approve.mutate(u.id)} disabled={approve.isPending}>
+            <button
+              type="button"
+              onClick={() =>
+                window.confirm(t('approvals.confirm', { name: u.displayName })) &&
+                approve.mutate(u.id)
+              }
+              disabled={approve.isPending}
+            >
               {t('approvals.approve')}
             </button>
           </div>

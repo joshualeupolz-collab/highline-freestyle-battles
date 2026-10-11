@@ -621,3 +621,170 @@ details.hint summary {
 details.more {
   margin-top: 1.5rem;
 }
+
+/* Entries the app writes into the chat (components/Chat.tsx). */
+.chat-event {
+  margin: 0.4rem 0;
+  font-size: 0.82rem;
+  text-align: center;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Battle list: format color on the left, finished battles tinted by the outcome. */
+.card.battle-card {
+  border-left: 5px solid var(--border);
+}
+.card.battle-card.won {
+  background: color-mix(in srgb, #16a34a 10%, var(--surface));
+}
+.card.battle-card.lost {
+  background: color-mix(in srgb, #dc2626 9%, var(--surface));
+}
+.badge.won {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.badge.lost {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+/* "?" after a provisional rating (components/UserLink.tsx). */
+.rating-q {
+  display: inline-grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-left: 0.1rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1;
+  vertical-align: text-top;
+}
+.rating-hint {
+  display: block;
+  font-size: 0.8rem;
+}
+
+/* Battle page head: format color, parts, people, settings as chips. */
+.battle-head {
+  border-left: 5px solid var(--border);
+  padding-left: 0.75rem;
+  margin-bottom: 1rem;
+}
+.format-parts {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+.chip {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+/* Camera: quality choice, zoom level and info on top of the picture (BattleVideos.tsx). */
+.camera-top {
+  position: absolute;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  left: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+.camera-top > * {
+  pointer-events: auto;
+}
+.segmented {
+  margin: 0;
+  border: none;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+}
+.camera-top .segmented button {
+  padding: 0.3rem 0.65rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.85rem;
+}
+.camera-top .segmented button.on {
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+}
+.camera-top .segmented button.info {
+  width: 1.8rem;
+  padding: 0.3rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+.zoom-label {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.camera-info {
+  position: absolute;
+  top: calc(3.5rem + env(safe-area-inset-top));
+  left: 0.75rem;
+  right: 0.75rem;
+  max-width: 28rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.75);
+  font-size: 0.85rem;
+}
+.camera-info p {
+  margin: 0.3rem 0;
+}
+
+/* Waiting new members: red badge on the profile button and next to the link. */
+.avatar {
+  position: relative;
+}
+.avatar-badge {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.35rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1.15rem;
+  text-align: center;
+}
+.count-badge {
+  margin-left: 0.4rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.8rem;
+}

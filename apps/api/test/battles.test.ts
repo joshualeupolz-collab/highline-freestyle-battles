@@ -446,14 +446,46 @@ describe('chat', () => {
     expect(await unread(ben)).toBe(1);
     expect(await unread(anna)).toBe(0);
 
-    const read = await json<{ messages: { body: string; senderId: string }[] }>(
-      call(`/api/battles/${id}/messages`, { session: ben.session }),
-    );
-    expect(read.body.messages).toMatchObject([{ body: 'Good luck!', senderId: anna.user.id }]);
+    const read = await json<{
+      messages: { body: string; senderId: string; event: { type: string } | null }[];
+    }>(call(`/api/battles/${id}/messages`, { session: ben.session }));
+    // The chat also documents what happened: Ben accepted the battle, then Anna wrote.
+    expect(read.body.messages).toMatchObject([
+      { senderId: ben.user.id, event: { type: 'accepted' } },
+      { body: 'Good luck!', senderId: anna.user.id, event: null },
+    ]);
     expect(await unread(ben)).toBe(0);
     expect((await call(`/api/battles/${id}/messages`, { session: carla.session })).status).toBe(
       403,
     );
+  });
+});
+
+describe('chat entries written by the app', () => {
+  it('documents proposals and answers without counting them as new messages', async () => {
+    const id = await activeBattle();
+    await post(ben, `/api/battles/${id}/grant-attempt`);
+    // Ben gave Anna an extra attempt by mistake and asks for it back; Anna says no.
+    const proposalId = await propose(ben, id, { kind: 'extra_attempt', change: -1 });
+    await post(anna, `/api/battles/${id}/proposals/${proposalId}/respond`, { decision: 'reject' });
+    const read = await json<{
+      messages: { senderId: string; event: { type: string; kind?: string } }[];
+    }>(call(`/api/battles/${id}/messages`, { session: anna.session }));
+    expect(read.body.messages.map((m) => m.event)).toMatchObject([
+      { type: 'accepted' },
+      { type: 'attempt_granted' },
+      { type: 'proposal', kind: 'extra_attempt' },
+      { type: 'proposal_rejected', kind: 'extra_attempt' },
+    ]);
+    const mine = await json<{ battles: { id: string; unreadMessages: number }[] }>(
+      call('/api/battles/mine', { session: anna.session }),
+    );
+    // Anna's own rejection was her last entry; Ben's entries before it are not "new messages".
+    expect(mine.body.battles.find((b) => b.id === id)?.unreadMessages).toBe(0);
+    const forBen = await json<{ battles: { id: string; unreadMessages: number }[] }>(
+      call('/api/battles/mine', { session: ben.session }),
+    );
+    expect(forBen.body.battles.find((b) => b.id === id)?.unreadMessages).toBe(0);
   });
 });
 

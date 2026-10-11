@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, Navigate, NavLink, Outlet } from 'react-router';
 import { api } from '../api';
-import { useMe } from '../auth';
+import { hasRole, useMe } from '../auth';
 import { t } from '../i18n';
 import { nextStep } from '../nextStep';
 
@@ -35,6 +35,7 @@ export function Layout() {
     enabled: active,
     refetchInterval: 60_000,
   });
+  const pending = usePendingCount(active && hasRole(user, 'athlete', 'federation', 'admin'));
   if (isLoading) return <main className="muted">{t('common.loading')}</main>;
   if (!user) return <Navigate to="/login" replace />;
 
@@ -49,6 +50,15 @@ export function Layout() {
         </Link>
         <Link to="/profile" className="avatar" aria-label={t('nav.profile')}>
           {user.displayName.slice(0, 1).toUpperCase()}
+          {pending > 0 && (
+            <span
+              className="avatar-badge"
+              role="img"
+              aria-label={t('approvals.waiting', { n: pending })}
+            >
+              {pending}
+            </span>
+          )}
         </Link>
       </header>
       <main className="with-tabs">
@@ -89,4 +99,16 @@ export function PublicLayout() {
       <Outlet />
     </main>
   );
+}
+
+/** How many new members wait for approval (for people who can approve). */
+export function usePendingCount(enabled: boolean): number {
+  const pending = useQuery({
+    queryKey: ['pendingUsers'],
+    queryFn: api.pendingUsers,
+    enabled,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  return enabled ? (pending.data?.users.length ?? 0) : 0;
 }

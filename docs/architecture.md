@@ -133,6 +133,7 @@ Notes:
 - `battle_proposals` implements core principle 2 ("everything can be changed if both sides agree") once, for settings changes, on-site results, draw confirmation, cancellation and goodwill. `proposal_responses` also works for n people.
 - Added after the first deployment (all additive): `formats.approved_at/approved_by/review_note` (format proposals; `approved_at` NULL = proposal), `battle_messages` (chat) and `battle_participants.last_read_message_at` (unread marker).
 - `video_files` is the replaceable storage layer: "delete everywhere" means processing every row of a video.
+- Added after step 12 (additive): `battle_messages.event_json` (the chat documents proposals, answers, extra attempts, choices and votes).
 - Added in step 12 (additive): `battles.ended_at`, `users.deletion_token_hash`.
 - Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.

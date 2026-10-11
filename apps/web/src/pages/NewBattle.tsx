@@ -89,11 +89,6 @@ export function NewBattlePage() {
           }}
         >
           <h2 style={{ marginTop: 0 }}>{selected.name}</h2>
-          <div>
-            <strong>{t('new.opponent')}</strong>
-            <UserPicker value={opponent} onChange={setOpponent} excludeId={me?.id} />
-            <span className="hint">{t('new.opponentHint')}</span>
-          </div>
           <SettingsFields value={settings} onChange={setSettings} />
           <label className="check">
             <input
@@ -103,6 +98,13 @@ export function NewBattlePage() {
             />
             <span>{t('settings.flexible')}</span>
           </label>
+          <span className="hint">{t('settings.flexibleHint')}</span>
+          {/* The exception: a challenge to one person. Folded away at the end. */}
+          <details className="more small" open={!!opponent}>
+            <summary>{t('new.directSummary')}</summary>
+            <UserPicker value={opponent} onChange={setOpponent} excludeId={me?.id} />
+            <span className="hint">{t('new.opponentHint')}</span>
+          </details>
           <ErrorText error={create.error} />
           <button type="submit" disabled={create.isPending}>
             {opponent ? t('new.challenge', { name: opponent.displayName }) : t('new.submit')}

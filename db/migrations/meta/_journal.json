@@ -57,6 +57,13 @@
       "when": 1791746178021,
       "tag": "0007_cleanup_and_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791749817755,
+      "tag": "0008_chat_events",
+      "breakpoints": true
     }
   ]
 }

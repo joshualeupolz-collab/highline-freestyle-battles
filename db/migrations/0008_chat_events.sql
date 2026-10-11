@@ -1,0 +1,1 @@
+ALTER TABLE `battle_messages` ADD `event_json` text;

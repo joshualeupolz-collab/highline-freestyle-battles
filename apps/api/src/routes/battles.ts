@@ -50,6 +50,7 @@ import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
+import { eventStatement } from '../services/battleEvents';
 import {
   cancelPendingProposalsStatement,
   cancelStatements,
@@ -369,12 +370,24 @@ battleRoutes.get('/mine', async (c) => {
           and(
             inArray(battleMessages.battleId, ids),
             ne(battleMessages.senderId, user.id),
+            // Entries the app writes (proposals, …) do not count as new messages.
+            isNull(battleMessages.eventJson),
             sql`${battleMessages.createdAt} > coalesce(${battleParticipants.lastReadMessageAt}, 0)`,
           ),
         )
         .groupBy(battleMessages.battleId)
     : [];
   // What is left for me to do (shown as the next step in the list).
+  const myRatings = rows.length
+    ? await db
+        .select({
+          battleId: ratingHistory.battleId,
+          before: ratingHistory.rBefore,
+          after: ratingHistory.rAfter,
+        })
+        .from(ratingHistory)
+        .where(and(inArray(ratingHistory.battleId, ids), eq(ratingHistory.userId, user.id)))
+    : [];
   const [mySubs, votes, proposalsForMe, versions] = rows.length
     ? await Promise.all([
         db
@@ -414,6 +427,11 @@ battleRoutes.get('/mine', async (c) => {
   return c.json({
     battles: rows.map((b) => ({
       unreadMessages: unread.find((u) => u.battleId === b.id)?.n ?? 0,
+      /** My rating change through this battle (decided battles). */
+      ratingChange: (() => {
+        const r = myRatings.find((x) => x.battleId === b.id);
+        return r ? r.after - r.before : null;
+      })(),
       todo: {
         submittedAll: (mySubs.find((s) => s.battleId === b.id)?.n ?? 0) >= partsOf(b) * b.rounds,
         iVoted: votes.some((v) => v.battleId === b.id && v.voterId === user.id),
@@ -467,6 +485,7 @@ battleRoutes.post('/:id/accept', async (c) => {
       db
         .insert(battleParticipants)
         .values({ battleId: battle.id, userId: user.id, seat: 1, joinedAt: now }),
+      eventStatement(db, battle.id, user.id, { type: 'accepted' }, now),
     ]);
   } catch (err) {
     if (String(err).includes('UNIQUE')) apiError(409, 'not_open');
@@ -495,7 +514,7 @@ battleRoutes.post('/:id/start', async (c) => {
   if (battle.status !== 'negotiating' || battle.mode !== 'online') apiError(409, 'not_negotiating');
   // The challenger proposed these settings, so the other side's consent completes the agreement.
   const acceptor = participants.find((p) => p.seat === 1);
-  if (acceptor?.userId !== user?.id) apiError(403, 'only_the_accepting_side_can_start');
+  if (!acceptor || acceptor.userId !== user?.id) apiError(403, 'only_the_accepting_side_can_start');
   if (battle.deadlineAt !== null && battle.deadlineAt <= now) apiError(409, 'deadline_passed');
   await db.batch([
     db
@@ -512,6 +531,7 @@ battleRoutes.post('/:id/start', async (c) => {
           eq(battleProposals.kind, 'settings'),
         ),
       ),
+    eventStatement(db, battle.id, acceptor.userId, { type: 'started' }, now),
   ]);
   return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
@@ -597,6 +617,7 @@ battleRoutes.post('/:id/proposals', async (c) => {
       proposedBy: user.id,
       createdAt: now,
     }),
+    eventStatement(db, battle.id, user.id, { type: 'proposal', kind, payload }, now),
   ]);
   return c.json(await battleResponse(db, battle.id, user?.id ?? null, now), 201);
 });
@@ -612,10 +633,20 @@ battleRoutes.post('/:id/proposals/:proposalId/withdraw', async (c) => {
   if (!proposal || proposal.battleId !== c.req.param('id')) apiError(404, 'not_found');
   if (proposal.proposedBy !== user?.id) apiError(403, 'forbidden');
   if (proposal.status !== 'pending') apiError(409, 'not_pending');
-  await db
-    .update(battleProposals)
-    .set({ status: 'withdrawn', resolvedAt: Date.now() })
-    .where(eq(battleProposals.id, proposal.id));
+  const now = Date.now();
+  await db.batch([
+    db
+      .update(battleProposals)
+      .set({ status: 'withdrawn', resolvedAt: now })
+      .where(eq(battleProposals.id, proposal.id)),
+    eventStatement(
+      db,
+      proposal.battleId,
+      proposal.proposedBy,
+      { type: 'proposal_withdrawn', kind: proposal.kind },
+      now,
+    ),
+  ]);
   return c.json(await battleResponse(db, proposal.battleId, user?.id ?? null));
 });
 
@@ -653,7 +684,17 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
   const payload = JSON.parse(proposal.payloadJson) as Record<string, unknown>;
 
   if (decision === 'reject') {
-    const statements: BatchItem<'sqlite'>[] = [response, resolve('rejected')];
+    const statements: BatchItem<'sqlite'>[] = [
+      response,
+      resolve('rejected'),
+      eventStatement(
+        db,
+        battle.id,
+        user.id,
+        { type: 'proposal_rejected', kind: proposal.kind },
+        now,
+      ),
+    ];
     if (proposal.kind === 'cancel') {
       const seatOrder = participants.map((p) => p.userId);
       statements.push(
@@ -677,7 +718,11 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
     return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
   }
 
-  const statements: BatchItem<'sqlite'>[] = [response, resolve('accepted')];
+  const statements: BatchItem<'sqlite'>[] = [
+    response,
+    resolve('accepted'),
+    eventStatement(db, battle.id, user.id, { type: 'proposal_accepted', kind: proposal.kind }, now),
+  ];
   switch (proposal.kind) {
     case 'settings': {
       const changes = payload.changes as Partial<BattleSettings>;
@@ -764,12 +809,18 @@ battleRoutes.post('/:id/grant-attempt', async (c) => {
   const others = participants.filter((p) => p.userId !== user.id);
   const target = others.length === 1 ? others[0] : undefined;
   if (!target) apiError(400, 'unsupported_for_group_battles');
-  await db
-    .update(battleParticipants)
-    .set({ extraAttempts: sql`${battleParticipants.extraAttempts} + 1` })
-    .where(
-      and(eq(battleParticipants.battleId, battle.id), eq(battleParticipants.userId, target.userId)),
-    );
+  await db.batch([
+    db
+      .update(battleParticipants)
+      .set({ extraAttempts: sql`${battleParticipants.extraAttempts} + 1` })
+      .where(
+        and(
+          eq(battleParticipants.battleId, battle.id),
+          eq(battleParticipants.userId, target.userId),
+        ),
+      ),
+    eventStatement(db, battle.id, user.id, { type: 'attempt_granted' }, Date.now()),
+  ]);
   return c.json(await battleResponse(db, battle.id, user?.id ?? null));
 });
 
@@ -805,7 +856,10 @@ battleRoutes.post('/:id/deadline-decision', async (c) => {
     choice === 'cancel'
       ? cancelStatements(db, battle.id, 'deadline_missed')
       : await decideStatements(db, battle, winnerScores(seatOrder, user.id), 'deadline', now);
-  await runBatch(db, statements);
+  await runBatch(db, [
+    ...statements,
+    eventStatement(db, battle.id, user.id, { type: 'deadline_decision', choice }, now),
+  ]);
   return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 
@@ -834,6 +888,7 @@ battleRoutes.post('/:id/vote', async (c) => {
       target: [reviewVotes.battleId, reviewVotes.voterId, reviewVotes.reviewLevel],
       set: { value, createdAt: now },
     });
+  await eventStatement(db, battle.id, user.id, { type: 'voted' }, now);
   await settleReview(db, battle, now, false);
   return c.json(await battleResponse(db, battle.id, user.id, now));
 });
@@ -859,13 +914,17 @@ battleRoutes.get('/:id/messages', async (c) => {
       id: battleMessages.id,
       senderId: battleMessages.senderId,
       body: battleMessages.body,
+      eventJson: battleMessages.eventJson,
       createdAt: battleMessages.createdAt,
     })
     .from(battleMessages)
     .where(and(eq(battleMessages.battleId, battleId), sql`${battleMessages.createdAt} > ${after}`))
     .orderBy(desc(battleMessages.createdAt))
     .limit(MESSAGES_PER_PAGE);
-  const messages = rows.reverse();
+  const messages = rows.reverse().map(({ eventJson, ...m }) => ({
+    ...m,
+    event: eventJson ? (JSON.parse(eventJson) as unknown) : null,
+  }));
 
   // Only write when there is something new, so polling does not cost a write each time.
   const newest = messages.at(-1)?.createdAt;

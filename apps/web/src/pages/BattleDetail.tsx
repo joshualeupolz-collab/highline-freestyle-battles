@@ -5,9 +5,11 @@ import { useParams } from 'react-router';
 import { api, type Battle, type Proposal } from '../api';
 import { useMe } from '../auth';
 import {
-  compactSettings,
+  formatColor,
+  partsText,
   SettingsFields,
   StatusBadge,
+  settingsChips,
   settingsText,
   useFormats,
 } from '../battleHelpers';
@@ -62,41 +64,54 @@ export function BattleDetailPage() {
   const step =
     mine && format ? nextStep(battle, todoOf(battle, me.id, format.parts.length), me.id) : null;
   const myProposalsOnly = battle.proposals.length > 0;
-  const meta = onsite
+  const chips = onsite
     ? [
         t('meta.onsite', { date: formatShort(battle.playedAt ?? battle.createdAt) }),
         t('meta.weight', { n: battle.settings.level }),
         battle.settings.scoring === 'scale' ? t('meta.margin') : t('meta.winLoss'),
-      ].join(' · ')
-    : compactSettings(battle.settings, format);
+      ]
+    : settingsChips(battle.settings);
 
   return (
     <>
-      <div className="row">
-        <h1 style={{ margin: 0 }}>{format?.name ?? '…'}</h1>
-        <StatusBadge status={battle.status} mode={battle.mode} />
-      </div>
-      <div className="versus">
-        {battle.participants.map((p, i) => (
-          <span key={p.userId}>
-            {i > 0 && <span className="muted"> {t('battles.vs')} </span>}
-            <strong>
-              <UserLink id={p.userId} name={p.displayName} />
-            </strong>{' '}
-            <RatingText rating={p.rating} />
-          </span>
-        ))}
-        {battle.participants.length < 2 && (
-          <span className="muted">
-            {' '}
-            –{' '}
-            {battle.invitedUserId === me.id
-              ? t('battle.challengesYou')
-              : t('battles.waitingForOpponent')}
-          </span>
+      <div className="battle-head" style={{ borderLeftColor: formatColor(battle.formatId) }}>
+        <div className="row">
+          <h1 style={{ margin: 0 }}>{format?.name ?? '…'}</h1>
+          <StatusBadge status={battle.status} mode={battle.mode} />
+        </div>
+        {format && (
+          <div className="format-parts" style={{ color: formatColor(battle.formatId) }}>
+            {partsText(format)}
+          </div>
         )}
+        <div className="versus">
+          {battle.participants.map((p, i) => (
+            <span key={p.userId}>
+              {i > 0 && <span className="muted"> {t('battles.vs')} </span>}
+              <strong>
+                <UserLink id={p.userId} name={p.displayName} />
+              </strong>{' '}
+              <RatingText rating={p.rating} />
+            </span>
+          ))}
+          {battle.participants.length < 2 && (
+            <span className="muted">
+              {' '}
+              –{' '}
+              {battle.invitedUserId === me.id
+                ? t('battle.challengesYou')
+                : t('battles.waitingForOpponent')}
+            </span>
+          )}
+        </div>
+        <div className="chips">
+          {chips.map((chip) => (
+            <span key={chip} className="chip">
+              {chip}
+            </span>
+          ))}
+        </div>
       </div>
-      <p className="battle-meta">{meta}</p>
       {battle.participants
         .filter((p) => (p.extraAttempts ?? 0) > 0)
         .map((p) => (
