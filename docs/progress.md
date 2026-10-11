@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-11 (third session: steps 8, 9, 11 and 12 – stage 1 features complete).
+Last updated: 2026-10-11 (end of the third session: steps 8, 9, 11, 12 and two UI rounds – all stage 1 features exist).
 
 ---
 
@@ -13,8 +13,9 @@ free tier, D1 database in Western Europe). Every merge into `main` is published 
 `.github/workflows/deploy.yml` (setup: `docs/deployment.md`).
 
 **Branch / PRs:** session 1 = PRs #1–#4 (branch `claude/nice-sagan-akpprj`). Session 2 = the video
-prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3 = step 8 on branch
-`claude/serene-cori-tl2ap4` (PR #10 step 8, then step 9). A new session can start a fresh branch from `main`.
+prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3 = branch
+`claude/serene-cori-tl2ap4`: PRs #10 (step 8), #11 (step 9), #12 (step 11), #13 (step 12),
+#14 and #15 (UI rounds 1 and 2), all merged and deployed. A new session starts a fresh branch from `main`.
 
 **Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 112 API tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
@@ -30,7 +31,7 @@ Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 |---|---|
 | 0 Setup | pnpm workspace, strict TypeScript, Biome, Vitest, CI, deploy workflow |
 | 1 Rating engine | `packages/rating`: weighted Glicko-2, inactivity, protection rule, groups/placements, estimates, merged formats, replay, ranking; matches `rating/glicko_sim.py` to 1e-6 |
-| 2 Database + Worker | D1 schema `apps/api/src/db/schema.ts`, migrations `0000`–`0005`, Hono API |
+| 2 Database + Worker | D1 schema `apps/api/src/db/schema.ts`, migrations `0000`–`0008`, Hono API |
 | 3 Login | sign-up with age confirmation, approval (invitation tree), first admin via `SETUP_TOKEN`, PBKDF2 + pepper, sessions, reset codes, audit log |
 | 4 Formats + RuleSets | admin management, versions, format proposals by athletes with approval |
 | 5 Battle flow | requests, direct challenges, fixed/negotiable rules, proposals, goodwill attempt (+ take-back), give up, deadlines, hourly job for expired/abandoned battles, rating update on decided battles |
@@ -109,8 +110,9 @@ profile button for members waiting for approval, confirmation before approving.
 0. **R2 setup (step 8):** check that the deploy step *Video bucket and its CORS rules* passes (if
    not: add *Workers R2 Storage → Edit* to the Cloudflare API token), then create the R2 access
    key and the GitHub secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
-   (`docs/deployment.md`, "Videos") – done, R2 direct uploads work. Still to confirm: the step 8
-   defaults in section 2.
+   (`docs/deployment.md`, "Videos") – done, R2 direct uploads work.
+   Not yet tried on the real database: the rating replay (*Actions → Rating replay → Run workflow*
+   with "force" is a safe first test – it should reproduce the current ratings).
 1. Video test results from iPhones (friends of the owner; guide in `docs/video-prototype.md` §1).
    Android (Chrome) is fully tested (`docs/video-prototype.md` §3).
 2. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
@@ -124,13 +126,16 @@ profile button for members waiting for approval, confirmation before approving.
 
 ## 4. Next steps
 
-1. **Test step 8 on real phones** (a real battle between two people, one recording without
-   connection at the line). Also the iPhone reports of step 7 (`docs/video-prototype.md` §1).
-2. **Feedback on the new UI** from real use; then legal texts (privacy policy, legal notice, terms – separate session) before inviting
-   more people, and stage 2.
-3. **Commit the browser test** (Playwright against a local Worker) so UI flows are checked in CI.
-4. Later in step 12: delete attempts that do not count after the battle (unless kept), *review only*
-   videos after the review; multipart upload if large HD uploads fail on mobile connections.
-5. Measure PBKDF2 CPU time on Cloudflare and raise `PASSWORD_ITERATIONS` if there is headroom.
-
-Then: on-site results (step 11), replay job and account deletion (step 12), stage 2.
+1. **More UI feedback** from the owner (announced for the next session).
+2. **Legal texts** (privacy policy, legal notice / Impressum, terms of use) before inviting more
+   people – best in a separate session (concept §16), then link them in the app (sign-up, profile).
+3. **Real-use tests:** iPhone reports of step 7 (`docs/video-prototype.md` §1); camera zoom works
+   on Android (owner, 2026-10-11).
+4. **Commit the browser tests** (Playwright against a local Worker: video battle with offline
+   upload + vote, on-site result) so UI flows are checked in CI. The scripts so far lived only in
+   the session's scratch space.
+5. Multipart upload if large HD uploads fail on mobile connections; measure PBKDF2 CPU time on
+   Cloudflare and raise `PASSWORD_ITERATIONS` if there is headroom.
+6. Then **stage 2** (concept §14): filming by friends (athlete code, inbox), review levels 2–3,
+   roles judge/organizer/federation, reports and annulment, group battles and competitions,
+   weight 4–5 with approval, push notifications.
