@@ -104,6 +104,7 @@ profile button for members waiting for approval, confirmation before approving.
 | Step 12 (owner): deleting an account counts running battles as given up; keeping videos is preselected; unneeded videos are deleted 7 days after the battle | Deleting must not avoid a loss; videos are valuable for the community |
 | Step 11 defaults (confirmed by the owner): no draw on site; confirmation within 14 days; date up to 60 days back; rejecting keeps the battle open for another result; either side can withdraw | Same 5-point scale and no-draw rule as the online review |
 | Legal texts: operator = the owner as a private person with home address; EN + DE, German version of the terms prevails; checkbox at sign-up and one-time acceptance for existing accounts (owner, session 4) | Needed before inviting beta testers; DE is usual for an operator in Germany |
+| Operator stays the owner for now; a later move to the international federation (Switzerland) is kept possible (concept §12) | GDPR applies anyway (users in the EU), so the move is about responsibility and an official operator, not less data protection |
 | Fixed: the camera's `.segmented` style applied to every segmented control (format part types looked like the camera bar) | Found while styling the language switch |
 | Step 9 (owner): on disagreement both may change their vote; no draw in stage 1; after 7 days a single vote for one side decides, otherwise unrated | Level 2 (pool) does not exist yet; whoever takes part is not punished |
 
