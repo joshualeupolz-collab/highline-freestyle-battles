@@ -80,7 +80,7 @@ after uploading videos does not exist yet.
 ## 3. Open questions for the project owner
 
 1. Video test results from iPhones (friends of the owner; guide in `docs/video-prototype.md` §1).
-   Android still to check: HD, crash test (close the browser while recording).
+   Android still to check: HD over 60 s, landscape with rotation lock (see `docs/video-prototype.md` §3).
 2. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
    needed before prototyping it.
 3. Optional housekeeping: mark the GitGuardian finding on PR #1 (`PASSWORD_ITERATIONS = 50_000`)
