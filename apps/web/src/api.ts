@@ -7,6 +7,7 @@ import type {
   CreateOnsiteBattle,
   CreateVideo,
   CurrentUser,
+  SpecialRole,
   UploadTarget,
 } from '@hfb/shared';
 
@@ -298,6 +299,27 @@ export interface UserHit {
   displayName: string;
 }
 
+export interface StaffEntry {
+  userId: string;
+  username: string;
+  displayName: string;
+  role: SpecialRole;
+  grantedAt: number;
+}
+
+export interface AuditEntry {
+  id: string;
+  action: string;
+  actor: UserHit | null;
+  targetType: string;
+  targetId: string | null;
+  targetUser: UserHit | null;
+  reason: string | null;
+  payload: unknown;
+  federationApprovalBy: UserHit | null;
+  createdAt: number;
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -343,6 +365,15 @@ export const api = {
   searchUsers: (q: string) => get<{ users: UserHit[] }>(`/users/search?q=${encodeURIComponent(q)}`),
   pendingUsers: () => get<{ users: PendingUser[] }>('/users/pending'),
   approveUser: (id: string) => post(`/users/${id}/approve`),
+  staff: () => get<{ staff: StaffEntry[] }>('/users/staff'),
+  grantRole: (id: string, role: SpecialRole, reason?: string) =>
+    post(`/users/${id}/roles`, { role, reason }),
+  revokeRole: (id: string, role: SpecialRole, reason?: string) =>
+    post(`/users/${id}/roles/revoke`, { role, reason }),
+  auditLog: (before?: string) =>
+    get<{ entries: AuditEntry[]; next: string | null }>(
+      before ? `/audit?before=${encodeURIComponent(before)}` : '/audit',
+    ),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

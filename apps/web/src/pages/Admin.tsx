@@ -1,12 +1,14 @@
 import type { FormatPart } from '@hfb/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { api, type UserHit } from '../api';
+import { Link } from 'react-router';
+import { type AuditEntry, api, type UserHit } from '../api';
 import { partsText, useFormats } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
 import { PartsFields } from '../components/PartsFields';
+import { UserLink } from '../components/UserLink';
 import { UserPicker } from '../components/UserPicker';
-import { formatDate, t } from '../i18n';
+import { formatDate, type MessageKey, t } from '../i18n';
 
 export function AdminPage() {
   return (
@@ -16,6 +18,8 @@ export function AdminPage() {
       <ResetCode />
       <Formats />
       <Replay />
+      <Team />
+      <AuditLog />
     </>
   );
 }
@@ -206,5 +210,94 @@ function Replay() {
         {t('admin.replayButton')}
       </button>
     </form>
+  );
+}
+
+/** Everyone with a special role; roles are changed on the person's profile. */
+function Team() {
+  const staff = useQuery({ queryKey: ['staff'], queryFn: api.staff });
+  const list = staff.data?.staff ?? [];
+  return (
+    <section className="card">
+      <h2 style={{ marginTop: 0 }}>{t('team.title')}</h2>
+      <p className="muted">{t('roles.hint')}</p>
+      <ErrorText error={staff.error} />
+      {staff.isSuccess && list.length === 0 && <p className="muted">{t('team.empty')}</p>}
+      {list.map((s) => (
+        <div key={`${s.role}:${s.userId}`} className="row">
+          <UserLink id={s.userId} name={s.displayName} />
+          <span className="badge">{t(`role.${s.role}` as MessageKey)}</span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function AuditLog() {
+  const log = useInfiniteQuery({
+    queryKey: ['audit'],
+    queryFn: ({ pageParam }) => api.auditLog(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.next ?? undefined,
+  });
+  const entries = log.data?.pages.flatMap((p) => p.entries) ?? [];
+  return (
+    <section className="card">
+      <h2 style={{ marginTop: 0 }}>{t('audit.title')}</h2>
+      <p className="muted">{t('audit.hint')}</p>
+      <ErrorText error={log.error} />
+      {log.isSuccess && entries.length === 0 && <p className="muted">{t('audit.empty')}</p>}
+      {entries.map((e) => (
+        <AuditLine key={e.id} entry={e} />
+      ))}
+      {log.hasNextPage && (
+        <button
+          type="button"
+          className="secondary"
+          disabled={log.isFetchingNextPage}
+          onClick={() => log.fetchNextPage()}
+        >
+          {t('audit.more')}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** One entry: when, who, what (the action name and its details), on what, why. */
+function AuditLine({ entry }: { entry: AuditEntry }) {
+  const target = entry.targetUser ? (
+    <UserLink id={entry.targetUser.id} name={entry.targetUser.displayName} />
+  ) : entry.targetType === 'battle' && entry.targetId ? (
+    <Link to={`/battles/${entry.targetId}`}>{entry.targetType}</Link>
+  ) : (
+    entry.targetType
+  );
+  const details =
+    entry.payload && typeof entry.payload === 'object'
+      ? Object.entries(entry.payload as Record<string, unknown>)
+          .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+          .join(', ')
+      : '';
+  return (
+    <div className="audit-line">
+      <div className="muted">{formatDate(entry.createdAt)}</div>
+      <div>
+        {entry.actor ? (
+          <UserLink id={entry.actor.id} name={entry.actor.displayName} />
+        ) : (
+          t('audit.system')
+        )}{' '}
+        <code>{entry.action}</code> {target}
+        {details && <span className="muted"> ({details})</span>}
+        {entry.federationApprovalBy && (
+          <span className="muted">
+            {' '}
+            · {t('audit.approvedBy', { name: entry.federationApprovalBy.displayName })}
+          </span>
+        )}
+      </div>
+      {entry.reason && <div className="hint">{entry.reason}</div>}
+    </div>
   );
 }

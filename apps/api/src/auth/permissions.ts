@@ -2,7 +2,13 @@
  * All permission rules in one place (CLAUDE.md, architecture rule 5).
  * Routes ask these functions instead of checking roles themselves.
  */
-import type { CurrentUser, Role, VideoVisibility } from '@hfb/shared';
+import {
+  type CurrentUser,
+  grantableRoles,
+  type Role,
+  type SpecialRole,
+  type VideoVisibility,
+} from '@hfb/shared';
 
 export function hasRole(user: CurrentUser | null, ...roles: Role[]): boolean {
   return !!user && user.status === 'active' && roles.some((r) => user.roles.includes(r));
@@ -21,6 +27,16 @@ export const can = {
 
   /** Request, accept and play battles. */
   battle: (user: CurrentUser | null) => hasRole(user, 'athlete'),
+
+  /** Hand out or take back a role (`grantableRoles`). Nobody changes their own roles. */
+  changeRole: (user: CurrentUser | null, role: SpecialRole, targetUserId: string) =>
+    !!user &&
+    user.status === 'active' &&
+    user.id !== targetUserId &&
+    grantableRoles(user.roles).includes(role),
+
+  /** Read the audit log (concept section 2: the federation can view it). */
+  viewAuditLog: (user: CurrentUser | null) => hasRole(user, 'federation', 'admin'),
 
   /** Hand out a password reset code (there is no reset by e-mail). Not for oneself. */
   createPasswordResetCode: (user: CurrentUser | null, targetUserId: string) =>
