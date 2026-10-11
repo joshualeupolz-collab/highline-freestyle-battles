@@ -1,7 +1,7 @@
 /**
  * Managing other accounts: approval of new users, password reset codes.
  */
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { randomCode, sha256Hex } from '../auth/crypto';
 import { requireUser } from '../auth/middleware';
@@ -17,6 +17,28 @@ const RESET_CODE_VALIDITY = 24 * 60 * 60_000;
 
 export const userRoutes = new Hono<AppEnv>();
 userRoutes.use(requireUser({ active: true }));
+
+/**
+ * Find active users by the start of their username (`?q=`, at least 2 characters).
+ * Uses the index on lower(username), so it does not scan the whole table.
+ */
+userRoutes.get('/search', async (c) => {
+  const q = (c.req.query('q') ?? '').trim().toLowerCase();
+  if (q.length < 2) return c.json({ users: [] });
+  const rows = await getDb(c.env.DB)
+    .select({ id: users.id, username: users.username, displayName: users.displayName })
+    .from(users)
+    .where(
+      and(
+        sql`lower(${users.username}) >= ${q}`,
+        sql`lower(${users.username}) < ${`${q}\u{10FFFF}`}`,
+        eq(users.status, 'active'),
+      ),
+    )
+    .orderBy(sql`lower(${users.username})`)
+    .limit(20);
+  return c.json({ users: rows });
+});
 
 /** Accounts waiting for approval, oldest first, with their questionnaire answers. */
 userRoutes.get('/pending', async (c) => {

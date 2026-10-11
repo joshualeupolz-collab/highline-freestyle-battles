@@ -272,3 +272,32 @@ describe('request protection', () => {
     expect(text.status).toBe(415);
   });
 });
+
+describe('user search', () => {
+  it('finds active users by the start of their username, case-insensitively', async () => {
+    const admin = await registerAdmin();
+    await registerAthlete('Anna', admin.session);
+    await registerAthlete('annika', admin.session);
+    await registerAthlete('ben', admin.session);
+    await register('anton'); // pending: not found
+    const res = await call('/api/users/search?q=AN', { session: admin.session });
+    const { users } = (await res.json()) as { users: { username: string }[] };
+    expect(users.map((u) => u.username)).toEqual(['Anna', 'annika']);
+    expect(
+      (
+        (await (await call('/api/users/search?q=a', { session: admin.session })).json()) as {
+          users: unknown[];
+        }
+      ).users,
+    ).toEqual([]);
+  });
+
+  it('uses the username index instead of scanning all users', async () => {
+    const plan = await env.DB.prepare(
+      "EXPLAIN QUERY PLAN SELECT id FROM users WHERE lower(username) >= 'an' AND lower(username) < 'an\u{10FFFF}'",
+    ).all<{ detail: string }>();
+    expect(plan.results.map((r) => r.detail).join(' ')).toMatch(
+      /USING INDEX users_username_unique/,
+    );
+  });
+});

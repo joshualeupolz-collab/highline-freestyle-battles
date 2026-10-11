@@ -269,6 +269,26 @@ battleRoutes.get('/mine', async (c) => {
     .where(or(inArray(battles.id, mineIds), eq(battles.invitedUserId, user.id)))
     .orderBy(desc(battles.createdAt))
     .limit(100);
+  const people = rows.length
+    ? await db
+        .select({
+          battleId: battleParticipants.battleId,
+          userId: battleParticipants.userId,
+          seat: battleParticipants.seat,
+          score: battleParticipants.score,
+          username: users.username,
+          displayName: users.displayName,
+        })
+        .from(battleParticipants)
+        .innerJoin(users, eq(users.id, battleParticipants.userId))
+        .where(
+          inArray(
+            battleParticipants.battleId,
+            rows.map((b) => b.id),
+          ),
+        )
+        .orderBy(battleParticipants.seat)
+    : [];
   const now = Date.now();
   return c.json({
     battles: rows.map((b) => ({
@@ -282,6 +302,7 @@ battleRoutes.get('/mine', async (c) => {
       deadlineAt: b.deadlineAt,
       deadlinePassed: b.status === 'active' && isDeadlinePassed(b, now),
       decisionReason: b.decisionReason,
+      participants: people.filter((p) => p.battleId === b.id).map(({ battleId: _, ...p }) => p),
     })),
   });
 });

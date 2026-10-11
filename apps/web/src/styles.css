@@ -1,0 +1,236 @@
+/* Mobile first. Colors as variables so a later redesign touches only this block. */
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --primary: #0f766e;
+  --primary-text: #ffffff;
+  --danger: #b91c1c;
+  --warning-bg: #fef3c7;
+  --radius: 12px;
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #111a2e;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #1e293b;
+    --primary: #14b8a6;
+    --primary-text: #042f2e;
+    --danger: #f87171;
+    --warning-bg: #3f2d0a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+a {
+  color: var(--primary);
+}
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 1rem;
+}
+h2 {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1rem env(safe-area-inset-right);
+}
+.header .brand {
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+.nav {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding-top: 0.25rem;
+}
+.nav a {
+  white-space: nowrap;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.nav a.active {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+a.card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.card.notice {
+  background: var(--warning-bg);
+}
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.badge.active,
+.badge.negotiating {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+form {
+  display: grid;
+  gap: 0.9rem;
+}
+label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 500;
+}
+label.check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-weight: 400;
+}
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+}
+input[type="checkbox"] {
+  width: auto;
+  margin-top: 0.3rem;
+}
+.hint {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-text);
+}
+button.secondary {
+  background: transparent;
+  color: var(--primary);
+}
+button.danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.error {
+  color: var(--danger);
+  margin: 0;
+}
+.success {
+  color: var(--primary);
+  margin: 0;
+}
+.code {
+  font-family: ui-monospace, monospace;
+  font-size: 1.4rem;
+  letter-spacing: 0.1em;
+}
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+dt {
+  color: var(--muted);
+}
+dd {
+  margin: 0;
+}
+ul.hits {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+ul.hits li button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-weight: 400;
+  border-radius: 0;
+}

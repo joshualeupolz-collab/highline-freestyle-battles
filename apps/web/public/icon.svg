@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Highline Battles</title>
+  <rect width="512" height="512" rx="96" fill="#0f766e"/>
+  <path d="M40 300 Q256 380 472 300" fill="none" stroke="#f8fafc" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="256" cy="150" r="34" fill="#f8fafc"/>
+  <path d="M256 186 L256 280 M256 210 L196 170 M256 210 L316 170 M256 280 L222 342 M256 280 L290 342" stroke="#f8fafc" stroke-width="22" stroke-linecap="round" fill="none"/>
+</svg>

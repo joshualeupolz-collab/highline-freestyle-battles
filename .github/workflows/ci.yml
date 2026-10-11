@@ -30,6 +30,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm build
 
   rating-reference:
     # Regenerates the fixtures from the Python reference and runs the engine tests against them,
