@@ -28,7 +28,13 @@ export async function decideStatements(
   return [
     db
       .update(battles)
-      .set({ status: 'decided', decidedAt: now, eventAt: now, decisionReason: reason })
+      .set({
+        status: 'decided',
+        decidedAt: now,
+        eventAt: now,
+        endedAt: now,
+        decisionReason: reason,
+      })
       .where(eq(battles.id, battle.id)),
     ...results.map((r) =>
       db
@@ -62,7 +68,7 @@ export function cancelStatements(
   return [
     db
       .update(battles)
-      .set({ status: 'cancelled', cancelReason: reason })
+      .set({ status: 'cancelled', cancelReason: reason, endedAt: now })
       .where(eq(battles.id, battleId)),
     cancelPendingProposalsStatement(db, battleId, now),
   ];
@@ -104,7 +110,7 @@ export async function resolveAbandonedDeadlines(db: Database, now = Date.now()):
   // Requests nobody accepted (or agreed on) before their deadline simply expire.
   await db
     .update(battles)
-    .set({ status: 'cancelled', cancelReason: 'expired' })
+    .set({ status: 'cancelled', cancelReason: 'expired', endedAt: now })
     .where(and(inArray(battles.status, ['open', 'negotiating']), lt(battles.deadlineAt, now)));
 
   const cutoff = now - AUTO_DECIDE_AFTER_DAYS * 86_400_000;

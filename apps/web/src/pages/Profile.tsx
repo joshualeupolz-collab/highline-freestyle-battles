@@ -1,7 +1,7 @@
 import { PASSWORD_MIN } from '@hfb/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { api } from '../api';
 import { useMe, useSetMe } from '../auth';
 import { ErrorText } from '../components/ErrorText';
@@ -20,6 +20,16 @@ export function ProfilePage() {
     },
   });
   const logout = useMutation({ mutationFn: api.logout, onSettled: () => setMe(null) });
+  const navigate = useNavigate();
+  const [deletePassword, setDeletePassword] = useState('');
+  const [keepVideos, setKeepVideos] = useState(true);
+  const remove = useMutation({
+    mutationFn: api.deleteAccount,
+    onSuccess: (res) => {
+      setMe(null);
+      navigate('/deletion-request', { state: { token: res.deletionToken } });
+    },
+  });
   if (!me) return null;
 
   return (
@@ -76,6 +86,41 @@ export function ProfilePage() {
       <button type="button" className="danger" onClick={() => logout.mutate()}>
         {t('profile.logout')}
       </button>
+
+      <details className="card" style={{ marginTop: '2rem' }}>
+        <summary>{t('profile.delete')}</summary>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (window.confirm(t('profile.deleteConfirm')))
+              remove.mutate({ password: deletePassword, keepVideos });
+          }}
+        >
+          <p className="hint">{t('profile.deleteHint')}</p>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={keepVideos}
+              onChange={(e) => setKeepVideos(e.target.checked)}
+            />
+            <span>{t('profile.keepVideos')}</span>
+          </label>
+          <label>
+            {t('field.password')}
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <ErrorText error={remove.error} />
+          <button type="submit" className="danger" disabled={remove.isPending}>
+            {t('profile.deleteButton')}
+          </button>
+        </form>
+      </details>
     </>
   );
 }

@@ -7,13 +7,15 @@ import type { RuleSetParams } from '@hfb/rating';
 import { createRulesetRequestSchema, ruleSetParamsSchema } from '@hfb/shared';
 import { desc, eq, lte, max } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { requireUser } from '../auth/middleware';
 import { can } from '../auth/permissions';
 import { type Database, getDb } from '../db/client';
-import { rulesets } from '../db/schema';
+import { replayRequests, rulesets } from '../db/schema';
 import type { AppEnv } from '../env';
 import { auditInsert } from '../lib/audit';
 import { apiError } from '../lib/errors';
+import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
 
 export const rulesetRoutes = new Hono<AppEnv>();
@@ -103,4 +105,32 @@ rulesetRoutes.post('/', requireUser({ active: true }), async (c) => {
   const row = await db.select().from(rulesets).where(eq(rulesets.version, version)).get();
   if (!row) apiError(500, 'internal_error');
   return c.json(toResponse(row), 201);
+});
+
+/**
+ * Request a full rating recalculation (e.g. after a RuleSet change). The daily GitHub Actions job
+ * (.github/workflows/replay.yml) does it; it can also be started there by hand.
+ */
+rulesetRoutes.post('/replay', requireUser({ active: true }), async (c) => {
+  const actor = c.get('user');
+  if (!actor || !can.manageRules(actor)) apiError(403, 'forbidden');
+  const { reason } = await parseJson(c, z.object({ reason: z.string().trim().min(3).max(500) }));
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+  const id = newId(now);
+  await db.batch([
+    db.insert(replayRequests).values({ id, reason, requestedBy: actor.id, createdAt: now }),
+    auditInsert(
+      db,
+      {
+        actorId: actor.id,
+        action: 'rating.replay_request',
+        targetType: 'replay',
+        targetId: id,
+        reason,
+      },
+      now,
+    ),
+  ]);
+  return c.json({ id }, 201);
 });

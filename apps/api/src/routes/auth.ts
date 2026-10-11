@@ -3,6 +3,8 @@
  */
 import {
   changePasswordRequestSchema,
+  deleteAccountRequestSchema,
+  deletionRequestSchema,
   loginRequestSchema,
   registerRequestSchema,
   resetPasswordRequestSchema,
@@ -25,6 +27,7 @@ import { auditInsert } from '../lib/audit';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
+import { deleteAccount, deleteVideosOfStatement } from '../services/accountDeletion';
 
 /** After this many failed logins in a row, the account is locked for LOCK_DURATION. */
 export const MAX_FAILED_LOGINS = 5;
@@ -207,5 +210,40 @@ authRoutes.post('/reset-password', async (c) => {
     db.update(passwordResetCodes).set({ usedAt: now }).where(eq(passwordResetCodes.id, id)),
     db.delete(sessions).where(eq(sessions.userId, code.userId)),
   ]);
+  return c.json({ ok: true });
+});
+
+/**
+ * Delete one's own account (concept section 12). Needs the password. Answers with the token of
+ * the deletion link, shown once: with it the person can later have their kept videos deleted.
+ */
+authRoutes.post('/delete-account', requireUser(), async (c) => {
+  const input = await parseJson(c, deleteAccountRequestSchema);
+  const db = getDb(c.env.DB);
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const row = await db.select().from(users).where(eq(users.id, user.id)).get();
+  if (
+    !row?.passwordHash ||
+    !(await verifyPassword(input.password, row.passwordHash, c.env.PASSWORD_PEPPER))
+  ) {
+    apiError(403, 'wrong_password');
+  }
+  const token = await deleteAccount(db, user.id, input.keepVideos);
+  clearSessionCookie(c);
+  return c.json({ deletionToken: token });
+});
+
+/** With the deletion link: delete the videos a deleted account had kept. */
+authRoutes.post('/deletion-request', async (c) => {
+  const { token } = await parseJson(c, deletionRequestSchema);
+  const db = getDb(c.env.DB);
+  const row = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.deletionTokenHash, await sha256Hex(token)))
+    .get();
+  if (!row) apiError(404, 'invalid_code');
+  await deleteVideosOfStatement(db, row.id, Date.now());
   return c.json({ ok: true });
 });

@@ -196,6 +196,8 @@ A person can hold several roles (e.g. athlete + judge).
   - **logged-in users only**
   - **review only** (deleted once the review is complete)
 - **Account deletion:** the user chooses whether their videos stay or are deleted. The profile becomes "deleted user"; battle results and opponents' ratings remain. The user receives a **deletion link** for later deletion requests.
+  - Decided 2026-10-11 (step 12): keeping the videos is preselected. Running battles count as given up (a win for the opponent, so deleting is no way to avoid a loss); open requests and unconfirmed results are cancelled. Chat messages are deleted.
+- **Videos no longer needed** (attempts that did not count and were not kept, *review only* videos) are deleted 7 days after the battle ended (decided 2026-10-11).
 - Minimum age 16 by self-declaration; exceptions case by case with parental consent. If we learn of an under-16 user without consent, the account is suspended or deleted.
 - Required: privacy policy (EN + DE), legal notice ("Impressum", operated from Germany), terms of use. To be drafted separately and briefly checked by someone qualified.
 
@@ -267,7 +269,6 @@ Current progress and next steps: [`docs/progress.md`](progress.md).
 4. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones (test page `/lab/video` exists, see [`docs/video-prototype.md`](video-prototype.md)).
 5. Exchange format for trick list / scoring formula with the other developer.
 6. Type and scope of federation penalties.
-7. What happens to open battles when an account is deleted?
 
 ---
 

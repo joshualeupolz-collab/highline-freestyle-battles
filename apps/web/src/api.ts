@@ -308,6 +308,10 @@ export const api = {
     post('/auth/password', body),
   resetPassword: (body: { code: string; newPassword: string }) =>
     post('/auth/reset-password', body),
+  deleteAccount: (body: { password: string; keepVideos: boolean }) =>
+    post<{ deletionToken: string }>('/auth/delete-account', body),
+  deletionRequest: (token: string) => post<{ ok: true }>('/auth/deletion-request', { token }),
+  requestReplay: (reason: string) => post<{ id: string }>('/rulesets/replay', { reason }),
 
   formats: () => get<{ formats: Format[] }>('/formats'),
   createFormat: (body: unknown) => post<{ format: Format }>('/formats', body),

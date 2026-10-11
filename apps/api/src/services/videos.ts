@@ -2,7 +2,7 @@
  * Attempts, uploaded videos and the attempt that counts (concept sections 5.3–5.4 and 6).
  * Shared by the battle and video routes and the scheduled job.
  */
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, ne, or } from 'drizzle-orm';
 import { canViewVideo } from '../auth/permissions';
 import { deliveryStatus } from '../battles/rules';
 import type { Database } from '../db/client';
@@ -236,7 +236,7 @@ export async function removeStaleUploads(
     )
     .limit(50);
   if (stale.length === 0) return 0;
-  for (const file of stale) await store.delete(file.locator);
+  await store.delete(stale.map((f) => f.locator));
   await db
     .update(videoFiles)
     .set({ deletedAt: now })
@@ -247,4 +247,77 @@ export async function removeStaleUploads(
       ),
     );
   return stale.length;
+}
+
+/** Videos a battle no longer needs are deleted this long after it ended (decided 2026-10-11). */
+export const VIDEO_CLEANUP_DAYS = 7;
+
+/**
+ * Scheduled job, part 1: marks videos as deleted that are no longer needed after a battle ended
+ * (concept sections 6 and 12): attempts that did not count unless the owner keeps them, and
+ * "review only" videos. Returns how many were marked; part 2 removes their files.
+ */
+export async function markUnneededVideos(db: Database, now = Date.now()): Promise<number> {
+  const rows = await db
+    .select({ id: videos.id })
+    .from(videos)
+    .innerJoin(battles, eq(battles.id, videos.battleId))
+    .leftJoin(submissions, eq(submissions.videoId, videos.id))
+    .where(
+      and(
+        inArray(battles.status, ['decided', 'cancelled', 'annulled']),
+        lt(battles.endedAt, now - VIDEO_CLEANUP_DAYS * 86_400_000),
+        ne(videos.status, 'deleted'),
+        or(
+          and(isNull(submissions.videoId), eq(videos.retention, 'delete_after_battle')),
+          eq(videos.visibility, 'review_only'),
+        ),
+      ),
+    )
+    // D1 allows at most 100 bound parameters per query (the ids below).
+    .limit(90);
+  if (rows.length === 0) return 0;
+  await markVideosDeleted(
+    db,
+    rows.map((r) => r.id),
+    now,
+  );
+  return rows.length;
+}
+
+export function markVideosDeleted(db: Database, ids: string[], now: number) {
+  return db
+    .update(videos)
+    .set({ status: 'deleted', deletedAt: now })
+    .where(and(inArray(videos.id, ids), ne(videos.status, 'deleted')));
+}
+
+/**
+ * Scheduled job, part 2: removes the stored files of deleted videos from every storage location
+ * ("deletions must apply everywhere"). Today that is R2 only. Returns how many files were removed.
+ */
+export async function deleteFilesOfDeletedVideos(
+  db: Database,
+  store: VideoStore,
+  now = Date.now(),
+): Promise<number> {
+  const files = await db
+    .select({ id: videoFiles.id, locator: videoFiles.locator, backend: videoFiles.backend })
+    .from(videoFiles)
+    .innerJoin(videos, eq(videos.id, videoFiles.videoId))
+    .where(and(eq(videos.status, 'deleted'), isNull(videoFiles.deletedAt)))
+    .limit(90);
+  const r2 = files.filter((f) => f.backend === store.backend);
+  if (r2.length === 0) return 0;
+  await store.delete(r2.map((f) => f.locator));
+  await db
+    .update(videoFiles)
+    .set({ deletedAt: now })
+    .where(
+      inArray(
+        videoFiles.id,
+        r2.map((f) => f.id),
+      ),
+    );
+  return r2.length;
 }

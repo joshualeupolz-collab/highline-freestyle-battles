@@ -89,6 +89,11 @@ export const users = sqliteTable(
     lastFailedLoginAt: integer('last_failed_login_at'),
     createdAt: integer('created_at').notNull(),
     deletedAt: integer('deleted_at'),
+    /**
+     * Hash of the deletion link handed out when the account was deleted (concept section 12):
+     * with it, the person can later have the videos they kept deleted too.
+     */
+    deletionTokenHash: text('deletion_token_hash'),
   },
   (t) => [
     uniqueIndex('users_username_unique').on(lower(t.username)),
@@ -337,6 +342,8 @@ export const battles = sqliteTable(
     decidedAt: integer('decided_at'),
     /** Rating event timestamp: when the result became final and counts (spec §2.1). */
     eventAt: integer('event_at'),
+    /** When the battle was decided or cancelled (for cleaning up videos afterwards). */
+    endedAt: integer('ended_at'),
     cancelReason: text('cancel_reason'),
     annulledBy: text('annulled_by').references(() => users.id),
     annulledAt: integer('annulled_at'),
@@ -351,6 +358,7 @@ export const battles = sqliteTable(
     index('battles_replay_idx').on(t.formatId, t.eventAt),
     index('battles_competition_idx').on(t.competitionId),
     index('battles_invited_idx').on(t.invitedUserId, t.status),
+    index('battles_ended_idx').on(t.endedAt),
     oneOf('battles_kind_check', t.kind, BATTLE_KINDS),
     oneOf('battles_mode_check', t.mode, BATTLE_MODES),
     oneOf('battles_status_check', t.status, BATTLE_STATUSES),
