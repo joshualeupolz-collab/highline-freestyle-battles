@@ -1,0 +1,19 @@
+{
+  "name": "@hfb/rating",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure rating engine (weighted Glicko-2) for highline freestyle battles",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

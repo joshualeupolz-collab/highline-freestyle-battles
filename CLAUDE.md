@@ -4,6 +4,7 @@
 
 A free, open web app for highline freestyle battles with in-app video recording, tiered review and a
 Glicko-2 rating per format. Full concept: `docs/concept.md`. Rating: `rating/rating-specification.md`.
+Technical decisions, schema and implementation plan: `docs/architecture.md`.
 
 **Read the relevant sections of these two documents before any larger task.** They are the binding
 basis. If the code deviates from them, that is a bug – or the document needs to be updated after
@@ -36,7 +37,10 @@ agreement.
 |---|---|
 | Language | TypeScript (strict) |
 | App | PWA, offline-capable (service worker, IndexedDB for videos) |
-| Hosting | Cloudflare Pages (`*.pages.dev`) |
+| Hosting | One Cloudflare Worker with static assets serves PWA + API on one origin (`*.workers.dev`) |
+| Frontend | React + Vite (static SPA, no SSR), vite-plugin-pwa |
+| API framework | Hono, validation with zod, DB access with Drizzle |
+| Monorepo | pnpm workspaces; Biome for lint + format |
 | API | Cloudflare Workers |
 | Database | Cloudflare D1 (SQLite), versioned migrations in the repo |
 | Videos | Cloudflare R2, uploaded directly from the phone via signed URL |
@@ -74,6 +78,27 @@ rating/             rating specification and Python reference
 apps/web/           PWA (frontend)
 apps/api/           Cloudflare Worker (API)
 packages/rating/    rating engine (TypeScript, pure)
+packages/shared/    shared types and zod schemas
 db/migrations/      D1 migrations
 .github/workflows/  CI and background jobs
 ```
+
+## Commands
+
+```bash
+pnpm install          # install dependencies (Node 22, pnpm via corepack or `npm i -g pnpm`)
+pnpm test             # run all tests (Vitest)
+pnpm typecheck        # TypeScript in every package
+pnpm lint             # Biome lint + format check; `pnpm format` fixes formatting
+python rating/export_fixtures.py   # regenerate the rating reference fixtures (needs numpy)
+
+pnpm --filter @hfb/api dev               # local API on http://localhost:8787 (run db:migrate:local first)
+pnpm --filter @hfb/api db:migrate:local  # apply db/migrations to the local D1 database
+pnpm --filter @hfb/api db:generate       # after editing apps/api/src/db/schema.ts: create a migration
+```
+
+Database rules: `apps/api/src/db/schema.ts` is the source of truth; never edit an applied migration,
+add a new one. Seed data that must exist everywhere (RuleSets, launch formats) goes into a custom
+migration (`drizzle-kit generate --custom`).
+
+Run `pnpm lint && pnpm typecheck && pnpm test` before every commit.

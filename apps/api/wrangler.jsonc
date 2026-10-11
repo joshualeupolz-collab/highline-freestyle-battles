@@ -1,0 +1,27 @@
+// Cloudflare Worker configuration. Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "highline-freestyle-battles",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // The web app (apps/web, built with `pnpm --filter @hfb/web build`) as static files.
+  // Requests for files never start the Worker and are free; only /api/* runs our code.
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true },
+  // Hourly background job (src/index.ts → scheduled). Cron triggers are free.
+  "triggers": { "crons": ["17 * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hfb",
+      // Placeholder for local development. Before the first deployment, run
+      // `wrangler d1 create hfb` and put the returned id here.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../db/migrations"
+    }
+  ]
+}

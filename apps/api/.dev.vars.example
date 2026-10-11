@@ -1,0 +1,8 @@
+# Copy to .dev.vars for local development (`wrangler dev`). .dev.vars is not committed.
+# In production these are Cloudflare secrets: `wrangler secret put PASSWORD_PEPPER`.
+
+# Long random value, e.g. from `openssl rand -base64 32`. Must never change once users exist.
+PASSWORD_PEPPER=local-development-pepper
+
+# Whoever registers with this token while no admin exists becomes the first admin.
+SETUP_TOKEN=local-setup-token

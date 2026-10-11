@@ -1,0 +1,48 @@
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
+import { api } from '../api';
+import { settingsText, useFormatName } from '../battleHelpers';
+import { ErrorText } from '../components/ErrorText';
+import { t } from '../i18n';
+
+export function OpenRequestsPage() {
+  const navigate = useNavigate();
+  const requests = useQuery({ queryKey: ['openRequests'], queryFn: api.openRequests });
+  const formatName = useFormatName();
+  const accept = useMutation({
+    mutationFn: (id: string) => api.battleAction(id, 'accept'),
+    onSuccess: (res) => navigate(`/battles/${res.battle.id}`),
+  });
+
+  if (requests.isLoading) return <p className="muted">{t('common.loading')}</p>;
+  const list = requests.data?.requests ?? [];
+  return (
+    <>
+      <h1>{t('open.title')}</h1>
+      <ErrorText error={requests.error ?? accept.error} />
+      {list.length === 0 && <p className="muted">{t('open.empty')}</p>}
+      {list.map((r) => (
+        <div key={r.id} className="card">
+          <div className="row">
+            <strong>{formatName(r.formatId)}</strong>
+            {r.direct && <span className="badge active">{t('open.direct')}</span>}
+          </div>
+          <div>
+            {r.challenger.displayName}{' '}
+            <span className="muted">
+              {r.challenger.rating
+                ? `${Math.round(r.challenger.rating.r)} ±${Math.round(r.challenger.rating.rd)}`
+                : t('open.unrated')}
+            </span>
+          </div>
+          <div className="muted">{settingsText(r.settings)}</div>
+          <div className="actions">
+            <button type="button" onClick={() => accept.mutate(r.id)} disabled={accept.isPending}>
+              {t('open.accept')}
+            </button>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}

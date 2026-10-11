@@ -44,7 +44,8 @@ A person can hold several roles (e.g. athlete + judge).
 
 ## 3. Accounts, approval, initial rating
 
-- **Login:** username + password, optionally "Sign in with Google". An email address is optional. Without an email there is no "forgot password"; the admin or federation resets the password instead.
+- **Login:** username + password, optionally "Sign in with Google". An email address is optional. Without an email there is no "forgot password"; the admin or federation resets the password instead: they create a one-time code (valid 24 hours) and hand it over personally.
+- **First admin:** whoever registers with a secret setup token while no admin exists yet becomes the first admin.
 - **Age:** a checkbox at sign-up: "I am at least 16 years old." Younger users contact the federation; they are approved case by case with parental consent.
 - **Approval:** new accounts must be approved, by an existing athlete, the federation or an admin. An optional short questionnaire (e.g. how long they have been doing freestyle, community/location).
 - **Invitation tree:** the app stores who approved whom. This helps detect rings of fake accounts.
@@ -68,7 +69,7 @@ A person can hold several roles (e.g. athlete + judge).
 
 ## 5. Battle flow (online)
 
-1. **Request:** an athlete posts an open request for a format. Others see matching requests sorted by rating proximity, including the challenger's rating. Accepting or ignoring is up to them.
+1. **Request:** an athlete posts an open request for a format. Others see matching requests sorted by rating proximity, including the challenger's rating. Accepting or ignoring is up to them. An athlete can also **challenge one person directly**; only that person can accept, and direct challenges are listed first.
 2. **Settings** (set by the challenger, or marked "flexible" so both agree on them):
    - Format
    - Attempts per video: 1, 2, 3 or unlimited
@@ -81,6 +82,7 @@ A person can hold several roles (e.g. athlete + judge).
 5. **Review** (see section 7).
 6. **Special cases:**
    - Whoever doesn't deliver within the time window loses. The opponent may instead choose "cancelled, unrated".
+     If the side that delivered does not decide within **7 days** after the deadline, the battle counts as their win automatically; if nobody delivered, it is cancelled unrated (hourly background job).
    - If one side wants to cancel, the other decides: count it as a win or cancel without rating.
    - Goodwill: the opponent can grant an extra attempt or more time (e.g. after a mis-tap that can be shown on video).
 
@@ -90,6 +92,7 @@ A person can hold several roles (e.g. athlete + judge).
 
 - **Recording only inside the app**, no upload from the gallery.
 - **Attempt limit:** pressing Start uses up an attempt. The recording is kept and cannot be discarded. Target level "moderately secure": prevent casual cheating; a watertight lock is not required.
+- **Best of N (decided):** all attempts of a battle are uploaded. Before the videos are unlocked, the athlete chooses which attempt counts; the opponent and the reviewers only rate that one. The other attempts are deleted after the battle by default, unless the athlete chooses to keep them (e.g. good trick footage for the video database), with their own visibility.
 - On start, an attempt record with a timestamp is created and checked at upload. Optionally a random code or the time can be overlaid on the video.
 - **Quality levels** chosen before recording: Data saver / Normal / HD. Recording happens directly at that quality, without re-compressing on the phone. A hint explains that HD is worthwhile for training videos.
 - **Rough trimming on the phone:** mark start and end, e.g. one bounce before the combo and 1–2 bounces after. Cut without re-encoding, which is fast. The rest is not uploaded.
@@ -193,12 +196,12 @@ A person can hold several roles (e.g. athlete + judge).
 
 | Component | Choice |
 |---|---|
-| App | Progressive Web App (PWA), TypeScript, offline-capable. Frontend framework decided at project start (React for its reach, or SvelteKit). |
-| Hosting | Cloudflare Pages, initially the free `*.pages.dev` address. Own domain (~€10/year) only once successful. |
+| App | Progressive Web App (PWA), TypeScript, offline-capable. **React** (Vite, static single-page app), chosen for its reach among possible contributors. |
+| Hosting | **One Cloudflare Worker with static assets** serves the PWA and the API from the same address (initially the free `*.workers.dev`). Same origin means login cookies work in every browser, including Safari. Requests for static files are free and unlimited. Own domain (~€10/year) only once successful. |
 | Server logic | Cloudflare Workers (Free: 100,000 requests/day, enough for about 1,000 daily active users; then Workers Paid $5/month) |
 | Database | Cloudflare D1 (SQLite, Free: 5 GB/account) |
 | Videos | Cloudflare R2; archive on Telegram + hard drive |
-| Login | Auth library with username/password + Google OAuth |
+| Login | Small own session login (username/password, optional Google via the `arctic` library). Passwords are stored only as salted, slow PBKDF2 hashes plus a secret pepper that is kept outside the database. Details: `docs/architecture.md`. |
 | Notifications | Web Push (iPhone: app must be added to the home screen) |
 | Background jobs | GitHub Actions (video processing, archiving, full rating replay) |
 | Rating engine | Pure TypeScript module without database access; unit tests against rating specification section 11. `glicko_sim.py` remains the reference. |
@@ -207,7 +210,7 @@ A person can hold several roles (e.g. athlete + judge).
 
 **Costs:** €0 at launch. Later probably a few euros per month (R2 above 10 GB, possibly Workers Paid, domain).
 
-**Addition to the rating specification (planned for v1.1):** people whose `RD_eff` has reached the cap `RD_UNKNOWN` are **hidden** from rankings. Their rating stays stored and applies again immediately on return. A shorter period can apply to people with few battles (parameter).
+**Addition to the rating specification (planned for a later version):** people whose `RD_eff` has reached the cap `RD_UNKNOWN` are **hidden** from rankings. Their rating stays stored and applies again immediately on return. A shorter period can apply to people with few battles (parameter).
 
 ---
 
@@ -249,7 +252,7 @@ A person can hold several roles (e.g. athlete + judge).
 1. Level 1: confirm how s is computed from the two assessments (proposal in 7.5).
 2. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
 3. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
-4. Default values: time window, attempts, weight.
+4. Default values: time window, attempts, weight. *Provisional defaults in the app: best of 3 attempts, 7 days, weight 3, 5-point scale (`packages/shared/src/battles.ts`).*
 5. Archiving: after how many weeks to Telegram?
 6. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones.
 7. Exchange format for trick list / scoring formula with the other developer.

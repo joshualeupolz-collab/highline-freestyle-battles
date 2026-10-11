@@ -1,0 +1,77 @@
+name: Deploy
+
+# Publishes the app to Cloudflare on every push to main (and on demand via "Run workflow").
+# One-time setup: docs/deployment.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never run two deployments at the same time.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check configuration
+        env:
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+          PASSWORD_PEPPER: ${{ secrets.PASSWORD_PEPPER }}
+        run: |
+          missing=""
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing secret:CLOUDFLARE_API_TOKEN"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing variable:CLOUDFLARE_ACCOUNT_ID"
+          [ -n "$D1_DATABASE_ID" ] || missing="$missing variable:D1_DATABASE_ID"
+          [ -n "$PASSWORD_PEPPER" ] || missing="$missing secret:PASSWORD_PEPPER"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub settings:$missing (see docs/deployment.md)"
+            exit 1
+          fi
+
+      # Never deploy something that fails its own checks.
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+      - name: Insert the database id
+        env:
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+        run: sed -i "s/00000000-0000-0000-0000-000000000000/$D1_DATABASE_ID/" apps/api/wrangler.jsonc
+
+      - name: Apply database migrations
+        working-directory: apps/api
+        run: pnpm exec wrangler d1 migrations apply DB --remote
+
+      - name: Deploy the Worker with its secrets
+        working-directory: apps/api
+        env:
+          PASSWORD_PEPPER: ${{ secrets.PASSWORD_PEPPER }}
+          SETUP_TOKEN: ${{ secrets.SETUP_TOKEN }}
+        run: |
+          # Secrets go into a temporary file outside the repository and are never printed.
+          node -e '
+            const s = { PASSWORD_PEPPER: process.env.PASSWORD_PEPPER };
+            if (process.env.SETUP_TOKEN) s.SETUP_TOKEN = process.env.SETUP_TOKEN;
+            require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(s));
+          '
+          pnpm exec wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json"
+          rm "$RUNNER_TEMP/secrets.json"

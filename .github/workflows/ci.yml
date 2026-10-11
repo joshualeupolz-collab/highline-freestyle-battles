@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Migrations match the schema
+        run: |
+          pnpm --filter @hfb/api db:generate
+          if [ -n "$(git status --porcelain db/migrations)" ]; then
+            echo "apps/api/src/db/schema.ts changed without a migration. Run: pnpm --filter @hfb/api db:generate"
+            git status --porcelain db/migrations
+            exit 1
+          fi
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  rating-reference:
+    # Regenerates the fixtures from the Python reference and runs the engine tests against them,
+    # so a change to glicko_sim.py that the TypeScript engine does not follow is caught.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install numpy
+      - run: python rating/export_fixtures.py
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @hfb/rating test
