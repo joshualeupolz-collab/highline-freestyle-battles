@@ -359,3 +359,38 @@ table.ranking tr.me td {
   color: var(--primary-text);
   border-color: var(--primary);
 }
+
+.card.part {
+  margin-bottom: 0;
+  display: grid;
+  gap: 0.5rem;
+  background: var(--bg);
+}
+.segmented {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.seg-option {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--primary);
+  padding: 0.5rem 0.25rem;
+}
+.seg-option + .seg-option {
+  border-left: 1px solid var(--primary);
+}
+.seg-option.selected {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+.badge.fixed {
+  border-color: var(--text);
+  color: var(--text);
+}

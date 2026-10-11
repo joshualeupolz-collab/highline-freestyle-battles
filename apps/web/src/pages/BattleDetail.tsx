@@ -83,6 +83,15 @@ export function BattleDetailPage() {
           ))}
       </div>
 
+      {(battle.status === 'open' || battle.status === 'negotiating') && (
+        <div className={`card ${battle.settingsFlexible ? '' : 'notice'}`}>
+          <span className={`badge ${battle.settingsFlexible ? 'negotiating' : 'fixed'}`}>
+            {battle.settingsFlexible ? t('rules.flexible') : t('rules.fixed')}
+          </span>{' '}
+          {battle.settingsFlexible ? t('rules.flexibleHint') : t('rules.fixedHint')}
+        </div>
+      )}
+
       <Result battle={battle} name={name} />
       <ErrorText error={action.error} />
 
@@ -90,7 +99,15 @@ export function BattleDetailPage() {
         <section>
           <h2>{t('battle.proposals')}</h2>
           {battle.proposals.map((p) => (
-            <ProposalCard key={p.id} proposal={p} myId={me.id} name={name} onAction={run} />
+            <ProposalCard
+              key={p.id}
+              proposal={p}
+              myId={me.id}
+              name={name}
+              onAction={run}
+              // Accepting the settings during negotiation starts the battle: that is binding.
+              binding={battle.status === 'negotiating' && p.kind === 'settings'}
+            />
           ))}
         </section>
       )}
@@ -120,8 +137,14 @@ export function BattleDetailPage() {
 
       <div className="actions">
         {battle.status === 'open' && !isCreator && (
-          <button type="button" onClick={() => run('accept')}>
-            {t('battle.accept')}
+          <button
+            type="button"
+            onClick={() =>
+              (battle.settingsFlexible || window.confirm(t('battle.bindingConfirm'))) &&
+              run('accept')
+            }
+          >
+            {battle.settingsFlexible ? t('battle.acceptNegotiable') : t('battle.accept')}
           </button>
         )}
         {battle.status === 'open' && isCreator && (
@@ -130,7 +153,10 @@ export function BattleDetailPage() {
           </button>
         )}
         {battle.status === 'negotiating' && mine?.seat === 1 && (
-          <button type="button" onClick={() => run('start')}>
+          <button
+            type="button"
+            onClick={() => window.confirm(t('battle.bindingConfirm')) && run('start')}
+          >
             {t('battle.start')}
           </button>
         )}
@@ -227,11 +253,13 @@ function ProposalCard({
   myId,
   name,
   onAction,
+  binding,
 }: {
   proposal: Proposal;
   myId: string;
   name: (id: string) => string;
   onAction: (path: string, body?: unknown) => void;
+  binding: boolean;
 }) {
   const text =
     proposal.kind === 'settings'
@@ -256,7 +284,10 @@ function ProposalCard({
           <>
             <button
               type="button"
-              onClick={() => onAction(`${base}/respond`, { decision: 'accept' })}
+              onClick={() =>
+                (!binding || window.confirm(t('battle.bindingConfirm'))) &&
+                onAction(`${base}/respond`, { decision: 'accept' })
+              }
             >
               {t('battle.acceptProposal')}
             </button>

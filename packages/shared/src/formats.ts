@@ -2,17 +2,46 @@
 import { z } from 'zod';
 
 export const FORMAT_STATUSES = ['relevant', 'fun'] as const;
-export const FORMAT_PART_KINDS = ['best_trick', 'trick_combo', 'bounce_combo', 'response'] as const;
+/**
+ * What one video of a format contains.
+ * - `trick_combo`: a number of tricks; transition bounces between them are allowed.
+ *   A best trick is simply 1 trick.
+ * - `bounce_combo`: a number of bounces; every bounce counts.
+ * - `other`: anything else, described in free text (`label`).
+ * `best_trick` (old name for 1 trick) and `response` (back-and-forth, stage 3) stay valid.
+ */
+export const FORMAT_PART_KINDS = [
+  'trick_combo',
+  'bounce_combo',
+  'other',
+  'best_trick',
+  'response',
+] as const;
+/** The kinds offered when creating or proposing a format. */
+export const SELECTABLE_PART_KINDS = ['trick_combo', 'bounce_combo', 'other'] as const;
 
-/** One part of a format, e.g. "3-Trick Combo" = one part `{ kind: 'trick_combo', count: 3 }`. */
+/** One part (= one video) of a format, e.g. `{ kind: 'trick_combo', count: 3 }`. */
 export const formatPartSchema = z
   .object({
     kind: z.enum(FORMAT_PART_KINDS),
-    /** Number of tricks or bounces; 1 for a best trick. */
-    count: z.number().int().min(1).max(100),
-    label: z.string().trim().min(1).max(60).optional(),
+    /** Number of tricks or bounces; not used for `other`. */
+    count: z.number().int().min(1).max(100).optional(),
+    /** Free description; required for `other`. */
+    label: z.string().trim().min(1).max(200).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((part, ctx) => {
+    if (part.kind === 'other' && !part.label) {
+      ctx.addIssue({ code: 'custom', path: ['label'], message: 'Describe what is filmed' });
+    }
+    if ((part.kind === 'trick_combo' || part.kind === 'bounce_combo') && part.count === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['count'],
+        message: 'Number of tricks or bounces is missing',
+      });
+    }
+  });
 export type FormatPart = z.infer<typeof formatPartSchema>;
 
 export const formatPartsSchema = z.array(formatPartSchema).min(1).max(10);

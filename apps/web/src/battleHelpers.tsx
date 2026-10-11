@@ -8,7 +8,7 @@ import {
 } from '@hfb/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api, type BattleStatus, type Format } from './api';
-import { formatDate, type MessageKey, t } from './i18n';
+import { formatDate, t } from './i18n';
 
 export function useFormats() {
   return useQuery({ queryKey: ['formats'], queryFn: api.formats, staleTime: 5 * 60_000 });
@@ -19,10 +19,23 @@ export function useFormatName() {
   return (id: string) => data?.formats.find((f) => f.id === id)?.name ?? '…';
 }
 
-export function partsText(format: Format): string {
-  return format.parts
-    .map((p) => p.label ?? `${t(`part.${p.kind}` as MessageKey)} ×${p.count}`)
-    .join(' + ');
+/** One part in words: "3 tricks", "10 bounces", "1 trick" or the free description. */
+export function partText(part: Format['parts'][number]): string {
+  const n = part.count ?? 1;
+  switch (part.kind) {
+    case 'trick_combo':
+    case 'best_trick':
+      return t(n === 1 ? 'part.trick' : 'part.tricks', { n });
+    case 'bounce_combo':
+      return t(n === 1 ? 'part.bounce' : 'part.bounces', { n });
+    default:
+      return part.label ?? t('part.other');
+  }
+}
+
+/** All parts of a format; several parts = several videos. */
+export function partsText(format: Pick<Format, 'parts'>): string {
+  return format.parts.map(partText).join(' + ');
 }
 
 /** Local date and time strings for <input type="date"> and <input type="time">. */

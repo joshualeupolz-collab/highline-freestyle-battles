@@ -96,6 +96,14 @@ const en = {
   'battle.deadlinePassed': 'The deadline has passed.',
   'battle.recordingLater': 'Recording and uploading videos comes in the next version of the app.',
   'battle.accept': 'Accept battle',
+  'rules.fixed': 'Fixed rules',
+  'rules.flexible': 'Negotiable rules',
+  'rules.fixedHint': 'Accepting starts the battle right away with these settings.',
+  'rules.flexibleHint':
+    'After accepting you can propose other settings. The battle only starts when you both agree.',
+  'battle.bindingConfirm':
+    'Accept bindingly? The battle starts now. From now on, giving up or missing the deadline can cost you rating points.',
+  'battle.acceptNegotiable': 'Accept and discuss the rules',
   'battle.retract': 'Take back request',
   'battle.start': 'Start with these settings',
   'battle.proposeSettings': 'Propose other settings',
@@ -146,7 +154,6 @@ const en = {
   'admin.other': 'other',
   'admin.kind': 'Shown as',
   'admin.name': 'Name',
-  'admin.partKind': 'Part',
   'admin.count': 'Number of tricks / bounces',
   'admin.create': 'Create format',
   'admin.proposals': 'Format proposals',
@@ -160,9 +167,7 @@ const en = {
   'formats.proposeTitle': 'Propose a format',
   'formats.proposeHint':
     'Describe the format. An admin checks the proposal and adds it as an official format or under "more formats".',
-  'formats.description': 'Description (optional)',
-  'formats.parts': 'Parts (one video per part)',
-  'formats.addPart': '+ add part',
+  'formats.description': 'Description – explain the format in your own words',
   'formats.removePart': 'remove',
   'formats.propose': 'Send proposal',
   'formats.proposed': 'Thanks! Your proposal is waiting for review.',
@@ -194,11 +199,6 @@ const en = {
   'rankings.rating': 'Rating',
   'rankings.battles': 'Battles',
 
-  'part.best_trick': 'Best trick',
-  'part.trick_combo': 'Trick combo',
-  'part.bounce_combo': 'Bounce combo',
-  'part.response': 'Response',
-
   'chat.title': 'Chat',
   'chat.empty': 'No messages yet.',
   'chat.you': 'You',
@@ -206,6 +206,31 @@ const en = {
   'chat.send': 'Send',
   'chat.privacy': 'Only the people in this battle can read these messages.',
   'battles.newMessages': '{n} new',
+
+  'part.trick': '1 trick',
+  'part.tricks': '{n} tricks',
+  'part.bounce': '1 bounce',
+  'part.bounces': '{n} bounces',
+  'part.other': 'other',
+
+  'formats.parts': 'Videos',
+  'formats.partsHint':
+    'Most formats are one video. Add another video if the format consists of several parts.',
+  'formats.video': 'Video {n}',
+  'formats.partType': 'What is limited?',
+  'formats.kind.trick_combo': 'Tricks',
+  'formats.kind.bounce_combo': 'Bounces',
+  'formats.kind.other': 'Other',
+  'formats.kindHint.trick_combo':
+    'Limited number of tricks. A trick may take several bounces, transition bounces are allowed. Best trick = 1 trick.',
+  'formats.kindHint.bounce_combo': 'Limited number of bounces. Every bounce counts.',
+  'formats.kindHint.other':
+    'Anything that does not fit the two types. Describe it in your own words.',
+  'formats.countTricks': 'Number of tricks',
+  'formats.countBounces': 'Number of bounces',
+  'formats.otherLabel': 'What is filmed?',
+  'formats.otherPlaceholder': 'e.g. longest chain of the same trick',
+  'formats.addPart': '+ add another video',
 
   'common.loading': 'Loading…',
   'common.save': 'Save',
