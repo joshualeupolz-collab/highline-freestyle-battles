@@ -27,6 +27,7 @@ import {
 } from '../video/storage';
 import { trimVideo } from '../video/trim';
 import { kickUploads, onProgress, onServerChanged, uploadProgress } from '../video/uploadQueue';
+import { useCameraZoom } from '../video/zoom';
 import { ErrorText } from './ErrorText';
 
 const ROUND = 1; // multi-round formats come in stage 3
@@ -179,39 +180,19 @@ export function BattleVideos({
         );
       })}
 
-      {active && (
-        <details className="hint">
-          <summary>{t('videos.qualityTitle', { quality: t(`lab.quality.${quality}`) })}</summary>
-          <label>
-            {t('lab.quality')}
-            <select
-              value={quality}
-              onChange={(e) => {
-                const q = e.target.value as Quality;
-                setQuality(q);
-                try {
-                  localStorage.setItem(QUALITY_KEY, q);
-                } catch {
-                  // Not remembered in private mode.
-                }
-              }}
-            >
-              {QUALITIES.map((q) => (
-                <option key={q} value={q}>
-                  {t(`lab.quality.${q}`)}
-                </option>
-              ))}
-            </select>
-            <span className="hint">{t('lab.hdHint')}</span>
-          </label>
-        </details>
-      )}
-
       {recordPart !== null && (
         <RecordScreen
           battleId={battle.id}
           partIndex={recordPart}
           quality={quality}
+          onQuality={(q) => {
+            setQuality(q);
+            try {
+              localStorage.setItem(QUALITY_KEY, q);
+            } catch {
+              // Not remembered in private mode.
+            }
+          }}
           attemptsLeft={left(recordPart)}
           onDone={(recordingId) => {
             setRecordPart(null);
@@ -307,12 +288,14 @@ function RecordScreen({
   battleId,
   partIndex,
   quality,
+  onQuality,
   attemptsLeft: left,
   onDone,
 }: {
   battleId: string;
   partIndex: number;
   quality: Quality;
+  onQuality: (q: Quality) => void;
   attemptsLeft: number | null;
   onDone: (recordingId: string | null) => void;
 }) {
@@ -321,6 +304,8 @@ function RecordScreen({
   const [active, setActive] = useState<ActiveRecording | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
+  const zoom = useCameraZoom(stream);
   const finished = useRef(false);
 
   const finish = useCallback(
@@ -404,8 +389,42 @@ function RecordScreen({
   }
 
   return (
-    <div className="camera-full">
+    // touch-action: none keeps two fingers from zooming the page; they zoom the camera instead.
+    <div className="camera-full" {...zoom.handlers}>
       <video ref={preview} autoPlay muted playsInline />
+      <div className="camera-top">
+        {!active && (
+          <fieldset className="segmented" aria-label={t('lab.quality')}>
+            {QUALITIES.map((q) => (
+              <button
+                key={q}
+                type="button"
+                className={q === quality ? 'on' : ''}
+                onClick={() => onQuality(q)}
+              >
+                {QUALITY_PRESETS[q].height}p
+              </button>
+            ))}
+            <button
+              type="button"
+              className="info"
+              aria-label={t('camera.qualityInfo')}
+              onClick={() => setShowInfo(!showInfo)}
+            >
+              i
+            </button>
+          </fieldset>
+        )}
+        {zoom.available && <span className="zoom-label">{zoom.value.toFixed(1)}×</span>}
+      </div>
+      {showInfo && !active && (
+        <div className="camera-info">
+          <p>{t('camera.quality.hd')}</p>
+          <p>{t('camera.quality.normal')}</p>
+          <p>{t('camera.quality.saver')}</p>
+          <p>{zoom.available ? t('camera.zoomHint') : t('camera.noZoom')}</p>
+        </div>
+      )}
       <div className="camera-controls">
         <button
           type="button"

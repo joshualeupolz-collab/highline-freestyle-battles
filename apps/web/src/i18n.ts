@@ -53,6 +53,9 @@ const en = {
   'battles.vs': 'vs.',
   'battles.waitingForOpponent': 'waiting for an opponent',
   'battles.until': 'until {date}',
+  'battles.won': 'Won',
+  'battles.lost': 'Lost',
+  'battles.draw': 'Draw',
   'battle.nextStep': 'Next step',
   'battle.challengesYou': 'challenges you',
   'meta.attempts': '{n} attempts',
@@ -65,7 +68,8 @@ const en = {
   'battle.moreOptions': 'More options (more time, extra attempt, give up …)',
   'battle.cancelled': 'This battle was cancelled and does not count.',
   'battle.howItWorks': 'How recording works',
-  'rating.provisional': 'provisional',
+  'rating.provisionalHint':
+    'provisional: few battles yet or a long break, so the rating is still uncertain',
   'rating.new': 'new',
   'next.challenged': 'You were challenged: accept or ignore',
   'next.waitingForOpponent': 'Waiting for someone to accept',
@@ -87,7 +91,9 @@ const en = {
   'new.title': 'New battle',
   'new.format': 'Format',
   'new.opponent': 'Challenge someone directly (optional)',
-  'new.opponentHint': 'Leave empty to post an open request for everyone.',
+  'new.opponentHint':
+    'Only this person can accept. Leave empty to post an open request for everyone.',
+  'new.directSummary': 'Send it to one person only',
   'new.submit': 'Post open request',
   'new.challenge': 'Challenge {name}',
   'new.moreFormats': 'More formats ({n})',
@@ -116,16 +122,20 @@ const en = {
   'settings.deadlineDate': 'Deadline date',
   'settings.deadlineTime': 'Deadline time',
   'settings.germanTime': 'German time: {date}',
+  'settings.yourTime': 'Your local time',
+  'settings.factor': '×{f}',
   'settings.deadlineHint':
     'All videos must be uploaded by then. Default: 05:00 German time, so people in the Americas still have the whole previous day.',
   'settings.level': 'Weight',
   'settings.level1': '1 – fun',
-  'settings.level2': '2',
+  'settings.level2': '2 – casual',
   'settings.level3': '3 – normal',
   'settings.scoring': 'Result',
   'settings.scale': '5-point scale (with margin)',
   'settings.win_loss': 'Win / loss only',
-  'settings.flexible': 'Settings are a suggestion – agree on them with the opponent',
+  'settings.flexible': 'Settings negotiable',
+  'settings.flexibleHint':
+    'Your opponent cannot start right away: you agree on the settings together first.',
 
   'status.open': 'Open',
   'status.negotiating': 'Agreeing on settings',
@@ -198,6 +208,10 @@ const en = {
   'battle.reason.onsite': 'on site, confirmed by both',
   'battle.reason.competition': 'competition result',
 
+  'approvals.waiting': '{n} new members waiting for approval',
+  'approvals.noAnswers': 'No answers to the questions.',
+  'approvals.confirm':
+    'Approve {name}? Only approve people you know (or can check) are real highliners, not fake or duplicate accounts. You are recorded as the person who approved them.',
   'approvals.title': 'Approve new accounts',
   'approvals.empty': 'Nobody is waiting for approval.',
   'approvals.approve': 'Approve',
@@ -277,7 +291,7 @@ const en = {
 
   'rankings.title': 'Rankings',
   'rankings.hint':
-    'Sorted by rating minus twice the uncertainty (±), so a long break lowers the position. "Provisional" = fewer than 5 battles or high uncertainty.',
+    'Sorted by rating minus twice the uncertainty (±), so a long break lowers the position. "?" = provisional (fewer than 5 battles or high uncertainty).',
   'rankings.empty': 'No rated battles in this format yet.',
   'rankings.athlete': 'Athlete',
   'rankings.rating': 'Rating',
@@ -399,7 +413,15 @@ const en = {
   'videos.intro':
     'Record every attempt here in the app. Pressing the red button uses up an attempt. Videos are stored on this phone first and uploaded as soon as there is a connection (keep the app open). Then choose the attempt that counts. Both sides see the videos once both have chosen.',
   'videos.part': 'Part {n}',
-  'videos.qualityTitle': 'Recording quality: {quality}',
+  'camera.qualityInfo': 'What do the quality levels mean?',
+  'camera.quality.hd':
+    '1080p (HD): sharpest picture, about 45–60 MB per minute. Worth it for training or trick videos you want to keep.',
+  'camera.quality.normal':
+    '720p: sharp enough to judge a battle, about 20 MB per minute. The best choice for most battles.',
+  'camera.quality.saver':
+    '480p (data saver): smallest files, about 8 MB per minute. For slow or expensive mobile data.',
+  'camera.zoomHint': 'Zoom: spread two fingers on the picture. The video is recorded zoomed in.',
+  'camera.noZoom': 'This phone or browser does not allow zooming the camera from a web app.',
   'videos.noAttempts': 'No attempts yet.',
   'videos.record': 'Record attempt',
   'videos.left': 'Attempts left: {n}',
@@ -440,6 +462,32 @@ const en = {
   'videos.notVisible': 'Not visible.',
   'videos.opponentProgress':
     '{name}: {attempts} attempts recorded, {uploaded} uploaded, {chosen} chosen',
+
+  'event.accepted': '{who} accepted the battle',
+  'event.started': '{who} started the battle',
+  'event.proposal': '{who} {what}',
+  'event.what.settings': 'proposed other settings ({changes})',
+  'event.what.extension': 'asked for more time (until {date})',
+  'event.what.askAttempt': 'asked for an extra attempt',
+  'event.what.takeBack': 'wants to take back an extra attempt',
+  'event.what.result': 'entered the result: {result}',
+  'event.what.cancel': 'gave up',
+  'event.theOther': 'the other side',
+  'event.proposal_accepted': '{who} accepted: {kind}',
+  'event.proposal_rejected': '{who} rejected: {kind}',
+  'event.proposal_withdrawn': '{who} withdrew: {kind}',
+  'event.kind.settings': 'other settings',
+  'event.kind.extension': 'more time',
+  'event.kind.extra_attempt': 'extra attempt',
+  'event.kind.cancel': 'giving up',
+  'event.kind.result': 'result',
+  'event.attempt_granted': '{who} gave the opponent an extra attempt',
+  'event.submitted': '{who} chose an attempt that counts',
+  'event.unlocked': 'Everyone has chosen: the videos are unlocked',
+  'event.voted': '{who} voted',
+  'event.claimWin': '{who} counted the missed deadline as a win',
+  'event.cancelUnrated': '{who} cancelled the battle without rating',
+  'event.onsite_withdrawn': '{who}: the battle did not take place',
 
   'common.loading': 'Loading…',
   'common.save': 'Save',

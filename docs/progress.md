@@ -16,7 +16,7 @@ free tier, D1 database in Western Europe). Every merge into `main` is published 
 prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3 = step 8 on branch
 `claude/serene-cori-tl2ap4` (PR #10 step 8, then step 9). A new session can start a fresh branch from `main`.
 
-**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 111 API tests
+**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 112 API tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
@@ -50,7 +50,15 @@ videos come later (until then they are visible to logged-in users).
 with a dot when something waits for you, profile button top right (approvals, admin, format
 proposals there); every battle shows its next step (`apps/web/src/nextStep.ts`) in the list and
 at the top of the battle page; rare actions under "More options"; compact settings line;
-"provisional" instead of "?". The app stays English only (owner, 2026-10-11).
+rating "?" (tap for an explanation). The app stays English only (owner, 2026-10-11).
+**UI round 2 (owner's feedback):** camera zoom with two fingers (camera's own zoom where the
+browser offers it, otherwise the page cannot be zoomed on the camera screen), quality choice
+(480p/720p/1080p + info) inside the camera, finished battles tinted green/red with the rating
+change, format color in list and battle head, settings as chips, weights with their factor
+from the RuleSet, "Settings negotiable", direct challenge folded at the end, deadline fields
+hidden with "no deadline", chat documents proposals/answers/extra attempts/choices/votes
+(`battle_messages.event_json`, migration 0008; not counted as unread), red badge on the
+profile button for members waiting for approval, confirmation before approving.
 
 ---
 

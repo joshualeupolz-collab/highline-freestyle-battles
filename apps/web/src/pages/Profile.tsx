@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router';
 import { api } from '../api';
 import { hasRole, useMe, useSetMe } from '../auth';
 import { ErrorText } from '../components/ErrorText';
+import { usePendingCount } from '../components/Layout';
 import { t } from '../i18n';
 
 export function ProfilePage() {
@@ -30,6 +31,8 @@ export function ProfilePage() {
       navigate('/deletion-request', { state: { token: res.deletionToken } });
     },
   });
+  const canApprove = hasRole(me, 'athlete', 'federation', 'admin');
+  const pending = usePendingCount(canApprove);
   if (!me) return null;
 
   return (
@@ -37,8 +40,11 @@ export function ProfilePage() {
       <h1>{t('profile.title')}</h1>
       <div className="link-list">
         <Link to={`/users/${me.id}`}>{t('profile.viewPublic')}</Link>
-        {hasRole(me, 'athlete', 'federation', 'admin') && (
-          <Link to="/approvals">{t('nav.approvals')}</Link>
+        {canApprove && (
+          <Link to="/approvals">
+            {t('nav.approvals')}
+            {pending > 0 && <span className="count-badge">{pending}</span>}
+          </Link>
         )}
         <Link to="/formats/propose">{t('new.proposeFormat')}</Link>
         {hasRole(me, 'federation', 'admin') && <Link to="/admin">{t('nav.admin')}</Link>}

@@ -257,6 +257,8 @@ export type BattleSummary = Omit<
   | 'playedAt'
 > & {
   unreadMessages: number;
+  /** My rating change through this battle (decided battles), else null. */
+  ratingChange: number | null;
   /** What is left for me to do (see nextStep.ts). */
   todo: import('./nextStep').Todo;
 };
@@ -266,6 +268,13 @@ export interface Message {
   senderId: string;
   body: string;
   createdAt: number;
+  /** Set for entries the app writes itself (proposals, answers, extra attempts, …). */
+  event?: {
+    type: string;
+    kind?: string;
+    choice?: string;
+    payload?: Proposal['payload'];
+  } | null;
 }
 
 export interface OpenRequest {
@@ -316,6 +325,8 @@ export const api = {
   requestReplay: (reason: string) => post<{ id: string }>('/rulesets/replay', { reason }),
 
   formats: () => get<{ formats: Format[] }>('/formats'),
+  currentRuleset: () =>
+    get<{ version: number; params: { weights: Record<string, number> } }>('/rulesets/current'),
   createFormat: (body: unknown) => post<{ format: Format }>('/formats', body),
   formatProposals: () => get<{ proposals: FormatProposal[] }>('/formats/proposals'),
   proposeFormat: (body: unknown) => post('/formats/proposals', body),

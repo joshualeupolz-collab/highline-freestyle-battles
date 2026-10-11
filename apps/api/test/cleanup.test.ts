@@ -181,9 +181,11 @@ describe('deleting an account', () => {
     expect(row?.status).toBe('deleted');
     expect(row?.username).not.toBe('anna');
     expect(row?.password_hash).toBeNull();
-    const messages = await env.DB.prepare('SELECT COUNT(*) AS n FROM battle_messages').first<{
-      n: number;
-    }>();
+    const messages = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM battle_messages WHERE sender_id = ?',
+    )
+      .bind(anna.user.id)
+      .first<{ n: number }>();
     expect(messages?.n).toBe(0);
     // Logged out everywhere, the name is free again, the profile is gone.
     expect((await call('/api/auth/me', { session: anna.session })).status).toBe(401);

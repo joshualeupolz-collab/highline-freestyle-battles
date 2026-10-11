@@ -1,8 +1,9 @@
 import { MESSAGE_MAX_LENGTH } from '@hfb/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { api, type Participant } from '../api';
-import { t } from '../i18n';
+import { api, type Message, type Participant } from '../api';
+import { settingsText } from '../battleHelpers';
+import { formatShort, type MessageKey, t } from '../i18n';
 import { ErrorText } from './ErrorText';
 
 /** How often new messages are fetched while the battle page is open and visible. */
@@ -48,18 +49,25 @@ export function Chat({
       <h2 style={{ marginTop: 0 }}>{t('chat.title')}</h2>
       <div className="chat" ref={listRef}>
         {list.length === 0 && <p className="muted">{t('chat.empty')}</p>}
-        {list.map((m) => (
-          <div key={m.id} className={`message${m.senderId === myId ? ' mine' : ''}`}>
-            <div className="meta">
-              {m.senderId === myId ? t('chat.you') : name(m.senderId)} ·{' '}
-              {new Date(m.createdAt).toLocaleString(undefined, {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })}
+        {list.map((m) =>
+          m.event ? (
+            <div key={m.id} className="chat-event">
+              {eventText(m.event, m.senderId === myId ? t('chat.you') : name(m.senderId))}
+              <span className="muted"> · {formatShort(m.createdAt)}</span>
             </div>
-            <div className="body">{m.body}</div>
-          </div>
-        ))}
+          ) : (
+            <div key={m.id} className={`message${m.senderId === myId ? ' mine' : ''}`}>
+              <div className="meta">
+                {m.senderId === myId ? t('chat.you') : name(m.senderId)} ·{' '}
+                {new Date(m.createdAt).toLocaleString(undefined, {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })}
+              </div>
+              <div className="body">{m.body}</div>
+            </div>
+          ),
+        )}
       </div>
       <form
         className="inline"
@@ -83,4 +91,41 @@ export function Chat({
       <p className="hint">{t('chat.privacy')}</p>
     </section>
   );
+}
+
+/** One line for an entry the app wrote, e.g. "Anna asks for more time (until Sun, 18 Oct)". */
+function eventText(event: NonNullable<Message['event']>, who: string): string {
+  const kind = event.kind ?? '';
+  const payload = event.payload ?? {};
+  switch (event.type) {
+    case 'proposal': {
+      let what: string;
+      if (kind === 'settings')
+        what = t('event.what.settings', { changes: settingsText(payload.changes ?? {}) });
+      else if (kind === 'extension')
+        what = t('event.what.extension', { date: formatShort(payload.deadlineAt ?? 0) });
+      else if (kind === 'extra_attempt')
+        what = payload.change === 1 ? t('event.what.askAttempt') : t('event.what.takeBack');
+      else if (kind === 'result') {
+        const v = payload.value ?? 0;
+        what = t('event.what.result', {
+          result: t(Math.abs(v) === 2 ? 'review.clearly' : 'review.somewhat', {
+            name: v > 0 ? who : t('event.theOther'),
+          }),
+        });
+      } else what = t('event.what.cancel');
+      return t('event.proposal', { who, what });
+    }
+    case 'proposal_accepted':
+    case 'proposal_rejected':
+    case 'proposal_withdrawn':
+      return t(`event.${event.type}` as MessageKey, {
+        who,
+        kind: t(`event.kind.${kind || 'settings'}` as MessageKey),
+      });
+    case 'deadline_decision':
+      return t(event.choice === 'claim_win' ? 'event.claimWin' : 'event.cancelUnrated', { who });
+    default:
+      return t(`event.${event.type}` as MessageKey, { who });
+  }
 }
