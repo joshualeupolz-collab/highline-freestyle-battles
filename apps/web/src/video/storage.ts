@@ -6,10 +6,18 @@
 
 export type RecordingStatus = 'recording' | 'done' | 'interrupted';
 
+/**
+ * Why a recording ended. Leaving the app ends the attempt (concept section 6): the camera stops
+ * in the background, and pausing would allow hiding a fall. The cut-off video can later be sent
+ * to the opponent with a request for an extra attempt.
+ */
+export type EndReason = 'stopped' | 'app_left' | 'camera_lost';
+
 export interface StoredRecording {
   id: string;
   createdAt: number;
   status: RecordingStatus;
+  endReason?: EndReason;
   /** Which attempt of the test series this was (pressing Start uses up an attempt). */
   attempt: number;
   quality: string;

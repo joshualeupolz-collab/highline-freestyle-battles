@@ -6,7 +6,7 @@
  * So we ask for a keyframe every second: it makes cutting precise and crash recovery useful.
  */
 import type { QualityPreset } from './quality';
-import { addChunk, type StoredRecording, saveRecording } from './storage';
+import { addChunk, type EndReason, type StoredRecording, saveRecording } from './storage';
 
 /** Preferred first: H.264 in MP4 plays everywhere (iPhone, Android, desktop, ffmpeg). */
 export const MIME_CANDIDATES = [
@@ -70,16 +70,21 @@ export interface RecordProgress {
 
 export interface ActiveRecording {
   id: string;
-  /** Stops, waits until every chunk is stored and returns the final record. */
-  stop(): Promise<StoredRecording>;
+  /** Stops, waits until every chunk is stored and returns the final record. Safe to call twice. */
+  stop(reason?: EndReason): Promise<StoredRecording>;
   /** Notes something that happened during the recording (e.g. the app went to the background). */
   note(event: string): void;
 }
 
+/**
+ * Starts recording. The recording ends by itself when the app goes to the background or the
+ * camera stops delivering pictures; `onAutoStop` then receives the final record.
+ */
 export async function startRecording(
   stream: MediaStream,
   options: RecordOptions,
   onProgress: (p: RecordProgress) => void,
+  onAutoStop: (recording: StoredRecording) => void,
 ): Promise<ActiveRecording> {
   const recorderOptions: MediaRecorderOptions & { videoKeyFrameIntervalDuration?: number } = {
     videoBitsPerSecond: options.preset.videoBitsPerSecond,
@@ -154,28 +159,64 @@ export async function startRecording(
   recorder.onerror = (e) => {
     events.push(`${at()}: recorder error: ${String((e as ErrorEvent).error ?? e.type)}`);
   };
-  for (const track of stream.getTracks()) {
-    track.onended = () => events.push(`${at()}: ${track.kind} track ended`);
-  }
-
   recorder.start(options.timesliceMs);
   recording.mimeType = recorder.mimeType || recording.mimeType;
+
+  let stopping: Promise<StoredRecording> | undefined;
+  const stop = (reason: EndReason = 'stopped') => {
+    stopping ??= new Promise((resolve) => {
+      cleanup();
+      events.push(`${at()}: stopped (${reason})`);
+      recorder.onstop = async () => {
+        await writes;
+        recording.status = 'done';
+        recording.endReason = reason;
+        recording.durationMs = Math.round(performance.now() - t0);
+        recording.diagnostics = diagnostics();
+        await saveRecording(recording);
+        resolve(recording);
+      };
+      if (recorder.state === 'inactive') recorder.onstop(new Event('stop'));
+      else recorder.stop();
+    });
+    return stopping;
+  };
+  const autoStop = (reason: EndReason) => {
+    if (!stopping) stop(reason).then(onAutoStop);
+  };
+
+  // Leaving the app ends the attempt; so does a camera that stops delivering pictures.
+  const onVisibility = () => {
+    events.push(`${at()}: page ${document.visibilityState}`);
+    if (document.visibilityState === 'hidden') autoStop('app_left');
+  };
+  const onPageHide = () => autoStop('app_left');
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', onPageHide);
+  for (const track of stream.getTracks()) {
+    track.onended = () => {
+      events.push(`${at()}: ${track.kind} track ended`);
+      if (track.kind === 'video') autoStop('camera_lost');
+    };
+    track.onmute = () => {
+      events.push(`${at()}: ${track.kind} track muted`);
+      if (track.kind === 'video') autoStop('camera_lost');
+    };
+    track.onunmute = () => events.push(`${at()}: ${track.kind} track unmuted`);
+  }
+  function cleanup() {
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('pagehide', onPageHide);
+    for (const track of stream.getTracks()) {
+      track.onended = null;
+      track.onmute = null;
+      track.onunmute = null;
+    }
+  }
 
   return {
     id,
     note: (event) => events.push(`${at()}: ${event}`),
-    stop: () =>
-      new Promise((resolve) => {
-        recorder.onstop = async () => {
-          await writes;
-          recording.status = 'done';
-          recording.durationMs = Math.round(performance.now() - t0);
-          recording.diagnostics = diagnostics();
-          await saveRecording(recording);
-          resolve(recording);
-        };
-        if (recorder.state === 'inactive') recorder.onstop(new Event('stop'));
-        else recorder.stop();
-      }),
+    stop,
   };
 }
