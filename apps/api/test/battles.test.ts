@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { defaultDeadline } from '@hfb/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '../src/db/client';
 import { resolveAbandonedDeadlines } from '../src/services/battles';
@@ -12,7 +13,7 @@ interface Battle {
   status: string;
   settings: {
     attemptsPerVideo: number | null;
-    timeWindowHours: number | null;
+    deadlineAt: number | null;
     level: number;
     scoring: string;
   };
@@ -103,9 +104,30 @@ describe('requests', () => {
     const battle = await createBattle(anna);
     expect(battle).toMatchObject({
       status: 'open',
-      settings: { attemptsPerVideo: 3, timeWindowHours: 168, level: 3, scoring: 'scale' },
+      settings: { attemptsPerVideo: 3, level: 3, scoring: 'scale' },
     });
+    // Default deadline: in 7 days at 05:00 German time.
+    expect(battle.settings.deadlineAt).toBe(defaultDeadline());
+    expect(battle.deadlineAt).toBe(battle.settings.deadlineAt);
     expect(battle.participants.map((p) => p.userId)).toEqual([anna.user.id]);
+  });
+
+  it('accepts any number of attempts and any deadline within the limits', async () => {
+    const deadlineAt = Date.now() + 30 * HOUR;
+    const battle = await createBattle(anna, { settings: { attemptsPerVideo: 7, deadlineAt } });
+    expect(battle.settings).toMatchObject({ attemptsPerVideo: 7, deadlineAt });
+    for (const bad of [Date.now() - HOUR, Date.now() + 61 * 24 * HOUR]) {
+      const res = await call('/api/battles', {
+        session: anna.session,
+        body: { formatId: BEST_TRICK, settings: { deadlineAt: bad } },
+      });
+      expect(res.status).toBe(400);
+    }
+    const tooMany = await call('/api/battles', {
+      session: anna.session,
+      body: { formatId: BEST_TRICK, settings: { attemptsPerVideo: 100 } },
+    });
+    expect(tooMany.status).toBe(400);
   });
 
   it('rejects weight 4–5, unknown formats and accounts that are not approved', async () => {
@@ -154,6 +176,23 @@ describe('requests', () => {
     });
   });
 
+  it('hides requests whose deadline has passed and refuses to accept them', async () => {
+    const battle = await createBattle(ben);
+    await env.DB.prepare('UPDATE battles SET deadline_at = ? WHERE id = ?')
+      .bind(Date.now() - 1, battle.id)
+      .run();
+    const { body } = await json<{ requests: unknown[] }>(
+      call('/api/battles/open', { session: anna.session }),
+    );
+    expect(body.requests).toEqual([]);
+    expect((await post(anna, `/api/battles/${battle.id}/accept`)).status).toBe(409);
+    await resolveAbandonedDeadlines(getDb(env.DB));
+    const after = await json<{ battle: Battle }>(
+      call(`/api/battles/${battle.id}`, { session: ben.session }),
+    );
+    expect(after.body.battle).toMatchObject({ status: 'cancelled', cancelReason: 'expired' });
+  });
+
   it('lets the challenger retract an open request', async () => {
     const battle = await createBattle(anna);
     expect((await post(ben, `/api/battles/${battle.id}/retract`)).status).toBe(403);
@@ -163,13 +202,13 @@ describe('requests', () => {
 });
 
 describe('acceptance', () => {
-  it('starts the battle at once with fixed settings and sets the deadline', async () => {
-    const battle = await createBattle(anna);
-    const before = Date.now();
+  it('starts the battle at once and keeps the fixed deadline', async () => {
+    const deadlineAt = Date.now() + 50 * HOUR;
+    const battle = await createBattle(anna, { settings: { deadlineAt } });
     const res = await post(ben, `/api/battles/${battle.id}/accept`);
     expect(res.status).toBe(200);
     expect(res.body.battle.status).toBe('active');
-    expect(res.body.battle.deadlineAt).toBeGreaterThanOrEqual(before + 168 * HOUR);
+    expect(res.body.battle.deadlineAt).toBe(deadlineAt);
     expect((await post(carla, `/api/battles/${battle.id}/accept`)).status).toBe(409);
   });
 
@@ -184,7 +223,7 @@ describe('acceptance', () => {
   it('negotiates flexible settings: the accepting side can start with them as they are', async () => {
     const battle = await createBattle(anna, {
       settingsFlexible: true,
-      settings: { timeWindowHours: null },
+      settings: { deadlineAt: null },
     });
     expect((await post(ben, `/api/battles/${battle.id}/accept`)).body.battle.status).toBe(
       'negotiating',
@@ -197,16 +236,18 @@ describe('acceptance', () => {
   it('negotiates flexible settings: an accepted counter-proposal applies and starts the battle', async () => {
     const battle = await createBattle(anna, { settingsFlexible: true });
     await post(ben, `/api/battles/${battle.id}/accept`);
+    const counterDeadline = Date.now() + 48 * HOUR;
     const proposalId = await propose(ben, battle.id, {
       kind: 'settings',
-      changes: { attemptsPerVideo: 1, timeWindowHours: 48 },
+      changes: { attemptsPerVideo: 1, deadlineAt: counterDeadline },
     });
     const res = await post(anna, `/api/battles/${battle.id}/proposals/${proposalId}/respond`, {
       decision: 'accept',
     });
     expect(res.body.battle).toMatchObject({
       status: 'active',
-      settings: { attemptsPerVideo: 1, timeWindowHours: 48 },
+      settings: { attemptsPerVideo: 1, deadlineAt: counterDeadline },
+      deadlineAt: counterDeadline,
     });
   });
 });
@@ -251,16 +292,19 @@ describe('change proposals during the battle', () => {
     ).toBe(409);
   });
 
-  it('moves the deadline by an accepted extension; time window changes need an extension', async () => {
+  it('moves the deadline by an accepted extension or settings change', async () => {
     const id = await activeBattle();
-    expect(
-      (
-        await post(anna, `/api/battles/${id}/proposals`, {
-          kind: 'settings',
-          changes: { timeWindowHours: 24 },
-        })
-      ).status,
-    ).toBe(400);
+    const past = { kind: 'settings', changes: { deadlineAt: Date.now() - HOUR } };
+    expect((await post(anna, `/api/battles/${id}/proposals`, past)).status).toBe(400);
+    const earlier = Date.now() + 10 * HOUR;
+    const changeId = await propose(anna, id, {
+      kind: 'settings',
+      changes: { deadlineAt: earlier },
+    });
+    const changed = await post(ben, `/api/battles/${id}/proposals/${changeId}/respond`, {
+      decision: 'accept',
+    });
+    expect(changed.body.battle.deadlineAt).toBe(earlier);
     const deadlineAt = Date.now() + 500 * HOUR;
     const proposalId = await propose(anna, id, { kind: 'extension', deadlineAt });
     const res = await post(ben, `/api/battles/${id}/proposals/${proposalId}/respond`, {
@@ -273,6 +317,18 @@ describe('change proposals during the battle', () => {
     const id = await activeBattle();
     const res = await post(anna, `/api/battles/${id}/grant-attempt`);
     expect(res.body.battle.participants.map((p) => p.extraAttempts)).toEqual([0, 1]);
+  });
+
+  it('takes back an extra attempt only if the receiving side agrees', async () => {
+    const id = await activeBattle();
+    const takeBack = { kind: 'extra_attempt', change: -1 };
+    expect((await post(anna, `/api/battles/${id}/proposals`, takeBack)).status).toBe(409);
+    await post(anna, `/api/battles/${id}/grant-attempt`);
+    const proposalId = await propose(anna, id, takeBack);
+    const res = await post(ben, `/api/battles/${id}/proposals/${proposalId}/respond`, {
+      decision: 'accept',
+    });
+    expect(res.body.battle.participants.map((p) => p.extraAttempts)).toEqual([0, 0]);
   });
 });
 
@@ -369,6 +425,35 @@ describe('abandoned deadline (scheduled job)', () => {
       cancelReason: 'deadline_missed',
     });
     expect((await status(recent)).status).toBe('active');
+  });
+});
+
+describe('chat', () => {
+  it('lets only the participants talk and marks new messages as unread', async () => {
+    const id = await activeBattle();
+    const send = (who: Person, body: string) =>
+      call(`/api/battles/${id}/messages`, { session: who.session, body: { body } });
+    expect((await send(anna, 'Good luck!')).status).toBe(201);
+    expect((await send(carla, 'Can I join?')).status).toBe(403);
+    expect((await send(anna, '   ')).status).toBe(400);
+
+    const unread = async (who: Person) => {
+      const { body } = await json<{ battles: { id: string; unreadMessages: number }[] }>(
+        call('/api/battles/mine', { session: who.session }),
+      );
+      return body.battles.find((b) => b.id === id)?.unreadMessages;
+    };
+    expect(await unread(ben)).toBe(1);
+    expect(await unread(anna)).toBe(0);
+
+    const read = await json<{ messages: { body: string; senderId: string }[] }>(
+      call(`/api/battles/${id}/messages`, { session: ben.session }),
+    );
+    expect(read.body.messages).toMatchObject([{ body: 'Good luck!', senderId: anna.user.id }]);
+    expect(await unread(ben)).toBe(0);
+    expect((await call(`/api/battles/${id}/messages`, { session: carla.session })).status).toBe(
+      403,
+    );
   });
 });
 

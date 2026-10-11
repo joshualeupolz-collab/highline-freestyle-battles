@@ -11,8 +11,11 @@ import { LoginPage } from './pages/Login';
 import { NewBattlePage } from './pages/NewBattle';
 import { OpenRequestsPage } from './pages/OpenRequests';
 import { ProfilePage } from './pages/Profile';
+import { ProposeFormatPage } from './pages/ProposeFormat';
+import { RankingsPage } from './pages/Rankings';
 import { RegisterPage } from './pages/Register';
 import { ResetPasswordPage } from './pages/ResetPassword';
+import { UserProfilePage } from './pages/UserProfile';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -42,6 +45,9 @@ const router = createBrowserRouter([
       { path: '/', element: <BattlesPage /> },
       { path: '/open', element: <OpenRequestsPage /> },
       { path: '/new', element: <NewBattlePage /> },
+      { path: '/formats/propose', element: <ProposeFormatPage /> },
+      { path: '/rankings', element: <RankingsPage /> },
+      { path: '/users/:id', element: <UserProfilePage /> },
       { path: '/battles/:id', element: <BattleDetailPage /> },
       { path: '/approvals', element: <ApprovalsPage /> },
       { path: '/admin', element: <AdminPage /> },

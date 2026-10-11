@@ -27,7 +27,7 @@ Nobody can read a password, not even an admin. We store only:
 - a **PBKDF2-SHA256 hash** with a random salt per user (native WebCrypto in the Worker, fast enough for the Workers CPU limit; scrypt/argon2 in JavaScript would be too slow there),
 - combined with a secret **pepper** stored as a Cloudflare secret, not in the database. A stolen database alone is not enough to guess passwords.
 
-In addition: minimum password length (10), session tokens stored only as hashes, and after 5 failed logins in a row the account is locked for 15 minutes.
+In addition: minimum password length (8), session tokens stored only as hashes, and after 5 failed logins in a row the account is locked for 15 minutes.
 
 **Iterations:** 100,000 PBKDF2 iterations (the Workers maximum) took ~17 ms of CPU in a measurement, above the ~10 ms of Workers Free. We start with **50,000**. Every hash stores its iteration count, so the value can be raised after measuring on Cloudflare; accounts are upgraded automatically at their next login.
 
@@ -131,6 +131,7 @@ replay_requests  id, format_id NULL, from_event_at, reason, requested_by, create
 Notes:
 
 - `battle_proposals` implements core principle 2 ("everything can be changed if both sides agree") once, for settings changes, on-site results, draw confirmation, cancellation and goodwill. `proposal_responses` also works for n people.
+- Added after the first deployment (all additive): `formats.approved_at/approved_by/review_note` (format proposals; `approved_at` NULL = proposal), `battle_messages` (chat) and `battle_participants.last_read_message_at` (unread marker).
 - `video_files` is the replaceable storage layer: "delete everywhere" means processing every row of a video.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
@@ -188,6 +189,7 @@ open ──accept──▶ active ─────────────▶ rev
 | 4 | Formats and RuleSets (admin) | done |
 | 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines | done |
 | 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | done (plus deployment, `docs/deployment.md`) |
+| 6b | Feedback round 1: password minimum 8, free attempts/time window, Lichess-like format tiles, format proposals, extra attempt confirmation and take-back, profiles, format rankings (step 10 pulled forward), chat | done |
 | 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | |
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | |
 | 9 | Review level 1, result → rating update in the Worker, rating history | |

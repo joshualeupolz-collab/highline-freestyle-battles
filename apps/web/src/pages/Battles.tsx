@@ -29,6 +29,7 @@ export function BattlesPage() {
 
   const needsMe = (b: BattleSummary) =>
     b.deadlinePassed ||
+    b.unreadMessages > 0 ||
     (b.status === 'open' && b.invitedUserId === me?.id) ||
     b.status === 'negotiating';
   const running = (b: BattleSummary) =>
@@ -55,7 +56,14 @@ export function BattlesPage() {
                 <Link key={b.id} to={`/battles/${b.id}`} className="card">
                   <div className="row">
                     <strong>{formatName(b.formatId)}</strong>
-                    <StatusBadge status={b.status} />
+                    <span>
+                      {b.unreadMessages > 0 && (
+                        <span className="badge unread">
+                          {t('battles.newMessages', { n: b.unreadMessages })}
+                        </span>
+                      )}{' '}
+                      <StatusBadge status={b.status} />
+                    </span>
                   </div>
                   <div className="muted">
                     {opponent

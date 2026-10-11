@@ -130,3 +130,99 @@ describe('managing RuleSets', () => {
     );
   });
 });
+
+describe('format proposals', () => {
+  const proposal = { name: '2-Trick Combo', parts: [{ kind: 'trick_combo', count: 2 }] };
+
+  it('lets any athlete propose; the format is unusable until an admin approves it', async () => {
+    const admin = await registerAdmin();
+    const anna = await registerAthlete('anna', admin.session);
+    const res = await call('/api/formats/proposals', { session: anna.session, body: proposal });
+    expect(res.status).toBe(201);
+    const { proposal: created } = (await res.json()) as {
+      proposal: { id: string; slug: string; state: string };
+    };
+    expect(created).toMatchObject({ slug: '2-trick-combo', state: 'pending' });
+
+    const list = (await (await call('/api/formats')).json()) as { formats: { id: string }[] };
+    expect(list.formats.map((f) => f.id)).not.toContain(created.id);
+    const battle = await call('/api/battles', {
+      session: anna.session,
+      body: { formatId: created.id },
+    });
+    expect(battle.status).toBe(400);
+
+    const pending = (await (
+      await call('/api/formats/proposals', { session: admin.session })
+    ).json()) as {
+      proposals: { id: string; proposedBy: { username: string } }[];
+    };
+    expect(pending.proposals.map((p) => [p.id, p.proposedBy.username])).toEqual([
+      [created.id, 'anna'],
+    ]);
+
+    expect(
+      (
+        await call(`/api/formats/${created.id}/approve`, {
+          session: anna.session,
+          body: { status: 'fun' },
+        })
+      ).status,
+    ).toBe(403);
+    const approved = await call(`/api/formats/${created.id}/approve`, {
+      session: admin.session,
+      body: { status: 'fun' },
+    });
+    expect(approved.status).toBe(200);
+    const after = (await (await call('/api/formats')).json()) as {
+      formats: { id: string; status: string }[];
+    };
+    expect(after.formats.find((f) => f.id === created.id)?.status).toBe('fun');
+    expect(
+      (await call('/api/battles', { session: anna.session, body: { formatId: created.id } }))
+        .status,
+    ).toBe(201);
+    expect(await auditActions()).toContain('format.approve');
+  });
+
+  it('shows the proposer a rejection with its note', async () => {
+    const admin = await registerAdmin();
+    const anna = await registerAthlete('anna', admin.session);
+    const { proposal: created } = (await (
+      await call('/api/formats/proposals', { session: anna.session, body: proposal })
+    ).json()) as { proposal: { id: string } };
+    const res = await call(`/api/formats/${created.id}/reject`, {
+      session: admin.session,
+      body: { note: 'Same as 3-Trick Combo' },
+    });
+    expect(res.status).toBe(200);
+    const mine = (await (
+      await call('/api/formats/proposals', { session: anna.session })
+    ).json()) as {
+      proposals: { state: string; reviewNote: string }[];
+    };
+    expect(mine.proposals).toMatchObject([
+      { state: 'rejected', reviewNote: 'Same as 3-Trick Combo' },
+    ]);
+  });
+
+  it('limits open proposals per person and generates unique slugs', async () => {
+    const admin = await registerAdmin();
+    const anna = await registerAthlete('anna', admin.session);
+    const slugs: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const res = await call('/api/formats/proposals', { session: anna.session, body: proposal });
+      slugs.push(((await res.json()) as { proposal: { slug: string } }).proposal.slug);
+    }
+    expect(slugs).toEqual([
+      '2-trick-combo',
+      '2-trick-combo-2',
+      '2-trick-combo-3',
+      '2-trick-combo-4',
+      '2-trick-combo-5',
+    ]);
+    expect(
+      (await call('/api/formats/proposals', { session: anna.session, body: proposal })).status,
+    ).toBe(429);
+  });
+});

@@ -43,6 +43,53 @@ export interface Format {
   parts: { kind: string; count: number; label?: string }[];
 }
 
+export interface FormatProposal extends Format {
+  state: 'pending' | 'approved' | 'rejected';
+  reviewNote: string | null;
+  createdAt: number;
+  proposedBy: { username: string | null; displayName: string | null };
+}
+
+export interface RatingView {
+  r: number;
+  rd: number;
+  rankingValue: number;
+  provisional: boolean;
+  nBattles: number;
+  lastEventAt: number | null;
+}
+
+export interface Profile {
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    status: string;
+    createdAt: number;
+    roles: string[];
+    approvedBy: UserHit | null;
+  };
+  ratings: (RatingView & { formatId: string; formatName: string })[];
+  battles: {
+    id: string;
+    formatId: string;
+    formatName: string | null;
+    status: BattleStatus;
+    createdAt: number;
+    decidedAt: number | null;
+    score: number | null;
+    opponents: { userId: string; username: string; displayName: string }[];
+    ratingChange: number | null;
+  }[];
+}
+
+export interface RankingEntry extends RatingView {
+  rank: number;
+  userId: string;
+  username: string;
+  displayName: string;
+}
+
 export interface Participant {
   userId: string;
   username: string;
@@ -50,6 +97,7 @@ export interface Participant {
   seat: number;
   score: number | null;
   extraAttempts?: number;
+  rating?: RatingView | null;
 }
 
 export type BattleStatus =
@@ -63,7 +111,7 @@ export type BattleStatus =
 
 export interface Proposal {
   id: string;
-  kind: 'settings' | 'extension' | 'cancel';
+  kind: 'settings' | 'extension' | 'cancel' | 'extra_attempt';
   payload: { changes?: Partial<BattleSettings>; deadlineAt?: number };
   proposedBy: string;
   createdAt: number;
@@ -87,7 +135,16 @@ export interface Battle {
   proposals: Proposal[];
 }
 
-export type BattleSummary = Omit<Battle, 'settingsFlexible' | 'proposals' | 'cancelReason'>;
+export type BattleSummary = Omit<Battle, 'settingsFlexible' | 'proposals' | 'cancelReason'> & {
+  unreadMessages: number;
+};
+
+export interface Message {
+  id: string;
+  senderId: string;
+  body: string;
+  createdAt: number;
+}
 
 export interface OpenRequest {
   id: string;
@@ -134,7 +191,17 @@ export const api = {
 
   formats: () => get<{ formats: Format[] }>('/formats'),
   createFormat: (body: unknown) => post<{ format: Format }>('/formats', body),
+  formatProposals: () => get<{ proposals: FormatProposal[] }>('/formats/proposals'),
+  proposeFormat: (body: unknown) => post('/formats/proposals', body),
+  approveFormat: (id: string, body: { status: 'relevant' | 'fun' }) =>
+    post(`/formats/${id}/approve`, body),
+  rejectFormat: (id: string, body: { note: string }) => post(`/formats/${id}/reject`, body),
 
+  profile: (id: string) => get<Profile>(`/users/${id}`),
+  ranking: (formatId: string) =>
+    get<{ format: { id: string; name: string }; ranking: RankingEntry[] }>(
+      `/formats/${formatId}/ranking`,
+    ),
   searchUsers: (q: string) => get<{ users: UserHit[] }>(`/users/search?q=${encodeURIComponent(q)}`),
   pendingUsers: () => get<{ users: PendingUser[] }>('/users/pending'),
   approveUser: (id: string) => post(`/users/${id}/approve`),
@@ -145,6 +212,9 @@ export const api = {
   openRequests: () => get<{ requests: OpenRequest[] }>('/battles/open'),
   battle: (id: string) => get<BattleResponse>(`/battles/${id}`),
   createBattle: (body: unknown) => post<BattleResponse>('/battles', body),
+  messages: (battleId: string) => get<{ messages: Message[] }>(`/battles/${battleId}/messages`),
+  sendMessage: (battleId: string, body: string) =>
+    post<{ message: Message }>(`/battles/${battleId}/messages`, { body }),
   battleAction: (id: string, action: string, body?: unknown) =>
     post<BattleResponse>(`/battles/${id}/${action}`, body),
 };

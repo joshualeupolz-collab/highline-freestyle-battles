@@ -1,8 +1,14 @@
 /** Small helpers shared by the battle pages. */
-import type { BattleSettings } from '@hfb/shared';
+import {
+  type BattleSettings,
+  DEADLINE_TIME_ZONE,
+  defaultDeadline,
+  MAX_ATTEMPTS,
+  MAX_DEADLINE_DAYS,
+} from '@hfb/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api, type BattleStatus, type Format } from './api';
-import { type MessageKey, t } from './i18n';
+import { formatDate, type MessageKey, t } from './i18n';
 
 export function useFormats() {
   return useQuery({ queryKey: ['formats'], queryFn: api.formats, staleTime: 5 * 60_000 });
@@ -19,17 +25,40 @@ export function partsText(format: Format): string {
     .join(' + ');
 }
 
+/** Local date and time strings for <input type="date"> and <input type="time">. */
+function toInputs(ms: number) {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
+function fromInputs(date: string, time: string): number | null {
+  const ms = new Date(`${date}T${time || '00:00'}`).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** A deadline in German time, e.g. "Sun 18 Oct, 05:00" (deadlines are set in German time). */
+export function germanTime(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    timeZone: DEADLINE_TIME_ZONE,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function settingsText(s: Partial<BattleSettings>): string {
   const parts: string[] = [];
   if (s.attemptsPerVideo !== undefined)
     parts.push(`${t('settings.attempts')}: ${s.attemptsPerVideo ?? t('settings.unlimited')}`);
-  if (s.timeWindowHours !== undefined)
+  if (s.deadlineAt !== undefined)
     parts.push(
-      `${t('settings.timeWindow')}: ${
-        s.timeWindowHours === null
-          ? t('settings.flexibleTime')
-          : t('settings.days', { n: Math.round(s.timeWindowHours / 24) })
-      }`,
+      `${t('battle.deadline')}: ${s.deadlineAt === null ? t('settings.flexibleTime') : formatDate(s.deadlineAt)}`,
     );
   if (s.level !== undefined) parts.push(`${t('settings.level')}: ${s.level}`);
   if (s.scoring !== undefined)
@@ -45,53 +74,88 @@ export function StatusBadge({ status }: { status: BattleStatus }) {
 export function SettingsFields({
   value,
   onChange,
-  showTimeWindow = true,
 }: {
   value: BattleSettings;
   onChange: (s: BattleSettings) => void;
-  showTimeWindow?: boolean;
 }) {
+  const unlimited = value.attemptsPerVideo === null;
+  const noDeadline = value.deadlineAt === null;
+  const inputs = toInputs(value.deadlineAt ?? defaultDeadline());
+  const setDeadline = (date: string, time: string) => {
+    const ms = fromInputs(date, time);
+    if (ms !== null) onChange({ ...value, deadlineAt: ms });
+  };
+  const today = toInputs(Date.now()).date;
+  const lastDay = toInputs(Date.now() + MAX_DEADLINE_DAYS * 86_400_000).date;
   return (
     <>
-      <label>
-        {t('settings.attempts')}
-        <select
-          value={value.attemptsPerVideo ?? 'unlimited'}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              attemptsPerVideo:
-                e.target.value === 'unlimited' ? null : (Number(e.target.value) as 1 | 2 | 3),
-            })
-          }
-        >
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="unlimited">{t('settings.unlimited')}</option>
-        </select>
-      </label>
-      {showTimeWindow && (
-        <label>
-          {t('settings.timeWindow')}
-          <select
-            value={value.timeWindowHours ?? 'none'}
+      <fieldset className="field">
+        <legend>{t('settings.attempts')}</legend>
+        <div className="inline">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={MAX_ATTEMPTS}
+            value={value.attemptsPerVideo ?? ''}
+            disabled={unlimited}
             onChange={(e) =>
               onChange({
                 ...value,
-                timeWindowHours: e.target.value === 'none' ? null : Number(e.target.value),
+                attemptsPerVideo: Math.min(MAX_ATTEMPTS, Math.max(1, Number(e.target.value) || 1)),
               })
             }
-          >
-            {[1, 2, 3, 7, 14, 30].map((d) => (
-              <option key={d} value={d * 24}>
-                {t('settings.days', { n: d })}
-              </option>
-            ))}
-            <option value="none">{t('settings.flexibleTime')}</option>
-          </select>
+            aria-label={t('settings.attempts')}
+          />
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={unlimited}
+              onChange={(e) =>
+                onChange({ ...value, attemptsPerVideo: e.target.checked ? null : 3 })
+              }
+            />
+            <span>{t('settings.unlimited')}</span>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset className="field">
+        <legend>{t('battle.deadline')}</legend>
+        <div className="inline">
+          <input
+            type="date"
+            value={inputs.date}
+            min={today}
+            max={lastDay}
+            disabled={noDeadline}
+            onChange={(e) => setDeadline(e.target.value, inputs.time)}
+            aria-label={t('settings.deadlineDate')}
+          />
+          <input
+            type="time"
+            value={inputs.time}
+            disabled={noDeadline}
+            onChange={(e) => setDeadline(inputs.date, e.target.value)}
+            aria-label={t('settings.deadlineTime')}
+          />
+        </div>
+        {!noDeadline && value.deadlineAt !== null && (
+          <span className="hint">
+            {t('settings.germanTime', { date: germanTime(value.deadlineAt) })}
+          </span>
+        )}
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={noDeadline}
+            onChange={(e) =>
+              onChange({ ...value, deadlineAt: e.target.checked ? null : defaultDeadline() })
+            }
+          />
+          <span>{t('settings.flexibleTime')}</span>
         </label>
-      )}
+        <span className="hint">{t('settings.deadlineHint')}</span>
+      </fieldset>
       <label>
         {t('settings.level')}
         <select

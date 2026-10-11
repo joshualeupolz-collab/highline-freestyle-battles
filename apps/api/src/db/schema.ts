@@ -234,10 +234,20 @@ export const formats = sqliteTable(
     mergedInto: text('merged_into'),
     createdBy: text('created_by').references(() => users.id),
     createdAt: integer('created_at').notNull(),
+    /**
+     * NULL = a proposal by an athlete that is not approved yet; it cannot be used for battles.
+     * Formats created by the federation/admin are approved at once.
+     */
+    approvedAt: integer('approved_at'),
+    approvedBy: text('approved_by').references(() => users.id),
+    /** Feedback for the proposer, e.g. why a proposal was rejected. */
+    reviewNote: text('review_note'),
+    /** Archived formats (and rejected proposals) can no longer be chosen. */
     archivedAt: integer('archived_at'),
   },
   (t) => [
     foreignKey({ columns: [t.mergedInto], foreignColumns: [t.id] }),
+    index('formats_created_by_idx').on(t.createdBy),
     oneOf('formats_status_check', t.status, FORMAT_STATUSES),
     check('formats_k_points_check', sql`${t.kPoints} IS NULL OR ${t.kPoints} > 0`),
   ],
@@ -370,6 +380,8 @@ export const battleParticipants = sqliteTable(
     joinedAt: integer('joined_at').notNull(),
     /** Attempts granted on top of `attempts_per_video` (goodwill). */
     extraAttempts: integer('extra_attempts').notNull().default(0),
+    /** Newest chat message this person has seen (for the "new messages" marker). */
+    lastReadMessageAt: integer('last_read_message_at'),
     /** Raw result, depending on `battles.scoring`. */
     score: real('score'),
     points: real('points'),
@@ -411,6 +423,29 @@ export const battleProposals = sqliteTable(
     oneOf('battle_proposals_kind_check', t.kind, PROPOSAL_KINDS),
     oneOf('battle_proposals_status_check', t.status, PROPOSAL_STATUSES),
     json('battle_proposals_payload_json_check', t.payloadJson),
+  ],
+);
+
+/**
+ * Chat between the participants of a battle. Only participants can read it (later also the
+ * federation for a reported battle). Deleting an account deletes its messages.
+ */
+export const battleMessages = sqliteTable(
+  'battle_messages',
+  {
+    id: text('id').primaryKey(),
+    battleId: text('battle_id')
+      .notNull()
+      .references(() => battles.id),
+    senderId: text('sender_id')
+      .notNull()
+      .references(() => users.id),
+    body: text('body').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    index('battle_messages_battle_idx').on(t.battleId, t.createdAt),
+    index('battle_messages_sender_idx').on(t.senderId),
   ],
 );
 

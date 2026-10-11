@@ -17,13 +17,16 @@ export type FormatPart = z.infer<typeof formatPartSchema>;
 
 export const formatPartsSchema = z.array(formatPartSchema).min(1).max(10);
 
+export const slugSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(40)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Lowercase letters, digits and single dashes');
+
 export const createFormatRequestSchema = z.object({
-  slug: z
-    .string()
-    .trim()
-    .min(2)
-    .max(40)
-    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Lowercase letters, digits and single dashes'),
+  /** Short id for links; generated from the name if omitted. */
+  slug: slugSchema.optional(),
   name: z.string().trim().min(2).max(60),
   description: z.string().trim().max(500).optional(),
   status: z.enum(FORMAT_STATUSES).default('relevant'),
@@ -48,3 +51,24 @@ export const newFormatVersionRequestSchema = z.object({
   parts: formatPartsSchema,
   reason: z.string().trim().max(500).optional(),
 });
+
+/** Any athlete can propose a format; the federation/admin approves or rejects it. */
+export const proposeFormatRequestSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  description: z.string().trim().max(500).optional(),
+  parts: formatPartsSchema,
+});
+
+export const approveFormatRequestSchema = z.object({
+  /** relevant = official (shown as a tile), fun = under "more formats". */
+  status: z.enum(FORMAT_STATUSES),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const rejectFormatRequestSchema = z.object({
+  /** Shown to the person who proposed the format. */
+  note: z.string().trim().min(1).max(500),
+});
+
+/** How many open proposals one person may have at a time (prevents spam). */
+export const MAX_OPEN_PROPOSALS = 5;
