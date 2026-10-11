@@ -5,7 +5,9 @@ import { useParams } from 'react-router';
 import { api, type Battle, type Proposal } from '../api';
 import { useMe } from '../auth';
 import { partsText, SettingsFields, StatusBadge, settingsText, useFormats } from '../battleHelpers';
+import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
+import { RatingText, UserLink } from '../components/UserLink';
 import { formatDate, type MessageKey, t } from '../i18n';
 
 const DAY = 86_400_000;
@@ -50,9 +52,17 @@ export function BattleDetailPage() {
       {format && <p className="muted">{partsText(format)}</p>}
 
       <div className="card">
-        <strong>
-          {battle.participants.map((p) => p.displayName).join(` ${t('battles.vs')} `)}
-        </strong>
+        <div className="versus">
+          {battle.participants.map((p, i) => (
+            <span key={p.userId}>
+              {i > 0 && <span className="muted"> {t('battles.vs')} </span>}
+              <strong>
+                <UserLink id={p.userId} name={p.displayName} />
+              </strong>{' '}
+              <RatingText rating={p.rating} />
+            </span>
+          ))}
+        </div>
         {battle.participants.length < 2 && (
           <span className="muted"> – {t('battles.waitingForOpponent')}</span>
         )}
@@ -142,9 +152,24 @@ export function BattleDetailPage() {
             >
               {t('battle.proposeExtension')}
             </button>
-            <button type="button" className="secondary" onClick={() => run('grant-attempt')}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() =>
+                window.confirm(t('battle.grantAttemptConfirm')) && run('grant-attempt')
+              }
+            >
               {t('battle.grantAttempt')}
             </button>
+            {battle.participants.some((p) => p.userId !== me.id && (p.extraAttempts ?? 0) > 0) && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => run('proposals', { kind: 'extra_attempt', change: -1 })}
+              >
+                {t('battle.takeBackAttempt')}
+              </button>
+            )}
           </>
         )}
         {running && mine && (
@@ -159,6 +184,10 @@ export function BattleDetailPage() {
           </button>
         )}
       </div>
+
+      {mine && battle.participants.length > 1 && (
+        <Chat battleId={battle.id} myId={me.id} participants={battle.participants} />
+      )}
 
       {panel === 'settings' && (
         <SettingsProposal
@@ -209,7 +238,9 @@ function ProposalCard({
       ? t('battle.proposal.settings', { changes: settingsText(proposal.payload.changes ?? {}) })
       : proposal.kind === 'extension'
         ? t('battle.proposal.extension', { date: formatDate(proposal.payload.deadlineAt ?? 0) })
-        : t('battle.proposal.cancel');
+        : proposal.kind === 'extra_attempt'
+          ? t('battle.proposal.takeBack')
+          : t('battle.proposal.cancel');
   const own = proposal.proposedBy === myId;
   const base = `proposals/${proposal.id}`;
   return (

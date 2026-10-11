@@ -8,17 +8,15 @@ import { z } from 'zod';
 export const ONLINE_SCORINGS = ['win_loss', 'scale'] as const;
 /** Weight levels anyone may choose; 4–5 need approval by a judge or organizer (stage 2). */
 export const MAX_FREE_LEVEL = 3;
+export const MAX_ATTEMPTS = 99;
+/** Longest time window: 60 days. */
+export const MAX_TIME_WINDOW_HOURS = 60 * 24;
 
 export const battleSettingsSchema = z.object({
-  /** Attempts per video: 1, 2, 3 or null = unlimited. */
-  attemptsPerVideo: z.union([z.literal(1), z.literal(2), z.literal(3), z.null()]),
+  /** Attempts per video: any number up to MAX_ATTEMPTS, or null = unlimited. */
+  attemptsPerVideo: z.number().int().min(1).max(MAX_ATTEMPTS).nullable(),
   /** Hours from acceptance until all videos must be submitted; null = flexible, no deadline. */
-  timeWindowHours: z
-    .number()
-    .int()
-    .min(1)
-    .max(60 * 24)
-    .nullable(),
+  timeWindowHours: z.number().int().min(1).max(MAX_TIME_WINDOW_HOURS).nullable(),
   /** Weight 1 (fun) … 5 (official competition). */
   level: z.number().int().min(1).max(5),
   scoring: z.enum(ONLINE_SCORINGS),
@@ -57,6 +55,8 @@ export const proposalRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('extension'), deadlineAt: z.number().int().positive() }),
   /** Give up the battle. The other side decides: count it as their win, or cancel unrated. */
   z.object({ kind: z.literal('cancel') }),
+  /** Take back one extra attempt given by mistake; the opponent who received it must agree. */
+  z.object({ kind: z.literal('extra_attempt'), change: z.literal(-1) }),
 ]);
 export type ProposalRequest = z.infer<typeof proposalRequestSchema>;
 
@@ -74,3 +74,9 @@ export const deadlineDecisionSchema = z.object({
  * the battle counts as their win automatically; if nobody delivered, it is cancelled unrated.
  */
 export const AUTO_DECIDE_AFTER_DAYS = 7;
+
+export const MESSAGE_MAX_LENGTH = 1000;
+
+export const sendMessageRequestSchema = z.object({
+  body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
+});

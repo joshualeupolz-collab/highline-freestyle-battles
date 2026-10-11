@@ -1,6 +1,7 @@
 import { PASSWORD_MIN } from '@hfb/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { api } from '../api';
 import { useMe, useSetMe } from '../auth';
 import { ErrorText } from '../components/ErrorText';
@@ -24,6 +25,9 @@ export function ProfilePage() {
   return (
     <>
       <h1>{t('profile.title')}</h1>
+      <p>
+        <Link to={`/users/${me.id}`}>{t('profile.viewPublic')}</Link>
+      </p>
       <div className="card">
         <dl>
           <dt>{t('field.username')}</dt>

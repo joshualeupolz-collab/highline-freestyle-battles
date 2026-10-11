@@ -1,17 +1,27 @@
 /**
  * Managing other accounts: approval of new users, password reset codes.
  */
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { randomCode, sha256Hex } from '../auth/crypto';
 import { requireUser } from '../auth/middleware';
 import { can } from '../auth/permissions';
 import { getDb } from '../db/client';
-import { passwordResetCodes, userRoles, users } from '../db/schema';
+import {
+  battleParticipants,
+  battles,
+  formats,
+  passwordResetCodes,
+  ratingHistory,
+  ratingStates,
+  userRoles,
+  users,
+} from '../db/schema';
 import type { AppEnv } from '../env';
 import { auditInsert } from '../lib/audit';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
+import { displayParams, ratingView } from '../services/ratingView';
 
 const RESET_CODE_VALIDITY = 24 * 60 * 60_000;
 
@@ -130,4 +140,103 @@ userRoutes.post('/:id/password-reset-code', async (c) => {
     ),
   ]);
   return c.json({ code, expiresAt }, 201);
+});
+
+/**
+ * Public profile for logged-in users: ratings per format, who approved the account and the
+ * latest battles with their rating change.
+ */
+userRoutes.get('/:id', async (c) => {
+  const db = getDb(c.env.DB);
+  const id = c.req.param('id');
+  const user = await db.select().from(users).where(eq(users.id, id)).get();
+  if (!user || user.status === 'deleted') apiError(404, 'not_found');
+
+  const [roles, approver, states, params] = await Promise.all([
+    db
+      .select({ role: userRoles.role })
+      .from(userRoles)
+      .where(and(eq(userRoles.userId, id), isNull(userRoles.revokedAt))),
+    user.approvedBy
+      ? db
+          .select({ id: users.id, username: users.username, displayName: users.displayName })
+          .from(users)
+          .where(eq(users.id, user.approvedBy))
+          .get()
+      : Promise.resolve(undefined),
+    db
+      .select({ state: ratingStates, formatName: formats.name })
+      .from(ratingStates)
+      .innerJoin(formats, eq(formats.id, ratingStates.formatId))
+      .where(eq(ratingStates.userId, id)),
+    displayParams(db),
+  ]);
+
+  const mine = await db
+    .select({ battle: battles, score: battleParticipants.score })
+    .from(battleParticipants)
+    .innerJoin(battles, eq(battles.id, battleParticipants.battleId))
+    .where(and(eq(battleParticipants.userId, id), sql`${battles.status} <> 'open'`))
+    .orderBy(desc(battles.createdAt))
+    .limit(20);
+  const battleIds = mine.map((m) => m.battle.id);
+  const [opponents, history, formatRows] = battleIds.length
+    ? await Promise.all([
+        db
+          .select({
+            battleId: battleParticipants.battleId,
+            userId: users.id,
+            username: users.username,
+            displayName: users.displayName,
+          })
+          .from(battleParticipants)
+          .innerJoin(users, eq(users.id, battleParticipants.userId))
+          .where(
+            and(
+              inArray(battleParticipants.battleId, battleIds),
+              sql`${battleParticipants.userId} <> ${id}`,
+            ),
+          ),
+        db
+          .select()
+          .from(ratingHistory)
+          .where(and(inArray(ratingHistory.battleId, battleIds), eq(ratingHistory.userId, id))),
+        db.select({ id: formats.id, name: formats.name }).from(formats),
+      ])
+    : [[], [], []];
+
+  return c.json({
+    user: {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      status: user.status,
+      createdAt: user.createdAt,
+      roles: roles.map((r) => r.role).sort(),
+      approvedBy: approver ?? null,
+    },
+    ratings: states
+      .map(({ state, formatName }) => ({
+        formatId: state.formatId,
+        formatName,
+        ...ratingView(state, params),
+      }))
+      .sort((a, b) => b.nBattles - a.nBattles),
+    battles: mine.map(({ battle, score }) => {
+      const h = history.find((x) => x.battleId === battle.id);
+      return {
+        id: battle.id,
+        formatId: battle.formatId,
+        formatName: formatRows.find((f) => f.id === battle.formatId)?.name ?? null,
+        status: battle.status,
+        createdAt: battle.createdAt,
+        decidedAt: battle.decidedAt,
+        score,
+        opponents: opponents
+          .filter((o) => o.battleId === battle.id)
+          .map(({ battleId: _, ...o }) => o),
+        ratingChange: h ? Math.round(h.rAfter - h.rBefore) : null,
+      };
+    }),
+  });
 });

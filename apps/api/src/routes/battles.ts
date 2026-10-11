@@ -13,6 +13,7 @@ import {
   MAX_FREE_LEVEL,
   proposalRequestSchema,
   proposalResponseSchema,
+  sendMessageRequestSchema,
 } from '@hfb/shared';
 import { and, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
@@ -28,6 +29,7 @@ import {
 } from '../battles/rules';
 import { type Database, getDb, runBatch } from '../db/client';
 import {
+  battleMessages,
   battleParticipants,
   battleProposals,
   battles,
@@ -46,6 +48,7 @@ import {
   decideStatements,
   requiredSubmissionsPerPerson,
 } from '../services/battles';
+import { displayParams, ratingView } from '../services/ratingView';
 import { latestFormatVersion } from './formats';
 import { currentRuleset, parseRulesetParams } from './rulesets';
 
@@ -108,6 +111,25 @@ async function pendingProposals(db: Database, battleId: string) {
 
 async function battleResponse(db: Database, battleId: string, now = Date.now()) {
   const { battle, participants } = await loadBattle(db, battleId);
+  const [states, params] = await Promise.all([
+    db
+      .select()
+      .from(ratingStates)
+      .where(
+        and(
+          eq(ratingStates.formatId, battle.formatId),
+          inArray(
+            ratingStates.userId,
+            participants.map((p) => p.userId),
+          ),
+        ),
+      ),
+    displayParams(db),
+  ]);
+  const withRatings = participants.map((p) => {
+    const state = states.find((s) => s.userId === p.userId);
+    return { ...p, rating: state ? ratingView(state, params, now) : null };
+  });
   return {
     battle: {
       id: battle.id,
@@ -128,7 +150,7 @@ async function battleResponse(db: Database, battleId: string, now = Date.now()) 
       decidedAt: battle.decidedAt,
       decisionReason: battle.decisionReason,
       cancelReason: battle.cancelReason,
-      participants,
+      participants: withRatings,
       proposals: await pendingProposals(db, battle.id),
     },
   };
@@ -153,7 +175,9 @@ battleRoutes.post('/', async (c) => {
   if (settings.level > MAX_FREE_LEVEL) apiError(400, 'level_requires_approval');
 
   const format = await db.select().from(formats).where(eq(formats.id, input.formatId)).get();
-  if (!format || format.archivedAt !== null) apiError(400, 'unknown_format');
+  if (!format || format.archivedAt !== null || format.approvedAt === null) {
+    apiError(400, 'unknown_format');
+  }
   const version = await latestFormatVersion(db, format.id);
   const ruleset = await currentRuleset(db, now);
   if (!version || !ruleset) apiError(500, 'internal_error');
@@ -289,9 +313,34 @@ battleRoutes.get('/mine', async (c) => {
         )
         .orderBy(battleParticipants.seat)
     : [];
+  // New chat messages from others since I last opened each battle.
+  const unread = rows.length
+    ? await db
+        .select({ battleId: battleMessages.battleId, n: sql<number>`count(*)` })
+        .from(battleMessages)
+        .innerJoin(
+          battleParticipants,
+          and(
+            eq(battleParticipants.battleId, battleMessages.battleId),
+            eq(battleParticipants.userId, user.id),
+          ),
+        )
+        .where(
+          and(
+            inArray(
+              battleMessages.battleId,
+              rows.map((b) => b.id),
+            ),
+            ne(battleMessages.senderId, user.id),
+            sql`${battleMessages.createdAt} > coalesce(${battleParticipants.lastReadMessageAt}, 0)`,
+          ),
+        )
+        .groupBy(battleMessages.battleId)
+    : [];
   const now = Date.now();
   return c.json({
     battles: rows.map((b) => ({
+      unreadMessages: unread.find((u) => u.battleId === b.id)?.n ?? 0,
       id: b.id,
       formatId: b.formatId,
       status: b.status,
@@ -415,8 +464,21 @@ battleRoutes.post('/:id/proposals', async (c) => {
     }
   }
 
+  let payload: Record<string, unknown>;
+  if (input.kind === 'extra_attempt') {
+    if (battle.status !== 'active') apiError(409, 'battle_not_running');
+    const others = participants.filter((p) => p.userId !== user.id);
+    const target = others.length === 1 ? others[0] : undefined;
+    if (!target) apiError(400, 'unsupported_for_group_battles');
+    if (target.extraAttempts < 1) apiError(409, 'no_extra_attempt_to_take_back');
+    payload = { change: -1, userId: target.userId };
+  } else {
+    const { kind: _, ...rest } = input;
+    payload = rest;
+  }
+
   const id = newId(now);
-  const { kind, ...payload } = input;
+  const kind = input.kind;
   await db.batch([
     // A new proposal replaces my own earlier pending one of the same kind.
     db
@@ -549,6 +611,19 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
     case 'cancel':
       statements.push(...cancelStatements(db, battle.id, 'agreed'));
       break;
+    case 'extra_attempt':
+      statements.push(
+        db
+          .update(battleParticipants)
+          .set({ extraAttempts: sql`max(${battleParticipants.extraAttempts} - 1, 0)` })
+          .where(
+            and(
+              eq(battleParticipants.battleId, battle.id),
+              eq(battleParticipants.userId, payload.userId as string),
+            ),
+          ),
+      );
+      break;
     default:
       apiError(400, 'unsupported_proposal');
   }
@@ -614,4 +689,73 @@ battleRoutes.post('/:id/deadline-decision', async (c) => {
       : await decideStatements(db, battle, winnerScores(seatOrder, user.id), 'deadline', now);
   await runBatch(db, statements);
   return c.json(await battleResponse(db, battle.id, now));
+});
+
+// ---------------------------------------------------------------------------------------------
+// Chat between the participants
+// ---------------------------------------------------------------------------------------------
+
+const MESSAGES_PER_PAGE = 200;
+
+/** Messages of a battle, oldest first (`?after=` for only newer ones). Marks them as read. */
+battleRoutes.get('/:id/messages', async (c) => {
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const db = getDb(c.env.DB);
+  const { participants } = await loadBattle(db, c.req.param('id'));
+  requireParticipant(participants, user.id);
+  const battleId = c.req.param('id');
+  const after = Number(c.req.query('after') ?? 0) || 0;
+
+  const rows = await db
+    .select({
+      id: battleMessages.id,
+      senderId: battleMessages.senderId,
+      body: battleMessages.body,
+      createdAt: battleMessages.createdAt,
+    })
+    .from(battleMessages)
+    .where(and(eq(battleMessages.battleId, battleId), sql`${battleMessages.createdAt} > ${after}`))
+    .orderBy(desc(battleMessages.createdAt))
+    .limit(MESSAGES_PER_PAGE);
+  const messages = rows.reverse();
+
+  // Only write when there is something new, so polling does not cost a write each time.
+  const newest = messages.at(-1)?.createdAt;
+  const me = await db
+    .select({ lastRead: battleParticipants.lastReadMessageAt })
+    .from(battleParticipants)
+    .where(and(eq(battleParticipants.battleId, battleId), eq(battleParticipants.userId, user.id)))
+    .get();
+  if (newest !== undefined && newest > (me?.lastRead ?? 0)) {
+    await db
+      .update(battleParticipants)
+      .set({ lastReadMessageAt: newest })
+      .where(
+        and(eq(battleParticipants.battleId, battleId), eq(battleParticipants.userId, user.id)),
+      );
+  }
+  return c.json({ messages });
+});
+
+battleRoutes.post('/:id/messages', async (c) => {
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const { body } = await parseJson(c, sendMessageRequestSchema);
+  const db = getDb(c.env.DB);
+  const { battle, participants } = await loadBattle(db, c.req.param('id'));
+  requireParticipant(participants, user.id);
+  const now = Date.now();
+  const message = { id: newId(now), battleId: battle.id, senderId: user.id, body, createdAt: now };
+  await db.batch([
+    db.insert(battleMessages).values(message),
+    // My own message counts as read for me.
+    db
+      .update(battleParticipants)
+      .set({ lastReadMessageAt: now })
+      .where(
+        and(eq(battleParticipants.battleId, battle.id), eq(battleParticipants.userId, user.id)),
+      ),
+  ]);
+  return c.json({ message: { id: message.id, senderId: user.id, body, createdAt: now } }, 201);
 });

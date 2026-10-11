@@ -234,3 +234,128 @@ ul.hits li button {
   font-weight: 400;
   border-radius: 0;
 }
+
+/* Format tiles on "New battle" (Lichess-like quick pairing grid). */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+@media (min-width: 560px) {
+  .tiles {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.tile {
+  display: grid;
+  gap: 0.25rem;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  min-height: 6rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-weight: 400;
+}
+.tile strong {
+  font-size: 1.05rem;
+}
+.tile span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.tile.selected {
+  border: 2px solid var(--primary);
+}
+button.link {
+  background: none;
+  border: 0;
+  color: var(--primary);
+  padding: 0.25rem 0;
+  font-weight: 600;
+}
+fieldset.field {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+fieldset.field legend {
+  font-weight: 500;
+  padding: 0;
+  margin-bottom: 0.3rem;
+}
+.inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.inline input[type="number"] {
+  width: 5.5rem;
+}
+
+a.tile {
+  text-decoration: none;
+}
+.tile .big {
+  font-size: 1.6rem;
+}
+table.ranking {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+table.ranking th,
+table.ranking td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+table.ranking th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+table.ranking tr.me td {
+  background: var(--warning-bg);
+}
+
+.chat {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+.message {
+  max-width: 85%;
+  padding: 0.45rem 0.7rem;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.message.mine {
+  justify-self: end;
+  border-color: var(--primary);
+}
+.message .meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.message .body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.badge.unread {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}

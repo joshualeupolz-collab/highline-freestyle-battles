@@ -108,6 +108,18 @@ describe('requests', () => {
     expect(battle.participants.map((p) => p.userId)).toEqual([anna.user.id]);
   });
 
+  it('accepts any number of attempts and any time window within the limits', async () => {
+    const battle = await createBattle(anna, {
+      settings: { attemptsPerVideo: 7, timeWindowHours: 30 },
+    });
+    expect(battle.settings).toMatchObject({ attemptsPerVideo: 7, timeWindowHours: 30 });
+    const tooMany = await call('/api/battles', {
+      session: anna.session,
+      body: { formatId: BEST_TRICK, settings: { attemptsPerVideo: 100 } },
+    });
+    expect(tooMany.status).toBe(400);
+  });
+
   it('rejects weight 4–5, unknown formats and accounts that are not approved', async () => {
     const res = await call('/api/battles', {
       session: anna.session,
@@ -274,6 +286,18 @@ describe('change proposals during the battle', () => {
     const res = await post(anna, `/api/battles/${id}/grant-attempt`);
     expect(res.body.battle.participants.map((p) => p.extraAttempts)).toEqual([0, 1]);
   });
+
+  it('takes back an extra attempt only if the receiving side agrees', async () => {
+    const id = await activeBattle();
+    const takeBack = { kind: 'extra_attempt', change: -1 };
+    expect((await post(anna, `/api/battles/${id}/proposals`, takeBack)).status).toBe(409);
+    await post(anna, `/api/battles/${id}/grant-attempt`);
+    const proposalId = await propose(anna, id, takeBack);
+    const res = await post(ben, `/api/battles/${id}/proposals/${proposalId}/respond`, {
+      decision: 'accept',
+    });
+    expect(res.body.battle.participants.map((p) => p.extraAttempts)).toEqual([0, 0]);
+  });
 });
 
 describe('cancellation', () => {
@@ -369,6 +393,35 @@ describe('abandoned deadline (scheduled job)', () => {
       cancelReason: 'deadline_missed',
     });
     expect((await status(recent)).status).toBe('active');
+  });
+});
+
+describe('chat', () => {
+  it('lets only the participants talk and marks new messages as unread', async () => {
+    const id = await activeBattle();
+    const send = (who: Person, body: string) =>
+      call(`/api/battles/${id}/messages`, { session: who.session, body: { body } });
+    expect((await send(anna, 'Good luck!')).status).toBe(201);
+    expect((await send(carla, 'Can I join?')).status).toBe(403);
+    expect((await send(anna, '   ')).status).toBe(400);
+
+    const unread = async (who: Person) => {
+      const { body } = await json<{ battles: { id: string; unreadMessages: number }[] }>(
+        call('/api/battles/mine', { session: who.session }),
+      );
+      return body.battles.find((b) => b.id === id)?.unreadMessages;
+    };
+    expect(await unread(ben)).toBe(1);
+    expect(await unread(anna)).toBe(0);
+
+    const read = await json<{ messages: { body: string; senderId: string }[] }>(
+      call(`/api/battles/${id}/messages`, { session: ben.session }),
+    );
+    expect(read.body.messages).toMatchObject([{ body: 'Good luck!', senderId: anna.user.id }]);
+    expect(await unread(ben)).toBe(0);
+    expect((await call(`/api/battles/${id}/messages`, { session: carla.session })).status).toBe(
+      403,
+    );
   });
 });
 

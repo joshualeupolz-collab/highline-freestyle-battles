@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 30;
-export const PASSWORD_MIN = 10;
+export const PASSWORD_MIN = 8;
 /** Upper bound so nobody can make the server hash megabytes. */
 export const PASSWORD_MAX = 128;
 

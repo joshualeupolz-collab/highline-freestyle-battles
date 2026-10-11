@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { api } from '../api';
 import { settingsText, useFormatName } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
+import { UserLink } from '../components/UserLink';
 import { t } from '../i18n';
 
 export function OpenRequestsPage() {
@@ -28,7 +29,7 @@ export function OpenRequestsPage() {
             {r.direct && <span className="badge active">{t('open.direct')}</span>}
           </div>
           <div>
-            {r.challenger.displayName}{' '}
+            <UserLink id={r.challenger.userId} name={r.challenger.displayName} />{' '}
             <span className="muted">
               {r.challenger.rating
                 ? `${Math.round(r.challenger.rating.r)} ±${Math.round(r.challenger.rating.rd)}`

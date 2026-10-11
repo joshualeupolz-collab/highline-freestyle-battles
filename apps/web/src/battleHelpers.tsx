@@ -1,5 +1,10 @@
 /** Small helpers shared by the battle pages. */
-import type { BattleSettings } from '@hfb/shared';
+import {
+  type BattleSettings,
+  DEFAULT_BATTLE_SETTINGS,
+  MAX_ATTEMPTS,
+  MAX_TIME_WINDOW_HOURS,
+} from '@hfb/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api, type BattleStatus, type Format } from './api';
 import { type MessageKey, t } from './i18n';
@@ -19,6 +24,18 @@ export function partsText(format: Format): string {
     .join(' + ');
 }
 
+/** "3 days 4 h", "2 days", "5 h". */
+export function durationText(hours: number): string {
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  return [
+    days > 0 ? t('settings.days', { n: days }) : '',
+    rest > 0 ? t('settings.hours', { n: rest }) : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 export function settingsText(s: Partial<BattleSettings>): string {
   const parts: string[] = [];
   if (s.attemptsPerVideo !== undefined)
@@ -26,9 +43,7 @@ export function settingsText(s: Partial<BattleSettings>): string {
   if (s.timeWindowHours !== undefined)
     parts.push(
       `${t('settings.timeWindow')}: ${
-        s.timeWindowHours === null
-          ? t('settings.flexibleTime')
-          : t('settings.days', { n: Math.round(s.timeWindowHours / 24) })
+        s.timeWindowHours === null ? t('settings.flexibleTime') : durationText(s.timeWindowHours)
       }`,
     );
   if (s.level !== undefined) parts.push(`${t('settings.level')}: ${s.level}`);
@@ -51,46 +66,84 @@ export function SettingsFields({
   onChange: (s: BattleSettings) => void;
   showTimeWindow?: boolean;
 }) {
+  const unlimited = value.attemptsPerVideo === null;
+  const noDeadline = value.timeWindowHours === null;
+  const hours = value.timeWindowHours ?? DEFAULT_BATTLE_SETTINGS.timeWindowHours ?? 168;
+  const setWindow = (days: number, rest: number) =>
+    onChange({
+      ...value,
+      timeWindowHours: Math.min(MAX_TIME_WINDOW_HOURS, Math.max(1, days * 24 + rest)),
+    });
   return (
     <>
-      <label>
-        {t('settings.attempts')}
-        <select
-          value={value.attemptsPerVideo ?? 'unlimited'}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              attemptsPerVideo:
-                e.target.value === 'unlimited' ? null : (Number(e.target.value) as 1 | 2 | 3),
-            })
-          }
-        >
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="unlimited">{t('settings.unlimited')}</option>
-        </select>
-      </label>
-      {showTimeWindow && (
-        <label>
-          {t('settings.timeWindow')}
-          <select
-            value={value.timeWindowHours ?? 'none'}
+      <fieldset className="field">
+        <legend>{t('settings.attempts')}</legend>
+        <div className="inline">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={MAX_ATTEMPTS}
+            value={value.attemptsPerVideo ?? ''}
+            disabled={unlimited}
             onChange={(e) =>
               onChange({
                 ...value,
-                timeWindowHours: e.target.value === 'none' ? null : Number(e.target.value),
+                attemptsPerVideo: Math.min(MAX_ATTEMPTS, Math.max(1, Number(e.target.value) || 1)),
               })
             }
-          >
-            {[1, 2, 3, 7, 14, 30].map((d) => (
-              <option key={d} value={d * 24}>
-                {t('settings.days', { n: d })}
-              </option>
-            ))}
-            <option value="none">{t('settings.flexibleTime')}</option>
-          </select>
-        </label>
+            aria-label={t('settings.attempts')}
+          />
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={unlimited}
+              onChange={(e) =>
+                onChange({ ...value, attemptsPerVideo: e.target.checked ? null : 3 })
+              }
+            />
+            <span>{t('settings.unlimited')}</span>
+          </label>
+        </div>
+      </fieldset>
+      {showTimeWindow && (
+        <fieldset className="field">
+          <legend>{t('settings.timeWindow')}</legend>
+          <div className="inline">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={60}
+              value={Math.floor(hours / 24)}
+              disabled={noDeadline}
+              onChange={(e) => setWindow(Number(e.target.value) || 0, hours % 24)}
+              aria-label={t('settings.daysLabel')}
+            />
+            <span>{t('settings.daysLabel')}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={23}
+              value={hours % 24}
+              disabled={noDeadline}
+              onChange={(e) => setWindow(Math.floor(hours / 24), Number(e.target.value) || 0)}
+              aria-label={t('settings.hoursLabel')}
+            />
+            <span>{t('settings.hoursLabel')}</span>
+          </div>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={noDeadline}
+              onChange={(e) =>
+                onChange({ ...value, timeWindowHours: e.target.checked ? null : hours })
+              }
+            />
+            <span>{t('settings.flexibleTime')}</span>
+          </label>
+        </fieldset>
       )}
       <label>
         {t('settings.level')}

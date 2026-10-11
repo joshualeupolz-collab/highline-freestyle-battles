@@ -62,7 +62,7 @@ A person can hold several roles (e.g. athlete + judge).
   - "Response" (repeat your opponent and add something – back-and-forth formats)
 - A battle can therefore consist of several videos (e.g. Best Trick + 3-Trick Combo + 10-Bounce Combo) and several rounds.
 - Launch formats: 3-Trick Combo, 10-Bounce Combo, Best Trick.
-- **Beta formats:** users can propose formats; these appear under "Other" with status `fun`. Whether a format becomes standard (`relevant`) is decided by the federation or admin, optionally after a poll.
+- **Format proposals (decided, already in stage 1):** every athlete can propose a format (name, description, parts). A proposal cannot be used until the federation or admin approves it, either as **official** (`relevant`, shown as a tile when creating a battle) or as **other format** (`fun`, under "more formats"), or rejects it with a note for the proposer. Promoting `fun` to `relevant` later is possible, optionally after a poll.
 - Similar formats can be merged for rating purposes (`merged_into`, see rating specification section 7).
 
 ---
@@ -72,8 +72,8 @@ A person can hold several roles (e.g. athlete + judge).
 1. **Request:** an athlete posts an open request for a format. Others see matching requests sorted by rating proximity, including the challenger's rating. Accepting or ignoring is up to them. An athlete can also **challenge one person directly**; only that person can accept, and direct challenges are listed first.
 2. **Settings** (set by the challenger, or marked "flexible" so both agree on them):
    - Format
-   - Attempts per video: 1, 2, 3 or unlimited
-   - Time window: fixed or flexible
+   - Attempts per video: any number (1–99) or unlimited
+   - Time window: any duration in days and hours (up to 60 days), or no deadline
    - Weight 1–5 (1 = fun … 5 = official competition). Levels 1–3 can be chosen freely; 4–5 only after approval by a judge or organizer.
    - Scoring type: win/loss only, or with margin
    - Review mode: Quick (5-point scale) or Detailed (score sheet, later stage)
@@ -84,7 +84,8 @@ A person can hold several roles (e.g. athlete + judge).
    - Whoever doesn't deliver within the time window loses. The opponent may instead choose "cancelled, unrated".
      If the side that delivered does not decide within **7 days** after the deadline, the battle counts as their win automatically; if nobody delivered, it is cancelled unrated (hourly background job).
    - If one side wants to cancel, the other decides: count it as a win or cancel without rating.
-   - Goodwill: the opponent can grant an extra attempt or more time (e.g. after a mis-tap that can be shown on video).
+   - Goodwill: the opponent can grant an extra attempt or more time (e.g. after a mis-tap that can be shown on video). Granting an extra attempt asks for confirmation; taking it back is only possible if the receiving side agrees.
+7. **Chat:** the participants of a battle can exchange messages. Only they can read them (later also the federation for a reported battle). Messages of a deleted account are deleted.
 
 ---
 
@@ -182,6 +183,7 @@ A person can hold several roles (e.g. athlete + judge).
 ## 12. Privacy and legal
 
 - The app is used worldwide. **The GDPR is the benchmark**, as it is the strictest rule almost everywhere.
+- **Profiles and rankings** are visible to logged-in, approved users only, not publicly on the internet.
 - **Visibility per video**, chosen at upload:
   - **public** (default, with explanation)
   - **logged-in users only**
@@ -223,6 +225,7 @@ A person can hold several roles (e.g. athlete + judge).
 - Upload to R2, unlocking after both have uploaded
 - Review level 1 (5-point scale)
 - Rating engine (Glicko-2 per specification), format rankings
+- Profiles (ratings per format, recent battles), chat per battle, format proposals (pulled forward after the first test round)
 - On-site results with confirmation from both sides
 
 **Stage 2 – Competition operation**

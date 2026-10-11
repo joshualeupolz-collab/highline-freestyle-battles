@@ -21,6 +21,7 @@ export function Layout() {
           </NavLink>
           {active && <NavLink to="/open">{t('nav.open')}</NavLink>}
           {active && <NavLink to="/new">{t('nav.new')}</NavLink>}
+          {active && <NavLink to="/rankings">{t('nav.rankings')}</NavLink>}
           {hasRole(user, 'athlete', 'federation', 'admin') && (
             <NavLink to="/approvals">{t('nav.approvals')}</NavLink>
           )}
