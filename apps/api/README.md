@@ -50,6 +50,7 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/battles/:id/grant-attempt` | Give the opponent one extra attempt |
 | POST | `/api/battles/:id/deadline-decision` | After a missed deadline: `claim_win` or `cancel` |
 | POST | `/api/battles/:id/attempts` | Register an attempt (pressing Start); checks the attempt limit |
+| POST | `/api/battles/:id/vote` | Review level 1: vote −2 … +2 (seen from seat 0); agreement decides and rates |
 | POST | `/api/battles/:id/submissions` | Choose the attempt that counts; unlocks the videos once everyone has chosen |
 | POST | `/api/videos` | Announce an upload; returns where to send the bytes |
 | PUT | `/api/videos/:id/upload` | Upload through the Worker (only without R2 access key, e.g. locally) |

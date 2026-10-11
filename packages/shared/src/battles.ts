@@ -91,3 +91,16 @@ export const MESSAGE_MAX_LENGTH = 1000;
 export const sendMessageRequestSchema = z.object({
   body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
 });
+
+/**
+ * Review level 1 (concept section 7.1): both athletes vote on the 5-point scale, seen from seat 0:
+ * +2 = seat 0 clearly better, +1 somewhat better, 0 can't decide, −1 / −2 the same for seat 1.
+ */
+export const reviewVoteSchema = z.object({ value: z.number().int().min(-2).max(2) });
+
+/**
+ * Days after the videos unlock until the review of level 1 is closed. Without agreement by then
+ * (stage 1, decided 2026-10-11): a single vote for one side decides; otherwise the battle ends
+ * unrated. Level 2 (athlete pool) takes over this case in stage 2.
+ */
+export const REVIEW_DAYS = 7;

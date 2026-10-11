@@ -14,6 +14,7 @@ import {
   MAX_FREE_LEVEL,
   proposalRequestSchema,
   proposalResponseSchema,
+  reviewVoteSchema,
   sendMessageRequestSchema,
 } from '@hfb/shared';
 import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
@@ -36,7 +37,9 @@ import {
   battles,
   formats,
   proposalResponses,
+  ratingHistory,
   ratingStates,
+  reviewVotes,
   submissions,
   users,
   videos,
@@ -51,6 +54,7 @@ import {
   requiredSubmissionsPerPerson,
 } from '../services/battles';
 import { displayParams, ratingView } from '../services/ratingView';
+import { reviewView, settleReview } from '../services/review';
 import { battleVideosView } from '../services/videos';
 import { latestFormatVersion } from './formats';
 import { currentRuleset, parseRulesetParams } from './rulesets';
@@ -166,6 +170,23 @@ export async function battleResponse(
         participants.map((p) => p.userId),
         viewerId,
       ),
+      review: await reviewView(
+        db,
+        battle,
+        participants.map((p) => p.userId),
+        viewerId,
+      ),
+      ratingChanges:
+        battle.status === 'decided'
+          ? await db
+              .select({
+                userId: ratingHistory.userId,
+                before: ratingHistory.rBefore,
+                after: ratingHistory.rAfter,
+              })
+              .from(ratingHistory)
+              .where(eq(ratingHistory.battleId, battle.id))
+          : [],
     },
   };
 }
@@ -726,6 +747,35 @@ battleRoutes.post('/:id/deadline-decision', async (c) => {
       : await decideStatements(db, battle, winnerScores(seatOrder, user.id), 'deadline', now);
   await runBatch(db, statements);
   return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
+});
+
+// ---------------------------------------------------------------------------------------------
+// Review level 1: both athletes vote (concept section 7.1)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Vote on the 5-point scale, seen from seat 0. The vote can be changed while the review runs:
+ * if both agree on a side, the battle is decided and the ratings are updated at once.
+ */
+battleRoutes.post('/:id/vote', async (c) => {
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const { value } = await parseJson(c, reviewVoteSchema);
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+  const { battle, participants } = await loadBattle(db, c.req.param('id'));
+  requireParticipant(participants, user.id);
+  if (battle.status !== 'reviewing' || battle.reviewLevel !== 1) apiError(409, 'not_in_review');
+  if (participants.length !== 2) apiError(400, 'unsupported_for_group_battles');
+  await db
+    .insert(reviewVotes)
+    .values({ battleId: battle.id, voterId: user.id, reviewLevel: 1, value, createdAt: now })
+    .onConflictDoUpdate({
+      target: [reviewVotes.battleId, reviewVotes.voterId, reviewVotes.reviewLevel],
+      set: { value, createdAt: now },
+    });
+  await settleReview(db, battle, now, false);
+  return c.json(await battleResponse(db, battle.id, user.id, now));
 });
 
 // ---------------------------------------------------------------------------------------------

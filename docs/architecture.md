@@ -217,6 +217,20 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 
 ---
 
+## 4c. Review level 1 (implemented in step 9)
+
+- `POST /battles/:id/vote` with a value −2 … +2 seen from seat 0 (`review_votes`, level 1). The
+  vote can be changed while the battle is `reviewing`. Others' votes are hidden until both voted.
+- Pure rules in `apps/api/src/battles/review.ts`: both on the same side → decided with
+  s = mean of the two votes (1 / 0 for win/loss); otherwise open. After `REVIEW_DAYS` (7) the hourly
+  job settles it: a single vote for one side decides, anything else ends the battle unrated
+  (`cancel_reason = no_agreement`).
+- Deciding runs `services/rating.ts` in the same batch (reason `review`). A conditional status
+  change first makes sure two votes arriving at once cannot rate the battle twice.
+- The battle response contains `review` and `ratingChanges` (from `rating_history`).
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |
@@ -231,7 +245,7 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 | 6b | Feedback round 1: password minimum 8, free attempts/time window, Lichess-like format tiles, format proposals, extra attempt confirmation and take-back, profiles, format rankings (step 10 pulled forward), chat | done |
 | 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | test page built (`/lab/video`, `docs/video-prototype.md`); waiting for results from real phones |
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | done (§4b); waiting for real-phone tests |
-| 9 | Review level 1, result → rating update in the Worker, rating history | |
+| 9 | Review level 1, result → rating update in the Worker, rating history | done (§4c) |
 | 10 | Format rankings | done (pulled forward, with profiles) |
 | 11 | On-site results with confirmation by both sides | |
 | 12 | Replay job, deployment pipeline, enforcing visibility, account deletion | |
