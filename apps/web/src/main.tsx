@@ -16,6 +16,7 @@ import { RankingsPage } from './pages/Rankings';
 import { RegisterPage } from './pages/Register';
 import { ResetPasswordPage } from './pages/ResetPassword';
 import { UserProfilePage } from './pages/UserProfile';
+import { VideoLabPage } from './pages/VideoLab';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -39,6 +40,8 @@ const router = createBrowserRouter([
       </main>
     ),
   },
+  // Video prototype for testers, no login needed (docs/video-prototype.md).
+  { path: '/lab/video', element: <VideoLabPage /> },
   {
     element: <Layout />,
     children: [

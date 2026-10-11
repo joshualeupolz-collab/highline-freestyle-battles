@@ -163,7 +163,8 @@ input[type="checkbox"] {
   font-size: 0.85rem;
 }
 
-button {
+button,
+a.button {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -173,7 +174,8 @@ button {
   background: var(--primary);
   color: var(--primary-text);
 }
-button.secondary {
+button.secondary,
+a.button.secondary {
   background: transparent;
   color: var(--primary);
 }
@@ -393,4 +395,39 @@ table.ranking tr.me td {
 .badge.fixed {
   border-color: var(--text);
   color: var(--text);
+}
+
+/* Video test page (/lab/video) */
+.lab-video {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  background: #000;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+.recording {
+  color: var(--danger);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.lab-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.5rem;
+}
+a.button {
+  display: inline-block;
+  text-decoration: none;
+}
+.lab-report {
+  font-size: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.lab-item strong,
+.lab-item span {
+  display: block;
 }

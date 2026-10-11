@@ -1,0 +1,181 @@
+/**
+ * In-app recording with MediaRecorder. Every chunk goes straight to IndexedDB (see storage.ts).
+ *
+ * Findings so far (Chromium, see docs/video-prototype.md): without a short keyframe interval
+ * Chrome writes a single keyframe at the start, and its MP4 output only emits data at keyframes.
+ * So we ask for a keyframe every second: it makes cutting precise and crash recovery useful.
+ */
+import type { QualityPreset } from './quality';
+import { addChunk, type StoredRecording, saveRecording } from './storage';
+
+/** Preferred first: H.264 in MP4 plays everywhere (iPhone, Android, desktop, ffmpeg). */
+export const MIME_CANDIDATES = [
+  'video/mp4;codecs=avc1.640028,mp4a.40.2',
+  'video/mp4;codecs=avc1,mp4a.40.2',
+  'video/mp4;codecs=avc1',
+  'video/mp4',
+  'video/webm;codecs=vp9,opus',
+  'video/webm;codecs=vp8,opus',
+  'video/webm',
+];
+
+export function isRecordingSupported(): boolean {
+  return typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+}
+
+export function supportedMimeTypes(): string[] {
+  if (typeof MediaRecorder === 'undefined') return [];
+  return MIME_CANDIDATES.filter((type) => MediaRecorder.isTypeSupported(type));
+}
+
+export type Facing = 'environment' | 'user';
+
+export interface CameraResult {
+  stream: MediaStream;
+  /** Set when the microphone could not be used and the camera runs without sound. */
+  audioError?: string;
+}
+
+export async function openCamera(preset: QualityPreset, facing: Facing): Promise<CameraResult> {
+  const video: MediaTrackConstraints = {
+    facingMode: { ideal: facing },
+    width: { ideal: preset.width },
+    height: { ideal: preset.height },
+    frameRate: { ideal: preset.frameRate },
+  };
+  try {
+    return { stream: await navigator.mediaDevices.getUserMedia({ video, audio: true }) };
+  } catch (error) {
+    // Without microphone permission we still want to test the video part.
+    const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+    return { stream, audioError: String(error) };
+  }
+}
+
+export interface RecordOptions {
+  /** undefined = let the browser choose. */
+  mimeType: string | undefined;
+  quality: string;
+  preset: QualityPreset;
+  /** undefined = browser default. */
+  keyFrameIntervalMs: number | undefined;
+  timesliceMs: number;
+  attempt: number;
+}
+
+export interface RecordProgress {
+  chunks: number;
+  bytes: number;
+}
+
+export interface ActiveRecording {
+  id: string;
+  /** Stops, waits until every chunk is stored and returns the final record. */
+  stop(): Promise<StoredRecording>;
+  /** Notes something that happened during the recording (e.g. the app went to the background). */
+  note(event: string): void;
+}
+
+export async function startRecording(
+  stream: MediaStream,
+  options: RecordOptions,
+  onProgress: (p: RecordProgress) => void,
+): Promise<ActiveRecording> {
+  const recorderOptions: MediaRecorderOptions & { videoKeyFrameIntervalDuration?: number } = {
+    videoBitsPerSecond: options.preset.videoBitsPerSecond,
+    audioBitsPerSecond: options.preset.audioBitsPerSecond,
+  };
+  if (options.mimeType) recorderOptions.mimeType = options.mimeType;
+  // Chrome 113+; other browsers ignore unknown options.
+  if (options.keyFrameIntervalMs)
+    recorderOptions.videoKeyFrameIntervalDuration = options.keyFrameIntervalMs;
+  const recorder = new MediaRecorder(stream, recorderOptions);
+
+  const id = crypto.randomUUID();
+  const t0 = performance.now();
+  const chunkTimes: number[] = [];
+  const events: string[] = [];
+  const at = () => `${Math.round(performance.now() - t0)} ms`;
+  const recording: StoredRecording = {
+    id,
+    createdAt: Date.now(),
+    status: 'recording',
+    attempt: options.attempt,
+    quality: options.quality,
+    mimeType: options.mimeType ?? '',
+    chunkCount: 0,
+    bytes: 0,
+    durationMs: 0,
+    diagnostics: {},
+  };
+  const diagnostics = () => {
+    const gaps = chunkTimes.slice(1).map((time, i) => time - (chunkTimes[i] as number));
+    return {
+      requested: {
+        mimeType: options.mimeType ?? '(browser default)',
+        ...options.preset,
+        keyFrameIntervalMs: options.keyFrameIntervalMs ?? '(browser default)',
+        timesliceMs: options.timesliceMs,
+      },
+      recorderMimeType: recorder.mimeType,
+      videoSettings: stream.getVideoTracks()[0]?.getSettings(),
+      audioSettings: stream.getAudioTracks()[0]?.getSettings() ?? '(no audio)',
+      chunks: {
+        count: chunkTimes.length,
+        firstAfterMs: chunkTimes[0] !== undefined ? Math.round(chunkTimes[0]) : null,
+        maxGapMs: gaps.length ? Math.round(Math.max(...gaps)) : null,
+      },
+      events,
+    };
+  };
+  await saveRecording(recording);
+
+  let index = 0;
+  let writes = Promise.resolve();
+  recorder.ondataavailable = (e) => {
+    if (!e.data || e.data.size === 0) return;
+    const i = index++;
+    chunkTimes.push(performance.now() - t0);
+    recording.chunkCount = index;
+    recording.bytes += e.data.size;
+    recording.mimeType = recorder.mimeType || recording.mimeType || e.data.type;
+    onProgress({ chunks: recording.chunkCount, bytes: recording.bytes });
+    const data = e.data;
+    // Keep the order of writes; the record is saved after each chunk so a crash keeps the counts.
+    writes = writes
+      .then(async () => {
+        await addChunk(id, i, await data.arrayBuffer());
+        await saveRecording({ ...recording, diagnostics: diagnostics() });
+      })
+      .catch((error) => {
+        events.push(`${at()}: storing chunk ${i} failed: ${String(error)}`);
+      });
+  };
+  recorder.onerror = (e) => {
+    events.push(`${at()}: recorder error: ${String((e as ErrorEvent).error ?? e.type)}`);
+  };
+  for (const track of stream.getTracks()) {
+    track.onended = () => events.push(`${at()}: ${track.kind} track ended`);
+  }
+
+  recorder.start(options.timesliceMs);
+  recording.mimeType = recorder.mimeType || recording.mimeType;
+
+  return {
+    id,
+    note: (event) => events.push(`${at()}: ${event}`),
+    stop: () =>
+      new Promise((resolve) => {
+        recorder.onstop = async () => {
+          await writes;
+          recording.status = 'done';
+          recording.durationMs = Math.round(performance.now() - t0);
+          recording.diagnostics = diagnostics();
+          await saveRecording(recording);
+          resolve(recording);
+        };
+        if (recorder.state === 'inactive') recorder.onstop(new Event('stop'));
+        else recorder.stop();
+      }),
+  };
+}
