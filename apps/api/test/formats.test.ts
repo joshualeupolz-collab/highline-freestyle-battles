@@ -1,0 +1,132 @@
+import { env } from 'cloudflare:workers';
+import { DEFAULT_RULESET_PARAMS } from '@hfb/rating';
+import { describe, expect, it } from 'vitest';
+import { call, registerAdmin, registerAthlete } from './helpers';
+
+const newFormat = {
+  slug: 'trick-combo-5',
+  name: '5-Trick Combo',
+  parts: [{ kind: 'trick_combo', count: 5 }],
+};
+
+async function auditActions() {
+  const { results } = await env.DB.prepare('SELECT action FROM audit_log ORDER BY created_at').all<{
+    action: string;
+  }>();
+  return results.map((r) => r.action);
+}
+
+describe('managing formats', () => {
+  it('lets an admin create a format with version 1', async () => {
+    const admin = await registerAdmin();
+    const res = await call('/api/formats', { session: admin.session, body: newFormat });
+    expect(res.status).toBe(201);
+    const { format } = (await res.json()) as {
+      format: { id: string; version: number; status: string };
+    };
+    expect(format).toMatchObject({ version: 1, status: 'relevant' });
+
+    const list = (await (await call('/api/formats')).json()) as { formats: { slug: string }[] };
+    expect(list.formats.map((f) => f.slug)).toContain('trick-combo-5');
+    expect(await auditActions()).toContain('format.create');
+  });
+
+  it('rejects athletes, duplicate slugs and invalid parts', async () => {
+    const admin = await registerAdmin();
+    const anna = await registerAthlete('anna', admin.session);
+    expect((await call('/api/formats', { session: anna.session, body: newFormat })).status).toBe(
+      403,
+    );
+    await call('/api/formats', { session: admin.session, body: newFormat });
+    expect((await call('/api/formats', { session: admin.session, body: newFormat })).status).toBe(
+      409,
+    );
+    const invalid = { ...newFormat, slug: 'x-y', parts: [{ kind: 'juggling', count: 1 }] };
+    expect((await call('/api/formats', { session: admin.session, body: invalid })).status).toBe(
+      400,
+    );
+  });
+
+  it('versions the parts and keeps the history', async () => {
+    const admin = await registerAdmin();
+    const { format } = (await (
+      await call('/api/formats', { session: admin.session, body: newFormat })
+    ).json()) as {
+      format: { id: string };
+    };
+    const res = await call(`/api/formats/${format.id}/versions`, {
+      session: admin.session,
+      body: { parts: [{ kind: 'trick_combo', count: 6 }], reason: 'test' },
+    });
+    expect(res.status).toBe(201);
+    const detail = (await (await call(`/api/formats/${format.id}`)).json()) as {
+      format: { version: number };
+      versions: { version: number }[];
+    };
+    expect(detail.format.version).toBe(2);
+    expect(detail.versions.map((v) => v.version)).toEqual([1, 2]);
+  });
+
+  it('requests a rating replay when kPoints changes', async () => {
+    const admin = await registerAdmin();
+    const { format } = (await (
+      await call('/api/formats', { session: admin.session, body: newFormat })
+    ).json()) as {
+      format: { id: string };
+    };
+    const patch = (body: unknown) =>
+      call(`/api/formats/${format.id}`, { method: 'PATCH', session: admin.session, body });
+    expect((await patch({ status: 'fun' })).status).toBe(200);
+    expect((await patch({ kPoints: 1.5, reason: 'poll result' })).status).toBe(200);
+    expect((await patch({ reason: 'only a reason' })).status).toBe(400);
+    const replays = await env.DB.prepare('SELECT COUNT(*) AS n FROM replay_requests').first<{
+      n: number;
+    }>();
+    expect(replays?.n).toBe(1);
+  });
+
+  it('archives a format so it disappears from the list', async () => {
+    const admin = await registerAdmin();
+    const { format } = (await (
+      await call('/api/formats', { session: admin.session, body: newFormat })
+    ).json()) as {
+      format: { id: string };
+    };
+    expect(
+      (await call(`/api/formats/${format.id}/archive`, { method: 'POST', session: admin.session }))
+        .status,
+    ).toBe(200);
+    const list = (await (await call('/api/formats')).json()) as { formats: { id: string }[] };
+    expect(list.formats.map((f) => f.id)).not.toContain(format.id);
+    expect((await call(`/api/formats/${format.id}`)).status).toBe(200);
+  });
+});
+
+describe('managing RuleSets', () => {
+  it('creates a new version with validated parameters', async () => {
+    const admin = await registerAdmin();
+    const params = { ...DEFAULT_RULESET_PARAMS, clamp: 'both' };
+    const res = await call('/api/rulesets', {
+      session: admin.session,
+      body: { params, note: 'Poll: loser never gains' },
+    });
+    expect(res.status).toBe(201);
+    const current = (await (await call('/api/rulesets/current')).json()) as {
+      version: number;
+      params: { clamp: string };
+    };
+    expect(current).toMatchObject({ version: 2, params: { clamp: 'both' } });
+    expect(await auditActions()).toContain('ruleset.create');
+  });
+
+  it('rejects invalid parameters and non-admins', async () => {
+    const admin = await registerAdmin();
+    const anna = await registerAthlete('anna', admin.session);
+    const body = { params: DEFAULT_RULESET_PARAMS, note: 'x' };
+    expect((await call('/api/rulesets', { session: anna.session, body })).status).toBe(403);
+    const invalid = { params: { ...DEFAULT_RULESET_PARAMS, tau: -1 }, note: 'x' };
+    expect((await call('/api/rulesets', { session: admin.session, body: invalid })).status).toBe(
+      400,
+    );
+  });
+});

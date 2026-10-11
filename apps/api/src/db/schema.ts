@@ -26,6 +26,7 @@ import {
   BATTLE_SCORINGS,
   BATTLE_STATUSES,
   COMPETITION_STATUSES,
+  DECISION_REASONS,
   ESTIMATE_KINDS,
   FORMAT_STATUSES,
   PROPOSAL_DECISIONS,
@@ -313,6 +314,10 @@ export const battles = sqliteTable(
     /** Settings are negotiable instead of fixed by the challenger. */
     settingsFlexible: integer('settings_flexible', { mode: 'boolean' }).notNull().default(false),
     competitionId: text('competition_id').references(() => competitions.id),
+    /** Direct challenge: only this person may accept. NULL = open request for everyone. */
+    invitedUserId: text('invited_user_id').references(() => users.id),
+    /** Why the battle was decided (validated by the app, see DECISION_REASONS). */
+    decisionReason: text('decision_reason', { enum: DECISION_REASONS }),
     createdBy: text('created_by')
       .notNull()
       .references(() => users.id),
@@ -335,6 +340,7 @@ export const battles = sqliteTable(
     index('battles_open_idx').on(t.status, t.formatId, t.createdAt),
     index('battles_replay_idx').on(t.formatId, t.eventAt),
     index('battles_competition_idx').on(t.competitionId),
+    index('battles_invited_idx').on(t.invitedUserId, t.status),
     oneOf('battles_kind_check', t.kind, BATTLE_KINDS),
     oneOf('battles_mode_check', t.mode, BATTLE_MODES),
     oneOf('battles_status_check', t.status, BATTLE_STATUSES),

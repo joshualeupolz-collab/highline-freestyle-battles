@@ -6,10 +6,7 @@
  * value later means a table rebuild; prefer adding it here before the first deployment.
  */
 
-export { ROLES, USER_STATUSES } from '@hfb/shared';
-
-export const FORMAT_STATUSES = ['relevant', 'fun'] as const;
-export const FORMAT_PART_KINDS = ['best_trick', 'trick_combo', 'bounce_combo', 'response'] as const;
+export { FORMAT_PART_KINDS, FORMAT_STATUSES, ROLES, USER_STATUSES } from '@hfb/shared';
 
 export const COMPETITION_STATUSES = [
   'planned',
@@ -58,3 +55,15 @@ export const VIDEO_FILE_KINDS = ['original', 'compressed', 'clip', 'thumbnail'] 
 export const STORAGE_BACKENDS = ['r2', 'telegram', 'disk'] as const;
 
 export const ESTIMATE_KINDS = ['admin', 'federation', 'athlete'] as const;
+
+/**
+ * Why a battle was decided. Added after the first migration: SQLite cannot add a CHECK
+ * constraint without rebuilding the table, so this one is validated by the app only.
+ */
+export const DECISION_REASONS = [
+  'review', // decided by the review (levels 1–3)
+  'forfeit', // one side gave up, the other counted it as a win
+  'deadline', // one side missed the deadline, the other counted it as a win
+  'onsite', // on-site result confirmed by both sides
+  'competition', // entered by an organizer
+] as const;
