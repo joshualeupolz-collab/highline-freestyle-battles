@@ -6,11 +6,12 @@
  * served legal documents, and a way to make fast electronic contact (e-mail).
  */
 export const OPERATOR = {
-  name: '[Name of the operator]',
-  street: '[Street and number]',
-  city: '[Postcode and city]',
+  name: 'Joshua Leupolz',
+  street: 'Im Mesnergarten 1',
+  city: '79299 Wittnau',
   country: { en: 'Germany', de: 'Deutschland' },
-  email: '[contact e-mail]',
+  // To be replaced by a separate address for the app.
+  email: 'joshualeupolz@gmail.com',
 } as const;
 
 /** Source code of the app, linked from the legal notice. */

@@ -112,11 +112,11 @@ profile button for members waiting for approval, confirmation before approving.
 
 ## 3. Open questions for the project owner
 
-00. **Before inviting beta testers:** fill in name, postal address and contact e-mail in
-    `apps/web/src/legal/operator.ts` (the texts show placeholders until then). A short check of
-    the texts by someone qualified is recommended (Claude is not a lawyer). If the texts change
-    in a way people must agree to, raise `TERMS_VERSION` in `packages/shared/src/auth.ts`.
-
+00. **Legal texts:** operator data is filled in (`apps/web/src/legal/operator.ts`); the contact
+    e-mail is still the owner's private address – replace it with a separate address for the app
+    when it exists. A short check of the texts by someone qualified is recommended (Claude is not
+    a lawyer). If the texts change in a way people must agree to, raise `TERMS_VERSION` in
+    `packages/shared/src/auth.ts`.
 0. **R2 setup (step 8):** check that the deploy step *Video bucket and its CORS rules* passes (if
    not: add *Workers R2 Storage → Edit* to the Cloudflare API token), then create the R2 access
    key and the GitHub secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
