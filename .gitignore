@@ -7,3 +7,6 @@ dist/
 __pycache__/
 *.pyc
 .DS_Store
+e2e/.state/
+e2e/test-results/
+e2e/playwright-report/
