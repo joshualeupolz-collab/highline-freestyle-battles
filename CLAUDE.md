@@ -18,6 +18,9 @@ agreement.
 
 ## How to work
 
+- **Session handover:** at the start of every session, read `docs/progress.md` (current state,
+  decisions, open questions, next steps). At the end of every session, update it.
+
 - **Evaluate change proposals before implementing them.** For changes to the concept, rules or
   architecture: present the proposal and an assessment (effort, risks, alternatives) and wait for
   confirmation. Obvious small things (bug fixes, typos, clear improvements without side effects) can be

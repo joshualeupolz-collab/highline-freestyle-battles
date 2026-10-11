@@ -25,6 +25,8 @@ and build up a rating per battle format.
 | [`rating/rating-specification.md`](rating/rating-specification.md) | Rating system (Glicko-2 variant): formulas, parameters, test values |
 | [`rating/glicko_sim.py`](rating/glicko_sim.py) | Reference implementation and simulation of the rating system |
 | [`docs/architecture.md`](docs/architecture.md) | Technical decisions, database schema, implementation order |
+| [`docs/progress.md`](docs/progress.md) | Current state, decisions, open questions, next steps |
+| [`docs/auto-cut.md`](docs/auto-cut.md) | Design notes: automatic cut points at the bottom of each bounce |
 | [`docs/deployment.md`](docs/deployment.md) | Publishing to Cloudflare (one-time setup, automatic deploys) |
 | [`CLAUDE.md`](CLAUDE.md) | Working instructions for development with Claude Code |
 
