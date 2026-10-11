@@ -59,6 +59,16 @@ const router = createBrowserRouter([
   },
 ]);
 
+// After a deployment the service worker first serves the cached old app. The new worker takes over
+// right after installing (autoUpdate); then reload so nobody keeps running old code, e.g. a page
+// the old version does not know yet. Not on the very first visit, when there was no old worker.
+if ('serviceWorker' in navigator) {
+  const hadWorker = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadWorker) window.location.reload();
+  });
+}
+
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(
