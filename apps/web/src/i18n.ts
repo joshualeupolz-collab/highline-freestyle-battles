@@ -198,6 +198,12 @@ const en = {
   'admin.reject': 'Reject',
   'admin.rejectPrompt': 'Why is this proposal rejected? (shown to the proposer)',
   'admin.proposedBy': 'proposed by {name}',
+  'admin.replay': 'Recalculate all ratings',
+  'admin.replayHint':
+    'Requests a full recalculation from the raw data (e.g. after changing the RuleSet). A daily background job does it (or start "Rating replay" by hand in GitHub Actions).',
+  'admin.replayReason': 'Reason (goes into the audit log)',
+  'admin.replayButton': 'Request recalculation',
+  'admin.replayRequested': 'Requested. It runs with the next daily job.',
 
   'formats.proposeTitle': 'Propose a format',
   'formats.proposeHint':
@@ -217,6 +223,22 @@ const en = {
   'profile.passwordChanged': 'Password changed. Other devices were logged out.',
   'profile.logout': 'Log out',
   'profile.viewPublic': 'View my profile as others see it',
+  'profile.delete': 'Delete my account',
+  'profile.deleteHint':
+    'Your profile becomes "Deleted user"; your name, e-mail, password and chat messages are removed. Battle results and your opponents\' ratings stay. Running battles count as given up (a win for your opponent); open requests are cancelled. This cannot be undone.',
+  'profile.keepVideos':
+    'Keep my battle videos for the community (you can still have them deleted later with the deletion link)',
+  'profile.deleteButton': 'Delete account for good',
+  'profile.deleteConfirm': 'Really delete your account? This cannot be undone.',
+  'deletion.title': 'Account deletion',
+  'deletion.done':
+    'Your account has been deleted. Keep this link: with it you can later have your remaining videos deleted.',
+  'deletion.keepLink': 'The link is shown only once. Anyone who has it can delete these videos.',
+  'deletion.videosHint': 'Delete all videos that are still kept from this deleted account?',
+  'deletion.deleteVideos': 'Delete my remaining videos',
+  'deletion.confirm': 'Delete all remaining videos of this account?',
+  'deletion.videosDeleted':
+    'Done. The videos are being removed from storage (within about an hour).',
   'profile.memberSince': 'member since {date}',
   'profile.approvedBy': 'approved by',
   'profile.ratings': 'Ratings',

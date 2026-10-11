@@ -25,7 +25,8 @@ export interface VideoStore {
   size(key: string): Promise<number | null>;
   /** Answer to a request for the file: a redirect to a signed URL, or the bytes themselves. */
   serve(key: string, request: Request): Promise<Response>;
-  delete(key: string): Promise<void>;
+  /** Deletes files; several keys in one call (R2 accepts up to 1,000). */
+  delete(keys: string | string[]): Promise<void>;
 }
 
 /** How long signed URLs stay valid. Uploads of big files on slow connections need a while. */
@@ -39,8 +40,8 @@ export function videoStore(env: Env): VideoStore {
     async size(key: string) {
       return (await bucket.head(key))?.size ?? null;
     },
-    async delete(key: string) {
-      await bucket.delete(key);
+    async delete(keys: string | string[]) {
+      await bucket.delete(keys);
     },
   };
 

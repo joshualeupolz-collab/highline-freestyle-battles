@@ -62,3 +62,15 @@ export const resetPasswordRequestSchema = z.object({
   code: z.string().trim().min(1).max(200),
   newPassword: passwordSchema,
 });
+
+/**
+ * Delete one's own account (concept section 12). Results and opponents' ratings stay; the profile
+ * becomes "Deleted user". `keepVideos`: videos that count in battles stay (preselected).
+ */
+export const deleteAccountRequestSchema = z.object({
+  password: z.string().min(1).max(PASSWORD_MAX),
+  keepVideos: z.boolean().default(true),
+});
+
+/** Later request with the deletion link: delete the videos that were kept. */
+export const deletionRequestSchema = z.object({ token: z.string().min(20).max(100) });

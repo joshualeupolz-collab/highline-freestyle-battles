@@ -133,6 +133,7 @@ Notes:
 - `battle_proposals` implements core principle 2 ("everything can be changed if both sides agree") once, for settings changes, on-site results, draw confirmation, cancellation and goodwill. `proposal_responses` also works for n people.
 - Added after the first deployment (all additive): `formats.approved_at/approved_by/review_note` (format proposals; `approved_at` NULL = proposal), `battle_messages` (chat) and `battle_participants.last_read_message_at` (unread marker).
 - `video_files` is the replaceable storage layer: "delete everywhere" means processing every row of a video.
+- Added in step 12 (additive): `battles.ended_at`, `users.deletion_token_hash`.
 - Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
@@ -246,6 +247,31 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 
 ---
 
+## 4e. Clean-up, account deletion, replay (implemented in step 12)
+
+- **Videos after a battle** (hourly job, `services/videos.ts`): `VIDEO_CLEANUP_DAYS` (7) after a
+  battle ended (`battles.ended_at`, set when it is decided or cancelled), attempts that did not
+  count (unless the owner keeps them) and *review only* videos are marked `deleted`. A second step
+  removes the files of all deleted videos from R2 in batches (D1 allows 100 bound parameters per
+  query, so batches stay at 90). Deleted videos are never served (`GET /videos/:id/file` → 404).
+- **Visibility** is decided in one place, `canViewVideo`; *public* is treated like *logged in*
+  until public pages exist.
+- **Account deletion** (`POST /auth/delete-account`, password required, `services/accountDeletion.ts`):
+  personal data removed (username `deleted-…`, display name "Deleted user", no e-mail, password,
+  questionnaire), sessions/reset codes/login links deleted, roles revoked, chat messages deleted.
+  Active battles and battles in review count as given up (win for the opponent); open requests,
+  direct challenges, negotiations and unconfirmed on-site results are cancelled
+  (`account_deleted`). Videos are kept by default; otherwise marked deleted. The answer contains a
+  deletion link token (stored only as a hash, `users.deletion_token_hash`); with it,
+  `POST /auth/deletion-request` deletes the kept videos later.
+- **Replay** (`services/replay.ts`, `scripts/replay.ts`, `.github/workflows/replay.yml`): daily at
+  03:23 UTC, only if a `replay_request` is open (out-of-order battle, admin request via
+  `POST /rulesets/replay`), or forced by hand. It reads the raw data with `wrangler d1 execute`,
+  runs `replay()` from `packages/rating` and replaces `rating_states` and `rating_history` in one
+  SQL file. Battles decided while it ran trigger another replay request.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |
@@ -263,6 +289,6 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 | 9 | Review level 1, result → rating update in the Worker, rating history | done (§4c) |
 | 10 | Format rankings | done (pulled forward, with profiles) |
 | 11 | On-site results with confirmation by both sides | done (§4d) |
-| 12 | Replay job, deployment pipeline, enforcing visibility, account deletion | |
+| 12 | Replay job, deployment pipeline, enforcing visibility, account deletion | done (§4e) |
 
 The video prototype (step 7) is the biggest technical risk (trimming without re-encoding in the browser) and can be started early in a separate session (concept §16).

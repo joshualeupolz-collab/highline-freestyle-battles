@@ -57,6 +57,9 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/videos` | Announce an upload; returns where to send the bytes |
 | PUT | `/api/videos/:id/upload` | Upload through the Worker (only without R2 access key, e.g. locally) |
 | POST | `/api/videos/:id/complete` | Check the stored file and mark the video as uploaded |
+| POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
+| POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
+| POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |
 | GET | `/api/videos/:id/file` | Watch a video (redirect to a signed R2 URL, or the bytes) |
 
 Errors always look like `{ "error": "code", "message"?, "details"? }`.
@@ -80,6 +83,11 @@ locally Wrangler simulates it in `.wrangler/`. All access goes through `src/stor
 - Never edit a migration that has already been applied anywhere; add a new one.
 - Enum values live in `src/db/enums.ts`. They are CHECK constraints in SQLite, and changing a
   CHECK later means rebuilding the table, so values for later stages are already included.
+
+## Rating replay
+
+`pnpm --filter @hfb/api replay [--force] [--local]` recalculates all ratings from the raw data
+(`scripts/replay.ts`, run daily by `.github/workflows/replay.yml`).
 
 ## Tests
 

@@ -3,7 +3,11 @@ import { getDb } from './db/client';
 import type { Env } from './env';
 import { resolveAbandonedDeadlines } from './services/battles';
 import { resolveExpiredReviews } from './services/review';
-import { removeStaleUploads } from './services/videos';
+import {
+  deleteFilesOfDeletedVideos,
+  markUnneededVideos,
+  removeStaleUploads,
+} from './services/videos';
 import { videoStore } from './storage/videoStore';
 
 const app = createApp();
@@ -19,6 +23,12 @@ export default {
     );
     ctx.waitUntil(
       resolveExpiredReviews(db).then((n) => console.log(`settled ${n} expired reviews`)),
+    );
+    // Videos no longer needed after a battle: mark them, then remove their files.
+    ctx.waitUntil(
+      markUnneededVideos(db)
+        .then(() => deleteFilesOfDeletedVideos(db, videoStore(env)))
+        .then((n) => console.log(`removed ${n} files of deleted videos`)),
     );
     ctx.waitUntil(
       removeStaleUploads(db, videoStore(env)).then((n) =>

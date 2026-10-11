@@ -88,6 +88,13 @@ Without the access key everything still works: videos go through the Worker inst
 95 MB per video (Workers Free accepts at most 100 MB per request). The deploy run shows a warning
 in that case.
 
+## Rating replay
+
+`.github/workflows/replay.yml` recalculates all ratings when a recalculation was requested
+(Admin page → "Recalculate all ratings", or automatically after an out-of-order battle). It runs
+daily and uses the same secrets and variables as the deployment; nothing extra to set up. To run
+it at once: *Actions → Rating replay → Run workflow* (tick "force" to recalculate without a request).
+
 ## Later deployments
 
 Nothing to do: every merge into `main` publishes automatically after all checks passed.

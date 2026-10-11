@@ -7,6 +7,7 @@ import { AdminPage } from './pages/Admin';
 import { ApprovalsPage } from './pages/Approvals';
 import { BattleDetailPage } from './pages/BattleDetail';
 import { BattlesPage } from './pages/Battles';
+import { DeletionRequestPage } from './pages/DeletionRequest';
 import { LoginPage } from './pages/Login';
 import { NewBattlePage } from './pages/NewBattle';
 import { OnsiteResultPage } from './pages/OnsiteResult';
@@ -42,6 +43,8 @@ const router = createBrowserRouter([
       </main>
     ),
   },
+  // After deleting an account, and the deletion link: no login (concept section 12).
+  { path: '/deletion-request', element: <DeletionRequestPage /> },
   // Video prototype for testers, no login needed (docs/video-prototype.md).
   { path: '/lab/video', element: <VideoLabPage /> },
   {

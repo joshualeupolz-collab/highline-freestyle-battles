@@ -15,6 +15,7 @@ export function AdminPage() {
       <Proposals />
       <ResetCode />
       <Formats />
+      <Replay />
     </>
   );
 }
@@ -178,5 +179,32 @@ function Formats() {
         </button>
       </form>
     </section>
+  );
+}
+
+/** Ask for a full rating recalculation (done by a daily GitHub Actions job). */
+function Replay() {
+  const [reason, setReason] = useState('');
+  const request = useMutation({ mutationFn: api.requestReplay });
+  return (
+    <form
+      className="card"
+      onSubmit={(e) => {
+        e.preventDefault();
+        request.mutate(reason);
+      }}
+    >
+      <h2 style={{ marginTop: 0 }}>{t('admin.replay')}</h2>
+      <p className="muted">{t('admin.replayHint')}</p>
+      <label>
+        {t('admin.replayReason')}
+        <input value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} />
+      </label>
+      <ErrorText error={request.error} />
+      {request.isSuccess && <p className="success">{t('admin.replayRequested')}</p>}
+      <button type="submit" disabled={request.isPending}>
+        {t('admin.replayButton')}
+      </button>
+    </form>
   );
 }
