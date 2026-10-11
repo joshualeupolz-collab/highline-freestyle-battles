@@ -193,7 +193,7 @@ open ──accept──▶ active ─────────────▶ rev
 | 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | |
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | |
 | 9 | Review level 1, result → rating update in the Worker, rating history | |
-| 10 | Format rankings | |
+| 10 | Format rankings | done (pulled forward, with profiles) |
 | 11 | On-site results with confirmation by both sides | |
 | 12 | Replay job, deployment pipeline, enforcing visibility, account deletion | |
 

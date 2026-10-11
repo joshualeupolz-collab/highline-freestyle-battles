@@ -78,6 +78,7 @@ A person can hold several roles (e.g. athlete + judge).
    - Weight 1–5 (1 = fun … 5 = official competition). Levels 1–3 can be chosen freely; 4–5 only after approval by a judge or organizer.
    - Scoring type: win/loss only, or with margin
    - Review mode: Quick (5-point scale) or Detailed (score sheet, later stage)
+   - **Defaults (decided, easy to change in `packages/shared/src/battles.ts` and `deadline.ts`):** best of 3 attempts, deadline in 7 days at 05:00 German time, weight 3, 5-point scale, fixed rules.
 3. **Recording and upload** (see section 6). Several battles can run in parallel, including several against the same person.
 4. **Unlocking:** both sides' videos become visible only once **both** have uploaded. Exception: back-and-forth formats, where you see your opponent's video before your response.
 5. **Review** (see section 7).
@@ -98,7 +99,7 @@ A person can hold several roles (e.g. athlete + judge).
 - On start, an attempt record with a timestamp is created and checked at upload. Optionally a random code or the time can be overlaid on the video.
 - **Quality levels** chosen before recording: Data saver / Normal / HD. Recording happens directly at that quality, without re-compressing on the phone. A hint explains that HD is worthwhile for training videos.
 - **Rough trimming on the phone:** mark start and end, e.g. one bounce before the combo and 1–2 bounces after. Cut without re-encoding, which is fast. The rest is not uploaded.
-- **Cut points:** the user marks (later with auto-suggestions) the individual bounces or tricks as timestamps. One video plus a list of cut points is stored; actual single clips are created server-side (section 10).
+- **Cut points:** the user marks (later with auto-suggestions) the individual bounces or tricks as timestamps. One video plus a list of cut points is stored; actual single clips are created server-side (section 10). Design notes for automatic suggestions at the bottom dead center of each bounce: [`docs/auto-cut.md`](auto-cut.md).
 - **Offline:** the app works offline (PWA). Videos are stored locally and survive an app crash. Upload happens automatically once there is a connection and the app is open. iPhones do not support background upload.
 - **Filming by friends:** every athlete has a **fixed athlete code** they can change themselves. The person filming opens the app (no account needed, but the app must have been opened online once), enters code + opponent name and films. The opponent name tolerates typos.
   - The video goes to the athlete's **inbox** and is assigned to the matching battle on upload.
@@ -219,6 +220,8 @@ A person can hold several roles (e.g. athlete + judge).
 
 ## 14. Development stages
 
+Current progress and next steps: [`docs/progress.md`](progress.md).
+
 **Stage 1 – Core (MVP)**
 - Accounts, login, approval, age confirmation
 - Formats (created by admin), battle request, acceptance, settings, change requests
@@ -240,11 +243,11 @@ A person can hold several roles (e.g. athlete + judge).
 **Stage 3 – Database and community**
 - Trick list import, trick tagging, quality rating, detailed mode
 - Cut points, splitting into clips, Telegram archive
-- Beta formats, poll module, multi-round and back-and-forth formats
+- Poll module (e.g. for promoting formats), multi-round and back-and-forth formats (format proposals themselves were already built in stage 1)
 
 **Future**
 - AI trick recognition (body tracking → trick suggestions)
-- Auto-cut at the bottom dead center of the bounce
+- Auto-cut at the bottom dead center of the bounce (design notes: [`docs/auto-cut.md`](auto-cut.md); best explored together with the video prototype)
 - Gesture start for continuous filming (session camera)
 - Live streaming of on-site battles
 - Android APK
@@ -256,12 +259,11 @@ A person can hold several roles (e.g. athlete + judge).
 1. Level 1: confirm how s is computed from the two assessments (proposal in 7.5).
 2. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
 3. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
-4. Default values: time window, attempts, weight. *Provisional defaults in the app: best of 3 attempts, deadline in 7 days at 05:00 German time, weight 3, 5-point scale (`packages/shared/src/battles.ts`, `deadline.ts`).*
-5. Archiving: after how many weeks to Telegram?
-6. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones.
-7. Exchange format for trick list / scoring formula with the other developer.
-8. Type and scope of federation penalties.
-9. What happens to open battles when an account is deleted?
+4. Archiving: after how many weeks to Telegram?
+5. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones.
+6. Exchange format for trick list / scoring formula with the other developer.
+7. Type and scope of federation penalties.
+8. What happens to open battles when an account is deleted?
 
 ---
 
