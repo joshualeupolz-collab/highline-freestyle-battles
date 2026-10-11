@@ -147,6 +147,7 @@ A person can hold several roles (e.g. athlete + judge).
 ## 8. On-site battles, group battles, competitions
 
 - **On-site battle:** only the result is entered (optionally with margin and video). It counts once **both confirm**. Weight selectable as for online battles.
+  - Implemented in step 11 (defaults, to be confirmed by the owner): one side enters format, opponent, date (up to 60 days back), weight 1–3, scoring and the result on the 5-point scale without a draw. The other side accepts, rejects or enters a different result; either side can say "did not take place". Not confirmed within 14 days, it expires. Video and group battles on site follow later.
 - **Group battle (n people):** split into pairs; each pair counts 1/(n−1) (rating specification section 5.1).
 - **Official competition:** the organizer creates it and enters results, either individual or group battles (possibly with points) or only final placements. Individual results take precedence over final placements. Confirmation by the federation or a judge (rating specification section 5.2).
 - **Live streaming** of on-site battles: future idea (section 14).

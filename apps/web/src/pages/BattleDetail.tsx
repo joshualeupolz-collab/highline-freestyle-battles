@@ -33,7 +33,7 @@ export function BattleDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ['myBattles'] });
     },
   });
-  const [panel, setPanel] = useState<'none' | 'settings' | 'extension'>('none');
+  const [panel, setPanel] = useState<'none' | 'settings' | 'extension' | 'result'>('none');
 
   if (battleQuery.isLoading || !me) return <p className="muted">{t('common.loading')}</p>;
   const battle = battleQuery.data?.battle;
@@ -46,7 +46,8 @@ export function BattleDetailPage() {
   const format = formats.data?.formats.find((f) => f.id === battle.formatId);
   const mine = battle.participants.find((p) => p.userId === me.id);
   const isCreator = battle.createdBy === me.id;
-  const running = battle.status === 'negotiating' || battle.status === 'active';
+  const onsite = battle.mode === 'onsite';
+  const running = !onsite && (battle.status === 'negotiating' || battle.status === 'active');
   const name = (userId: string) =>
     battle.participants.find((p) => p.userId === userId)?.displayName ?? '?';
 
@@ -54,7 +55,7 @@ export function BattleDetailPage() {
     <>
       <div className="row">
         <h1 style={{ margin: 0 }}>{format?.name ?? '…'}</h1>
-        <StatusBadge status={battle.status} />
+        <StatusBadge status={battle.status} mode={battle.mode} />
       </div>
       {format && <p className="muted">{partsText(format)}</p>}
 
@@ -74,7 +75,9 @@ export function BattleDetailPage() {
           <span className="muted"> – {t('battles.waitingForOpponent')}</span>
         )}
         <p className="muted" style={{ margin: '0.25rem 0 0' }}>
-          {settingsText(battle.settings)}
+          {onsite
+            ? `${t('onsite.played', { date: formatDate(battle.playedAt ?? battle.createdAt) })} · ${settingsText({ level: battle.settings.level, scoring: battle.settings.scoring })}`
+            : settingsText(battle.settings)}
         </p>
         {battle.deadlineAt && battle.status === 'active' && (
           <p style={{ margin: '0.25rem 0 0' }}>
@@ -91,7 +94,7 @@ export function BattleDetailPage() {
         {mine && <OpponentProgress battle={battle} myId={me.id} />}
       </div>
 
-      {(battle.status === 'open' || battle.status === 'negotiating') && (
+      {!onsite && (battle.status === 'open' || battle.status === 'negotiating') && (
         <div className={`card ${battle.settingsFlexible ? '' : 'notice'}`}>
           <span className={`badge ${battle.settingsFlexible ? 'negotiating' : 'fixed'}`}>
             {battle.settingsFlexible ? t('rules.flexible') : t('rules.fixed')}
@@ -112,14 +115,62 @@ export function BattleDetailPage() {
               proposal={p}
               myId={me.id}
               name={name}
+              otherThan={(userId) =>
+                battle.participants.find((x) => x.userId !== userId)?.userId ?? ''
+              }
               onAction={run}
-              // Accepting the settings during negotiation starts the battle: that is binding.
-              binding={battle.status === 'negotiating' && p.kind === 'settings'}
+              // Accepting the settings during negotiation starts the battle, accepting an
+              // on-site result decides it: both are binding.
+              binding={
+                (battle.status === 'negotiating' && p.kind === 'settings') || p.kind === 'result'
+              }
             />
           ))}
         </section>
       )}
 
+      {onsite && battle.status === 'negotiating' && mine && (
+        <div className="card notice">
+          {t('onsite.pending', { date: formatDate(battle.deadlineAt ?? Date.now()) })}
+          <div className="actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setPanel(panel === 'result' ? 'none' : 'result')}
+            >
+              {t('onsite.otherResult')}
+            </button>
+            <button
+              type="button"
+              className="danger"
+              onClick={() => window.confirm(t('onsite.withdrawConfirm')) && run('withdraw-onsite')}
+            >
+              {t('onsite.withdraw')}
+            </button>
+          </div>
+          {panel === 'result' && (
+            <div className="vote-options">
+              {[2, 1, -1, -2].map((value) => {
+                const other = battle.participants.find((p) => p.userId !== me.id);
+                const who = value > 0 ? me.displayName : (other?.displayName ?? '?');
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className="secondary"
+                    onClick={() => run('proposals', { kind: 'result', value })}
+                  >
+                    {t(Math.abs(value) === 2 ? 'review.clearly' : 'review.somewhat', { name: who })}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      {battle.status === 'cancelled' && battle.cancelReason === 'onsite_withdrawn' && (
+        <p className="card">{t('onsite.withdrawn')}</p>
+      )}
       {battle.status === 'active' && mine && battle.deadlinePassed && (
         <div className="card notice">
           {t('battle.deadlinePassed')}
@@ -170,7 +221,7 @@ export function BattleDetailPage() {
             {t('battle.retract')}
           </button>
         )}
-        {battle.status === 'negotiating' && mine?.seat === 1 && (
+        {!onsite && battle.status === 'negotiating' && mine?.seat === 1 && (
           <button
             type="button"
             onClick={() => window.confirm(t('battle.bindingConfirm')) && run('start')}
@@ -283,25 +334,35 @@ function ProposalCard({
   proposal,
   myId,
   name,
+  otherThan,
   onAction,
   binding,
 }: {
   proposal: Proposal;
   myId: string;
   name: (id: string) => string;
+  otherThan: (userId: string) => string;
   onAction: (path: string, body?: unknown) => void;
   binding: boolean;
 }) {
+  const value = proposal.payload.value ?? 0;
   const text =
-    proposal.kind === 'settings'
-      ? t('battle.proposal.settings', { changes: settingsText(proposal.payload.changes ?? {}) })
-      : proposal.kind === 'extension'
-        ? t('battle.proposal.extension', { date: formatDate(proposal.payload.deadlineAt ?? 0) })
-        : proposal.kind === 'extra_attempt'
-          ? proposal.payload.change === 1
-            ? t('battle.proposal.extraAttempt')
-            : t('battle.proposal.takeBack')
-          : t('battle.proposal.cancel');
+    proposal.kind === 'result'
+      ? t('onsite.proposal', {
+          result: t(Math.abs(value) === 2 ? 'review.clearly' : 'review.somewhat', {
+            // The value is seen from the proposer: positive = the proposer was better.
+            name: name(value > 0 ? proposal.proposedBy : otherThan(proposal.proposedBy)),
+          }),
+        })
+      : proposal.kind === 'settings'
+        ? t('battle.proposal.settings', { changes: settingsText(proposal.payload.changes ?? {}) })
+        : proposal.kind === 'extension'
+          ? t('battle.proposal.extension', { date: formatDate(proposal.payload.deadlineAt ?? 0) })
+          : proposal.kind === 'extra_attempt'
+            ? proposal.payload.change === 1
+              ? t('battle.proposal.extraAttempt')
+              : t('battle.proposal.takeBack')
+            : t('battle.proposal.cancel');
   const own = proposal.proposedBy === myId;
   const base = `proposals/${proposal.id}`;
   return (

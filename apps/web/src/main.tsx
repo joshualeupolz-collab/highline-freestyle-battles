@@ -9,6 +9,7 @@ import { BattleDetailPage } from './pages/BattleDetail';
 import { BattlesPage } from './pages/Battles';
 import { LoginPage } from './pages/Login';
 import { NewBattlePage } from './pages/NewBattle';
+import { OnsiteResultPage } from './pages/OnsiteResult';
 import { OpenRequestsPage } from './pages/OpenRequests';
 import { ProfilePage } from './pages/Profile';
 import { ProposeFormatPage } from './pages/ProposeFormat';
@@ -49,6 +50,7 @@ const router = createBrowserRouter([
       { path: '/', element: <BattlesPage /> },
       { path: '/open', element: <OpenRequestsPage /> },
       { path: '/new', element: <NewBattlePage /> },
+      { path: '/onsite', element: <OnsiteResultPage /> },
       { path: '/formats/propose', element: <ProposeFormatPage /> },
       { path: '/rankings', element: <RankingsPage /> },
       { path: '/users/:id', element: <UserProfilePage /> },

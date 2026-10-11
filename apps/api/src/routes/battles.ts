@@ -22,6 +22,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { Hono } from 'hono';
 import { requireUser } from '../auth/middleware';
 import { can } from '../auth/permissions';
+import { voteScore } from '../battles/review';
 import {
   deliveryStatus,
   effectiveDeadline,
@@ -49,6 +50,7 @@ import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
 import {
+  cancelPendingProposalsStatement,
   cancelStatements,
   decideStatements,
   requiredSubmissionsPerPerson,
@@ -157,6 +159,7 @@ export async function battleResponse(
       createdBy: battle.createdBy,
       createdAt: battle.createdAt,
       acceptedAt: battle.acceptedAt,
+      playedAt: battle.playedAt,
       deadlineAt: battle.deadlineAt,
       deadlinePassed: battle.status === 'active' && isDeadlinePassed(battle, now),
       decidedAt: battle.decidedAt,
@@ -382,6 +385,7 @@ battleRoutes.get('/mine', async (c) => {
       unreadMessages: unread.find((u) => u.battleId === b.id)?.n ?? 0,
       id: b.id,
       formatId: b.formatId,
+      mode: b.mode,
       status: b.status,
       settings: settingsOf(b),
       createdBy: b.createdBy,
@@ -451,7 +455,7 @@ battleRoutes.post('/:id/start', async (c) => {
   const db = getDb(c.env.DB);
   const now = Date.now();
   const { battle, participants } = await loadBattle(db, c.req.param('id'));
-  if (battle.status !== 'negotiating') apiError(409, 'not_negotiating');
+  if (battle.status !== 'negotiating' || battle.mode !== 'online') apiError(409, 'not_negotiating');
   // The challenger proposed these settings, so the other side's consent completes the agreement.
   const acceptor = participants.find((p) => p.seat === 1);
   if (acceptor?.userId !== user?.id) apiError(403, 'only_the_accepting_side_can_start');
@@ -489,6 +493,9 @@ battleRoutes.post('/:id/proposals', async (c) => {
   requireParticipant(participants, user.id);
   if (battle.status !== 'negotiating' && battle.status !== 'active')
     apiError(409, 'battle_not_running');
+  // On-site battles only have a result to agree on; online battles get theirs from the review.
+  if ((battle.mode === 'onsite') !== (input.kind === 'result'))
+    apiError(400, 'unsupported_proposal');
 
   if (input.kind === 'settings') {
     if ((input.changes.level ?? 0) > MAX_FREE_LEVEL) apiError(400, 'level_requires_approval');
@@ -650,6 +657,22 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
                 : {}),
           })
           .where(eq(battles.id, battle.id)),
+      );
+      break;
+    }
+    case 'result': {
+      // On-site result confirmed by the other side (value seen from the proposer's view).
+      const seat0 = participants.find((p) => p.seat === 0)?.userId;
+      const fromSeat0 =
+        proposal.proposedBy === seat0 ? (payload.value as number) : -(payload.value as number);
+      const s0 = voteScore(fromSeat0, battle.scoring);
+      const results = participants.map((p) => ({
+        userId: p.userId,
+        score: p.seat === 0 ? s0 : 1 - s0,
+      }));
+      statements.push(
+        ...(await decideStatements(db, battle, results, 'onsite', now)),
+        cancelPendingProposalsStatement(db, battle.id, now),
       );
       break;
     }

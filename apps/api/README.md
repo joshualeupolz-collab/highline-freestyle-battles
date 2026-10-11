@@ -44,12 +44,14 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/battles/:id/accept` | Accept a request |
 | POST | `/api/battles/:id/retract` | Take back my open request |
 | POST | `/api/battles/:id/start` | Start with the negotiated settings (accepting side) |
-| POST | `/api/battles/:id/proposals` | Propose a change: `settings`, `extension`, `cancel`, `extra_attempt` |
+| POST | `/api/battles/:id/proposals` | Propose a change: `settings`, `extension`, `cancel`, `extra_attempt` (online), `result` (on site) |
 | POST | `/api/battles/:id/proposals/:pid/respond` | Accept or reject a proposal |
 | POST | `/api/battles/:id/proposals/:pid/withdraw` | Withdraw my proposal |
 | POST | `/api/battles/:id/grant-attempt` | Give the opponent one extra attempt |
 | POST | `/api/battles/:id/deadline-decision` | After a missed deadline: `claim_win` or `cancel` |
 | POST | `/api/battles/:id/attempts` | Register an attempt (pressing Start); checks the attempt limit |
+| POST | `/api/battles/onsite` | Enter an on-site result; the opponent confirms it via the `result` proposal |
+| POST | `/api/battles/:id/withdraw-onsite` | On-site battle did not take place: end it unrated |
 | POST | `/api/battles/:id/vote` | Review level 1: vote −2 … +2 (seen from seat 0); agreement decides and rates |
 | POST | `/api/battles/:id/submissions` | Choose the attempt that counts; unlocks the videos once everyone has chosen |
 | POST | `/api/videos` | Announce an upload; returns where to send the bytes |

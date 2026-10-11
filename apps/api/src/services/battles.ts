@@ -22,7 +22,7 @@ export async function decideStatements(
   db: Database,
   battle: BattleRow,
   results: { userId: string; score: number }[],
-  reason: 'forfeit' | 'deadline' | 'review',
+  reason: 'forfeit' | 'deadline' | 'review' | 'onsite',
   now: number,
 ): Promise<BatchItem<'sqlite'>[]> {
   return [

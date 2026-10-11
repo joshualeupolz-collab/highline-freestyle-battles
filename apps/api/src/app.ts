@@ -6,6 +6,7 @@ import type { AppEnv } from './env';
 import { authRoutes } from './routes/auth';
 import { battleRoutes } from './routes/battles';
 import { formatRoutes } from './routes/formats';
+import { onsiteRoutes } from './routes/onsite';
 import { rulesetRoutes } from './routes/rulesets';
 import { userRoutes } from './routes/users';
 import { battleVideoRoutes, videoRoutes } from './routes/videos';
@@ -28,6 +29,7 @@ export function createApp() {
   app.route('/users', userRoutes);
   app.route('/battles', battleRoutes);
   app.route('/battles', battleVideoRoutes);
+  app.route('/battles', onsiteRoutes);
   app.route('/videos', videoRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
