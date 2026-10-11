@@ -90,6 +90,7 @@ A person can hold several roles (e.g. athlete + judge).
 
 - **Recording only inside the app**, no upload from the gallery.
 - **Attempt limit:** pressing Start uses up an attempt. The recording is kept and cannot be discarded. Target level "moderately secure": prevent casual cheating; a watertight lock is not required.
+- **Best of N (decided):** all attempts of a battle are uploaded. Before the videos are unlocked, the athlete chooses which attempt counts; the opponent and the reviewers only rate that one. The other attempts are deleted after the battle by default, unless the athlete chooses to keep them (e.g. good trick footage for the video database), with their own visibility.
 - On start, an attempt record with a timestamp is created and checked at upload. Optionally a random code or the time can be overlaid on the video.
 - **Quality levels** chosen before recording: Data saver / Normal / HD. Recording happens directly at that quality, without re-compressing on the phone. A hint explains that HD is worthwhile for training videos.
 - **Rough trimming on the phone:** mark start and end, e.g. one bounce before the combo and 1–2 bounces after. Cut without re-encoding, which is fast. The rest is not uploaded.
@@ -193,12 +194,12 @@ A person can hold several roles (e.g. athlete + judge).
 
 | Component | Choice |
 |---|---|
-| App | Progressive Web App (PWA), TypeScript, offline-capable. Frontend framework decided at project start (React for its reach, or SvelteKit). |
-| Hosting | Cloudflare Pages, initially the free `*.pages.dev` address. Own domain (~€10/year) only once successful. |
+| App | Progressive Web App (PWA), TypeScript, offline-capable. **React** (Vite, static single-page app), chosen for its reach among possible contributors. |
+| Hosting | **One Cloudflare Worker with static assets** serves the PWA and the API from the same address (initially the free `*.workers.dev`). Same origin means login cookies work in every browser, including Safari. Requests for static files are free and unlimited. Own domain (~€10/year) only once successful. |
 | Server logic | Cloudflare Workers (Free: 100,000 requests/day, enough for about 1,000 daily active users; then Workers Paid $5/month) |
 | Database | Cloudflare D1 (SQLite, Free: 5 GB/account) |
 | Videos | Cloudflare R2; archive on Telegram + hard drive |
-| Login | Auth library with username/password + Google OAuth |
+| Login | Small own session login (username/password, optional Google via the `arctic` library). Passwords are stored only as salted, slow PBKDF2 hashes plus a secret pepper that is kept outside the database. Details: `docs/architecture.md`. |
 | Notifications | Web Push (iPhone: app must be added to the home screen) |
 | Background jobs | GitHub Actions (video processing, archiving, full rating replay) |
 | Rating engine | Pure TypeScript module without database access; unit tests against rating specification section 11. `glicko_sim.py` remains the reference. |
@@ -207,7 +208,7 @@ A person can hold several roles (e.g. athlete + judge).
 
 **Costs:** €0 at launch. Later probably a few euros per month (R2 above 10 GB, possibly Workers Paid, domain).
 
-**Addition to the rating specification (planned for v1.1):** people whose `RD_eff` has reached the cap `RD_UNKNOWN` are **hidden** from rankings. Their rating stays stored and applies again immediately on return. A shorter period can apply to people with few battles (parameter).
+**Addition to the rating specification (planned for a later version):** people whose `RD_eff` has reached the cap `RD_UNKNOWN` are **hidden** from rankings. Their rating stays stored and applies again immediately on return. A shorter period can apply to people with few battles (parameter).
 
 ---
 

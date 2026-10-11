@@ -1,4 +1,4 @@
-# Rating System – Specification (v1.0)
+# Rating System – Specification (v1.1)
 
 Highline Freestyle Battle App · As of 2026-10-11
 Reference implementation: `glicko_sim.py` (Glicko-2 core, simulation, test values)
@@ -65,6 +65,7 @@ The weight `wj` is the only deviation from the original. A battle with weight 2 
 There are no rating periods. Every **event** is processed immediately. An event is a single battle, a group battle or a competition result.
 
 - All participants of an event are updated **simultaneously**, always using their values from before the event.
+- **Event timestamp** = the moment the result becomes final and counts: decided by review, confirmed by both sides (on-site), approved (levels 4–5, see section 4) or confirmed (competitions). Because new events then almost always come after all processed ones, a replay is only needed in exceptional cases (annulment, merging formats, a late initial estimate, a full recalculation with a new RuleSet).
 - Replay order: by event timestamp, ties broken by ID. The result must be deterministic.
 
 ### 2.2 Inactivity (before every calculation and for every display)
@@ -122,7 +123,7 @@ Examples with k = 2: 100:90 → 0.55 · 150:80 → 0.78 · 200:50 → 0.94 · 12
 | 4 | 1.5 | only with approval (judge/organizer) |
 | 5 official competition | 2.0 | only with approval (judge/organizer) |
 
-**Decided:** battles at level 4–5 count only after approval. Until then they do not enter the rating at all (status `pending`). On approval, the event is placed at its battle timestamp. If that lies before events already processed, ratings are recalculated from that point (replay).
+**Decided:** battles at level 4–5 count only after approval. Until then they do not enter the rating at all (status `pending`). On approval, the event is rated with the approval time as its event timestamp (section 2.1), so no replay is needed. *(Changed in v1.1; v1.0 placed it at the battle time and recalculated from there.)*
 
 ---
 
@@ -154,7 +155,8 @@ Examples with k = 2: 100:90 → 0.55 · 150:80 → 0.78 · 200:50 → 0.94 · 12
 | estimate by users (≥ 3 estimates) | median of the estimates | 200 |
 
 - Every estimate is stored as a record: who rated whom, in which format, with which value, when.
-- An estimate is only possible while the person has fewer than `MIN_BATTLES` battles in that format.
+- An estimate is only possible while the person has fewer than `MIN_BATTLES` battles in that format. If it is given after the person's first battles, it still defines the **starting value** and the ratings are recalculated from the start (replay).
+- If an athlete revises their estimate, only the latest one counts. If several admin/federation estimates exist, the latest one counts.
 
 ### 6.2 Detecting over-rating
 
@@ -191,6 +193,7 @@ In the simulation, a group rated 250 points too high was reliably detected (z be
 
 - Sorted by `R = r − K_DISPLAY · RD_eff`.
 - Display: rating, ± RD and "?" if `RD_eff > PROVISIONAL_RD` or battles < `MIN_BATTLES`.
+- **Counting battles:** every event counts as one battle for each participant. A group battle or a competition placement is one battle, not n − 1, matching its total weight of one single battle (section 5.1).
 - Provisional ratings are shown, not hidden.
 
 ### 8.2 Combined ranking
@@ -261,6 +264,8 @@ ComboConfig(id, name, format_ids, drop_worst, missing_z, official, locked_by)
 
 `RatingState` and `RatingHistory` can be fully regenerated at any time from `Event`, `EventResult`, `Estimate` and `RuleSet`.
 
+The actual database schema is described in `docs/architecture.md`.
+
 ---
 
 ## 11. Test values for the implementation
@@ -304,6 +309,12 @@ Inactivity: previous RD 50, 210 days inactive → RD_eff = 176.
 - Inactivity only acts through increasing uncertainty. Rankings sort by r − 2·RD.
 - Combined rankings are based on z-values. The worst X formats are dropped; a missing format counts as −1. There is one official, locked configuration plus freely filterable variants.
 - Formats have status `relevant` or `fun`. Similar formats can be merged via `merged_into`.
+
+**Decided (project start, 2026-10-11, v1.1):**
+- Event timestamp = time the result becomes final. Levels 4–5 are rated at the time of approval, without a replay (section 4).
+- A group battle or competition placement counts as one battle for `MIN_BATTLES` (section 8.1).
+- A late initial estimate (person has already battled, but fewer than `MIN_BATTLES` times) applies retroactively as starting value (section 6.1).
+- Points of a battle in a merged format are converted with the `k_points` of the format it was played in.
 
 **Required from other sub-projects (app, backend, UI):**
 - A poll feature for rule changes, producing a new RuleSet version.
