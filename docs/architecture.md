@@ -27,7 +27,18 @@ Nobody can read a password, not even an admin. We store only:
 - a **PBKDF2-SHA256 hash** with a random salt per user (native WebCrypto in the Worker, fast enough for the Workers CPU limit; scrypt/argon2 in JavaScript would be too slow there),
 - combined with a secret **pepper** stored as a Cloudflare secret, not in the database. A stolen database alone is not enough to guess passwords.
 
-In addition: minimum password length, session tokens stored only as hashes, login rate limiting, "Sign in with Google" as an alternative. The CPU time of hashing is measured in the login step before the parameters are fixed.
+In addition: minimum password length (10), session tokens stored only as hashes, and after 5 failed logins in a row the account is locked for 15 minutes.
+
+**Iterations:** 100,000 PBKDF2 iterations (the Workers maximum) took ~17 ms of CPU in a measurement, above the ~10 ms of Workers Free. We start with **50,000**. Every hash stores its iteration count, so the value can be raised after measuring on Cloudflare; accounts are upgraded automatically at their next login.
+
+### Accounts and login (implemented in step 3)
+
+- **Session:** random token in an `HttpOnly; Secure; SameSite=Lax` cookie, valid 30 days, extended automatically while in use. Cross-site form posts are rejected (Origin check), and request bodies must be JSON.
+- **Sign-up:** username (3–30 characters, case-insensitive unique), display name, password, optional e-mail, required age confirmation, optional questionnaire. The account is `pending` and logged in, so it can see that it waits for approval.
+- **Approval:** any approved athlete, the federation or an admin. It stores who approved whom (invitation tree), grants the `athlete` role and is written to the audit log.
+- **First admin:** whoever registers with the secret `SETUP_TOKEN` while no admin exists becomes an active admin. Afterwards the token has no effect.
+- **Forgotten password:** there is no e-mail reset. The federation or an admin creates a one-time code (valid 24 h, shown once, stored only as a hash) and hands it over personally. Using it sets a new password and logs out all devices.
+- **Google login** is postponed. It needs a Google Cloud project with an OAuth client, which the project owner has to create; the data model (`oauth_accounts`) is ready.
 
 ### Costs
 
@@ -146,7 +157,7 @@ Notes:
 | 0 | Repository setup: pnpm workspace, strict TypeScript, Biome, Vitest, CI | done |
 | 1 | `packages/rating`: Glicko-2 core, inactivity, protection rule, scores, events (single/group/placement), estimates, merged formats, replay, format ranking; tests against spec §11 and the Python reference | done |
 | 2 | D1 schema (migrations 0000 + 0001), Worker skeleton with Hono, local development, seed data (RuleSet v1, launch formats) | done |
-| 3 | Login: sign-up with age confirmation, sessions, approval, admin bootstrap, audit log; then Google | |
+| 3 | Login: sign-up with age confirmation, sessions, approval, admin bootstrap, audit log, password reset codes | done (Google login postponed, see §1) |
 | 4 | Formats and RuleSets (admin) | |
 | 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines (Workers cron trigger) | |
 | 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | |

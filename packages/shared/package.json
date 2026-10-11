@@ -1,0 +1,19 @@
+{
+  "name": "@hfb/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Types and zod schemas shared by the API and the web app",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

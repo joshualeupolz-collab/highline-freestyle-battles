@@ -44,7 +44,8 @@ A person can hold several roles (e.g. athlete + judge).
 
 ## 3. Accounts, approval, initial rating
 
-- **Login:** username + password, optionally "Sign in with Google". An email address is optional. Without an email there is no "forgot password"; the admin or federation resets the password instead.
+- **Login:** username + password, optionally "Sign in with Google". An email address is optional. Without an email there is no "forgot password"; the admin or federation resets the password instead: they create a one-time code (valid 24 hours) and hand it over personally.
+- **First admin:** whoever registers with a secret setup token while no admin exists yet becomes the first admin.
 - **Age:** a checkbox at sign-up: "I am at least 16 years old." Younger users contact the federation; they are approved case by case with parental consent.
 - **Approval:** new accounts must be approved, by an existing athlete, the federation or an admin. An optional short questionnaire (e.g. how long they have been doing freestyle, community/location).
 - **Invitation tree:** the app stores who approved whom. This helps detect rings of fake accounts.

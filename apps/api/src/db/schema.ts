@@ -83,6 +83,9 @@ export const users = sqliteTable(
     questionnaireJson: text('questionnaire_json'),
     /** Code for filming by friends (stage 2). */
     athleteCode: text('athlete_code'),
+    /** Failed logins in a row; reset on success. Used to slow down password guessing. */
+    failedLoginCount: integer('failed_login_count').notNull().default(0),
+    lastFailedLoginAt: integer('last_failed_login_at'),
     createdAt: integer('created_at').notNull(),
     deletedAt: integer('deleted_at'),
   },
@@ -128,6 +131,28 @@ export const sessions = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('sessions_user_idx').on(t.userId)],
+);
+
+/**
+ * One-time codes to set a new password, created by an admin or the federation
+ * (there is no "forgot password" e-mail). Only a hash of the code is stored.
+ */
+export const passwordResetCodes = sqliteTable(
+  'password_reset_codes',
+  {
+    /** SHA-256 of the code. */
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    usedAt: integer('used_at'),
+  },
+  (t) => [index('password_reset_codes_user_idx').on(t.userId)],
 );
 
 export const userRoles = sqliteTable(

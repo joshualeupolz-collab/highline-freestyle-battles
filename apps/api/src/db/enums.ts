@@ -6,8 +6,7 @@
  * value later means a table rebuild; prefer adding it here before the first deployment.
  */
 
-export const USER_STATUSES = ['pending', 'active', 'suspended', 'deleted'] as const;
-export const ROLES = ['athlete', 'judge', 'organizer', 'federation', 'admin'] as const;
+export { ROLES, USER_STATUSES } from '@hfb/shared';
 
 export const FORMAT_STATUSES = ['relevant', 'fun'] as const;
 export const FORMAT_PART_KINDS = ['best_trick', 'trick_combo', 'bounce_combo', 'response'] as const;
