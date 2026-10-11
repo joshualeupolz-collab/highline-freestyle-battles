@@ -4,7 +4,8 @@ import { api, type BattleSummary } from '../api';
 import { useMe } from '../auth';
 import { StatusBadge, useFormatName } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
-import { formatDate, t } from '../i18n';
+import { formatShort, t } from '../i18n';
+import { nextStep } from '../nextStep';
 
 /** Start page: pending notice, or my battles grouped by what needs attention. */
 export function BattlesPage() {
@@ -28,11 +29,7 @@ export function BattlesPage() {
   const list = battles.data?.battles ?? [];
 
   const needsMe = (b: BattleSummary) =>
-    b.deadlinePassed ||
-    b.unreadMessages > 0 ||
-    (b.status === 'open' && b.invitedUserId === me?.id) ||
-    b.status === 'negotiating' ||
-    b.status === 'reviewing';
+    b.unreadMessages > 0 || !!(me && nextStep(b, b.todo, me.id)?.urgent);
   const running = (b: BattleSummary) =>
     ['open', 'negotiating', 'active', 'reviewing'].includes(b.status);
   const groups = [
@@ -53,6 +50,7 @@ export function BattlesPage() {
             <h2>{g.title}</h2>
             {g.items.map((b) => {
               const opponent = b.participants.find((p) => p.userId !== me?.id);
+              const step = me ? nextStep(b, b.todo, me.id) : null;
               return (
                 <Link key={b.id} to={`/battles/${b.id}`} className="card">
                   <div className="row">
@@ -71,9 +69,14 @@ export function BattlesPage() {
                       ? `${t('battles.vs')} ${opponent.displayName}`
                       : t('battles.waitingForOpponent')}
                     {b.deadlineAt && b.status === 'active'
-                      ? ` · ${t('battle.deadline')}: ${formatDate(b.deadlineAt)}`
+                      ? ` · ${t('battles.until', { date: formatShort(b.deadlineAt) })}`
                       : ''}
                   </div>
+                  {step && (
+                    <div className={step.urgent ? 'next-line urgent' : 'next-line'}>
+                      {t(step.key, { opponent: opponent?.displayName ?? '' })}
+                    </div>
+                  )}
                 </Link>
               );
             })}

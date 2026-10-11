@@ -56,7 +56,8 @@ export function RankingsPage() {
                 </td>
                 <td>
                   {e.r}
-                  {e.provisional ? '?' : ''} <span className="muted">±{e.rd}</span>
+                  {e.provisional ? <span className="muted"> · {t('rating.provisional')}</span> : ''}{' '}
+                  <span className="muted">±{e.rd}</span>
                 </td>
                 <td>{e.nBattles}</td>
               </tr>

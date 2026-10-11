@@ -8,7 +8,7 @@ import {
 } from '@hfb/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api, type BattleStatus, type Format } from './api';
-import { formatDate, t } from './i18n';
+import { formatDate, formatShort, t } from './i18n';
 
 export function useFormats() {
   return useQuery({ queryKey: ['formats'], queryFn: api.formats, staleTime: 5 * 60_000 });
@@ -197,4 +197,18 @@ export function SettingsFields({
       </label>
     </>
   );
+}
+
+/** Compact settings line, e.g. "3 tricks · 3 attempts · until Sun, 18 Oct, 05:00 · weight 3 · with margin". */
+export function compactSettings(settings: BattleSettings, format?: Pick<Format, 'parts'>): string {
+  const n = settings.attemptsPerVideo;
+  return [
+    format ? partsText(format) : '',
+    n === null ? t('meta.unlimited') : n === 1 ? t('meta.attempt') : t('meta.attempts', { n }),
+    settings.deadlineAt ? t('battles.until', { date: formatShort(settings.deadlineAt) }) : '',
+    t('meta.weight', { n: settings.level }),
+    settings.scoring === 'scale' ? t('meta.margin') : t('meta.winLoss'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }

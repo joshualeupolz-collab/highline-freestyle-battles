@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api } from '../api';
-import { useMe, useSetMe } from '../auth';
+import { hasRole, useMe, useSetMe } from '../auth';
 import { ErrorText } from '../components/ErrorText';
 import { t } from '../i18n';
 
@@ -35,9 +35,14 @@ export function ProfilePage() {
   return (
     <>
       <h1>{t('profile.title')}</h1>
-      <p>
+      <div className="link-list">
         <Link to={`/users/${me.id}`}>{t('profile.viewPublic')}</Link>
-      </p>
+        {hasRole(me, 'athlete', 'federation', 'admin') && (
+          <Link to="/approvals">{t('nav.approvals')}</Link>
+        )}
+        <Link to="/formats/propose">{t('new.proposeFormat')}</Link>
+        {hasRole(me, 'federation', 'admin') && <Link to="/admin">{t('nav.admin')}</Link>}
+      </div>
       <div className="card">
         <dl>
           <dt>{t('field.username')}</dt>
@@ -48,46 +53,47 @@ export function ProfilePage() {
           <dd>{me.roles.join(', ') || '–'}</dd>
         </dl>
       </div>
-      <form
-        className="card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          change.mutate({ currentPassword, newPassword });
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>{t('profile.changePassword')}</h2>
-        <label>
-          {t('field.currentPassword')}
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrent(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <label>
-          {t('field.newPassword')}
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNew(e.target.value)}
-            autoComplete="new-password"
-            required
-            minLength={PASSWORD_MIN}
-          />
-        </label>
-        <ErrorText error={change.error} />
-        {change.isSuccess && <p className="success">{t('profile.passwordChanged')}</p>}
-        <button type="submit" disabled={change.isPending}>
-          {t('common.save')}
-        </button>
-      </form>
+      <details className="card more">
+        <summary>{t('profile.changePassword')}</summary>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            change.mutate({ currentPassword, newPassword });
+          }}
+        >
+          <label>
+            {t('field.currentPassword')}
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrent(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <label>
+            {t('field.newPassword')}
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNew(e.target.value)}
+              autoComplete="new-password"
+              required
+              minLength={PASSWORD_MIN}
+            />
+          </label>
+          <ErrorText error={change.error} />
+          {change.isSuccess && <p className="success">{t('profile.passwordChanged')}</p>}
+          <button type="submit" disabled={change.isPending}>
+            {t('common.save')}
+          </button>
+        </form>
+      </details>
       <button type="button" className="danger" onClick={() => logout.mutate()}>
         {t('profile.logout')}
       </button>
 
-      <details className="card" style={{ marginTop: '2rem' }}>
+      <details className="card more">
         <summary>{t('profile.delete')}</summary>
         <form
           onSubmit={(e) => {

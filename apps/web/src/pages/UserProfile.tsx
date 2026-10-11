@@ -37,7 +37,7 @@ export function UserProfilePage() {
             <span>{r.formatName}</span>
             <strong className="big">
               {r.r}
-              {r.provisional ? '?' : ''}
+              {r.provisional ? ` · ${t('rating.provisional')}` : ''}
             </strong>
             <span>
               ±{r.rd} · {t('profile.battleCount', { n: r.nBattles })}

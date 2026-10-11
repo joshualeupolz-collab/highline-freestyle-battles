@@ -52,33 +52,80 @@ h2 {
 .header {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 0.5rem 1rem env(safe-area-inset-right);
+  padding: calc(0.5rem + env(safe-area-inset-top)) 1rem 0.5rem;
 }
 .header .brand {
   font-weight: 700;
   color: var(--text);
   text-decoration: none;
 }
-.nav {
-  display: flex;
-  gap: 0.25rem;
-  overflow-x: auto;
-  padding-top: 0.25rem;
-}
-.nav a {
-  white-space: nowrap;
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  text-decoration: none;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.nav a.active {
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
   background: var(--primary);
   color: var(--primary-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Tab bar at the bottom (components/Layout.tsx). */
+.tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  /* On wide screens the tabs stay as wide as the content. */
+  padding: 0 max(0px, calc((100% - 40rem) / 2)) env(safe-area-inset-bottom);
+}
+.tabs a {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.45rem 0 0.4rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.tabs a.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+.tabs svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tabs .dot {
+  position: absolute;
+  top: 0.35rem;
+  left: calc(50% + 0.6rem);
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--danger);
+}
+main.with-tabs {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
 }
 
 main {
@@ -519,4 +566,58 @@ a.button {
 .vote-options {
   display: grid;
   gap: 0.5rem;
+}
+
+/* Next step in the battle list and on the battle page (nextStep.ts). */
+.next-line {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.next-line.urgent {
+  color: var(--primary);
+  font-weight: 600;
+}
+.link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Battle page (pages/BattleDetail.tsx). */
+.versus {
+  margin-top: 0.5rem;
+}
+.battle-meta {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.next-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-left: 4px solid var(--border);
+}
+.next-step.urgent {
+  border-left-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+.next-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+button.wide {
+  width: 100%;
+}
+details.more summary,
+details.hint summary {
+  cursor: pointer;
+  color: var(--primary);
+}
+details.more {
+  margin-top: 1.5rem;
 }
