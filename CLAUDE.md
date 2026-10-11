@@ -83,6 +83,7 @@ apps/api/           Cloudflare Worker (API)
 packages/rating/    rating engine (TypeScript, pure)
 packages/shared/    shared types and zod schemas
 db/migrations/      D1 migrations
+e2e/                browser tests (Playwright)
 .github/workflows/  CI and background jobs
 ```
 
@@ -93,6 +94,7 @@ pnpm install          # install dependencies (Node 22, pnpm via corepack or `npm
 pnpm test             # run all tests (Vitest)
 pnpm typecheck        # TypeScript in every package
 pnpm lint             # Biome lint + format check; `pnpm format` fixes formatting
+pnpm e2e              # browser tests (Playwright, local Worker, fake camera); guide: e2e/README.md
 python rating/export_fixtures.py   # regenerate the rating reference fixtures (needs numpy)
 
 pnpm --filter @hfb/api dev               # local API on http://localhost:8787 (run db:migrate:local first)

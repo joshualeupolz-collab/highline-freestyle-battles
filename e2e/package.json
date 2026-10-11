@@ -1,0 +1,16 @@
+{
+  "name": "@hfb/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser tests (Playwright + Chromium with a fake camera) against a local Worker",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "~1.56.1",
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2"
+  }
+}

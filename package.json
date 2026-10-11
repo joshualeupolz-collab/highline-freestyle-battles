@@ -12,6 +12,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "build": "pnpm --filter @hfb/web build",
+    "e2e": "pnpm build && pnpm --filter @hfb/e2e e2e",
     "dev:api": "pnpm --filter @hfb/api dev",
     "dev:web": "pnpm --filter @hfb/web dev"
   },
