@@ -19,6 +19,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Migrations match the schema
+        run: |
+          pnpm --filter @hfb/api db:generate
+          if [ -n "$(git status --porcelain db/migrations)" ]; then
+            echo "apps/api/src/db/schema.ts changed without a migration. Run: pnpm --filter @hfb/api db:generate"
+            git status --porcelain db/migrations
+            exit 1
+          fi
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

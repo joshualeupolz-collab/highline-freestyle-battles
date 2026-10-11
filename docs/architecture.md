@@ -37,7 +37,7 @@ Everything above stays within the free tiers. Activating R2 requires a payment m
 
 ## 2. Database schema (D1)
 
-The migration for stage 1 is written in step 2. This section fixes its structure.
+Implemented in `apps/api/src/db/schema.ts` (source of truth) and `db/migrations/0000_init.sql`; RuleSet 1 and the launch formats are seeded by `db/migrations/0001_seed_rules.sql`. All enum values are listed in `apps/api/src/db/enums.ts`.
 
 ### Conventions (so later stages need no rebuild)
 
@@ -145,7 +145,7 @@ Notes:
 |---|---|---|
 | 0 | Repository setup: pnpm workspace, strict TypeScript, Biome, Vitest, CI | done |
 | 1 | `packages/rating`: Glicko-2 core, inactivity, protection rule, scores, events (single/group/placement), estimates, merged formats, replay, format ranking; tests against spec §11 and the Python reference | done |
-| 2 | D1 schema (migration 0001), Worker skeleton with Hono, local development, seed data (RuleSet v1, launch formats) | |
+| 2 | D1 schema (migrations 0000 + 0001), Worker skeleton with Hono, local development, seed data (RuleSet v1, launch formats) | done |
 | 3 | Login: sign-up with age confirmation, sessions, approval, admin bootstrap, audit log; then Google | |
 | 4 | Formats and RuleSets (admin) | |
 | 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines (Workers cron trigger) | |

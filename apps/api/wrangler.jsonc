@@ -1,0 +1,18 @@
+// Cloudflare Worker configuration. Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "highline-freestyle-battles",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hfb",
+      // Placeholder for local development. Before the first deployment, run
+      // `wrangler d1 create hfb` and put the returned id here.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../db/migrations"
+    }
+  ]
+}

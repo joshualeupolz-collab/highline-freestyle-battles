@@ -91,6 +91,14 @@ pnpm test             # run all tests (Vitest)
 pnpm typecheck        # TypeScript in every package
 pnpm lint             # Biome lint + format check; `pnpm format` fixes formatting
 python rating/export_fixtures.py   # regenerate the rating reference fixtures (needs numpy)
+
+pnpm --filter @hfb/api dev               # local API on http://localhost:8787 (run db:migrate:local first)
+pnpm --filter @hfb/api db:migrate:local  # apply db/migrations to the local D1 database
+pnpm --filter @hfb/api db:generate       # after editing apps/api/src/db/schema.ts: create a migration
 ```
+
+Database rules: `apps/api/src/db/schema.ts` is the source of truth; never edit an applied migration,
+add a new one. Seed data that must exist everywhere (RuleSets, launch formats) goes into a custom
+migration (`drizzle-kit generate --custom`).
 
 Run `pnpm lint && pnpm typecheck && pnpm test` before every commit.
