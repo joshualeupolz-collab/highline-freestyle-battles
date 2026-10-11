@@ -257,9 +257,16 @@ const en = {
   'lab.applyHint': 'Quality and camera apply when the camera is (re)started.',
   'lab.attemptsLeft': 'Attempts left: {left} of {total}.',
   'lab.resetAttempts': 'Reset',
-  'lab.chunks': '{count} chunks stored',
   'lab.cameraOn': 'Turn on camera',
-  'lab.cameraRestart': 'Restart camera',
+  'lab.cameraOff': 'Close camera',
+  'lab.leaveHint':
+    'Leaving the app during a recording (switching apps, locking the phone) ends the attempt. The video up to that moment is kept.',
+  'lab.autoStopped.app_left':
+    'The recording ended because the app was left. The attempt is used up; the video up to that moment is saved below. (In battles you will be able to send it to your opponent with a request for an extra attempt.)',
+  'lab.autoStopped.camera_lost':
+    'The recording ended because the camera stopped delivering pictures. The video up to that moment is saved below.',
+  'lab.endReason.app_left': 'ended: app left',
+  'lab.endReason.camera_lost': 'ended: camera lost',
   'lab.start': 'Start attempt {attempt}',
   'lab.stop': 'Stop',
   'lab.startHint':

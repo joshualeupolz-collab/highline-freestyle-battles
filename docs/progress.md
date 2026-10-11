@@ -71,14 +71,16 @@ after uploading videos does not exist yet.
 | Cut at the keyframe before the chosen start; if cutting fails on a platform, upload uncut + cut times and cut on the server | Owner agreed (session 2) |
 | Own small MP4/WebM cutting code instead of ffmpeg.wasm/mp4box.js | ffmpeg.wasm is ~30 MB and slow on phones; copying samples needs only a few hundred lines |
 | App reloads itself once a new version's service worker has taken over | Otherwise the first visit after a deploy runs the cached old app (`/lab/video` showed "404 Not Found") |
+| Leaving the app ends the attempt; a cut-off video can be sent to the opponent with a request for an extra attempt | Owner's decision after the Android test: the camera freezes in the background, and pause/resume would allow hiding a fall |
+| Full-screen camera with one record button (portrait: controls at the bottom, landscape: on the right) | Owner's feedback: in landscape the Start button was hard to reach |
 | Ask MediaRecorder for a keyframe every second | Chrome otherwise writes one keyframe per recording (no cutting, no crash recovery) |
 
 ---
 
 ## 3. Open questions for the project owner
 
-1. Video test results: the owner tests on Android, friends on iPhones (guide in
-   `docs/video-prototype.md` §1). Reports are sent to the owner and brought into the next session.
+1. Video test results from iPhones (friends of the owner; guide in `docs/video-prototype.md` §1).
+   Android still to check: HD, crash test (close the browser while recording).
 2. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
    needed before prototyping it.
 3. Optional housekeeping: mark the GitGuardian finding on PR #1 (`PASSWORD_ITERATIONS = 50_000`)
@@ -90,9 +92,8 @@ after uploading videos does not exist yet.
 
 ## 4. Next steps
 
-1. **Evaluate the video test reports (step 7)** from Android and iPhones
-   (`docs/video-prototype.md` §3 lists the open questions); fix what breaks on real phones, decide
-   format strategy, keyframe interval and bit rates.
+1. **Evaluate the iPhone test reports (step 7)**; Android (Chrome) is tested and works
+   (`docs/video-prototype.md` §3). Then decide format strategy, keyframe interval and bit rates.
 2. **Upload and unlocking (step 8):** signed R2 uploads (needs R2 enabled on the Cloudflare
    account, which requires a payment method but stays free within 10 GB), upload queue, choosing
    the attempt that counts, unlocking when both have submitted.

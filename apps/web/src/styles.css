@@ -406,10 +406,82 @@ table.ranking tr.me td {
   border-radius: 8px;
   margin-bottom: 0.5rem;
 }
-.recording {
-  color: var(--danger);
-  font-weight: 600;
+/* Full-screen camera: controls at the bottom in portrait, on the right in landscape. */
+.camera-full {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  color: #fff;
+}
+.camera-full video {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+}
+.camera-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem calc(1rem + env(safe-area-inset-bottom));
+}
+@media (orientation: landscape) {
+  .camera-full {
+    flex-direction: row;
+  }
+  .camera-controls {
+    flex-direction: column;
+    padding: 1rem calc(1rem + env(safe-area-inset-right)) 1rem 1rem;
+  }
+}
+.camera-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 5rem;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.camera-status strong {
+  color: #f87171;
+}
+.camera-close {
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.2rem;
+}
+/* Record button: red circle; while recording a red rounded square (= stop). */
+.record-button {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: transparent;
+}
+.record-button::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #dc2626;
+  transition: all 0.15s;
+}
+.record-button.recording::after {
+  inset: 18px;
+  border-radius: 6px;
 }
 .lab-item {
   display: block;

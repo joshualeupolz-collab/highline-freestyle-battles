@@ -13,6 +13,7 @@ import {
 } from '../video/recorder';
 import {
   deleteRecording,
+  type EndReason,
   listRecordings,
   loadRecordingBytes,
   markInterruptedRecordings,
@@ -85,6 +86,7 @@ export function VideoLabPage() {
   const [active, setActive] = useState<ActiveRecording | null>(null);
   const [progress, setProgress] = useState({ chunks: 0, bytes: 0 });
   const [elapsed, setElapsed] = useState(0);
+  const [autoStopped, setAutoStopped] = useState<EndReason | null>(null);
 
   const [recordings, setRecordings] = useState<StoredRecording[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export function VideoLabPage() {
     };
   }, [stream]);
 
-  // Timer, wake lock and background notes while recording.
+  // Timer, wake lock and a warning before closing the page while recording.
   useEffect(() => {
     if (!active) return;
     const started = Date.now();
@@ -124,14 +126,11 @@ export function VideoLabPage() {
         lock = l;
       })
       .catch(() => active.note('screen wake lock not available'));
-    const onVisibility = () => active.note(`page ${document.visibilityState}`);
     const onUnload = (e: BeforeUnloadEvent) => e.preventDefault();
-    document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('beforeunload', onUnload);
     return () => {
       clearInterval(timer);
       lock?.release().catch(() => {});
-      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('beforeunload', onUnload);
     };
   }, [active]);
@@ -139,6 +138,7 @@ export function VideoLabPage() {
   async function turnOnCamera() {
     setError(null);
     setCameraNote(null);
+    setAutoStopped(null);
     try {
       for (const track of stream?.getTracks() ?? []) track.stop();
       const result = await openCamera(QUALITY_PRESETS[quality], facing);
@@ -171,6 +171,14 @@ export function VideoLabPage() {
           attempt,
         },
         setProgress,
+        async (stopped) => {
+          // App left or camera lost: the attempt is over and the camera is released.
+          setActive(null);
+          setStream(null);
+          setAutoStopped(stopped.endReason ?? 'stopped');
+          await refresh();
+          setSelectedId(stopped.id);
+        },
       );
       setActive(recording);
       await refresh();
@@ -183,6 +191,7 @@ export function VideoLabPage() {
     if (!active) return;
     const recording = await active.stop();
     setActive(null);
+    setStream(null);
     await refresh();
     setSelectedId(recording.id);
   }
@@ -285,13 +294,14 @@ export function VideoLabPage() {
       </div>
 
       <div className="card">
-        <video ref={preview} className="lab-video" autoPlay muted playsInline />
+        {autoStopped && autoStopped !== 'stopped' && (
+          <p className="card notice">{t(`lab.autoStopped.${autoStopped}`)}</p>
+        )}
         <p>
           {t('lab.attemptsLeft', { left: Math.max(0, attemptsLeft), total: attemptsAllowed })}{' '}
           <button
             type="button"
             className="link"
-            disabled={!!active}
             onClick={() => {
               setAttemptsUsed(0);
               writeAttemptsUsed(0);
@@ -300,37 +310,55 @@ export function VideoLabPage() {
             {t('lab.resetAttempts')}
           </button>
         </p>
-        {active && (
-          <p className="recording">
-            ● {sec(elapsed)} · {mb(progress.bytes)} · {t('lab.chunks', { count: progress.chunks })}
-          </p>
-        )}
         <div className="actions">
-          {!stream && (
-            <button type="button" onClick={turnOnCamera}>
-              {t('lab.cameraOn')}
-            </button>
-          )}
-          {stream && !active && (
-            <>
-              <button type="button" disabled={attemptsLeft <= 0} onClick={start}>
-                {t('lab.start', { attempt: attemptsUsed + 1 })}
-              </button>
-              <button type="button" className="secondary" onClick={turnOnCamera}>
-                {t('lab.cameraRestart')}
-              </button>
-            </>
-          )}
-          {active && (
-            <button type="button" className="danger" onClick={stop}>
-              {t('lab.stop')}
-            </button>
-          )}
+          <button type="button" onClick={turnOnCamera}>
+            {t('lab.cameraOn')}
+          </button>
         </div>
         <p className="hint">{t('lab.startHint', { mb: expectedMbPerMinute(preset).toFixed(0) })}</p>
+        <p className="hint">{t('lab.leaveHint')}</p>
         {cameraNote && <p className="hint">{cameraNote}</p>}
         {error && <p className="error">{error}</p>}
       </div>
+
+      {stream && (
+        <div className="camera-full">
+          <video ref={preview} autoPlay muted playsInline />
+          <div className="camera-controls">
+            <button
+              type="button"
+              className="camera-close"
+              disabled={!!active}
+              aria-label={t('lab.cameraOff')}
+              onClick={() => setStream(null)}
+            >
+              ✕
+            </button>
+            <button
+              type="button"
+              className={`record-button${active ? ' recording' : ''}`}
+              disabled={!active && attemptsLeft <= 0}
+              aria-label={active ? t('lab.stop') : t('lab.start', { attempt: attemptsUsed + 1 })}
+              onClick={active ? stop : start}
+            />
+            <div className="camera-status">
+              {active ? (
+                <>
+                  <strong>● {sec(elapsed)}</strong>
+                  <span>{mb(progress.bytes)}</span>
+                </>
+              ) : (
+                <span>
+                  {t('lab.attemptsLeft', {
+                    left: Math.max(0, attemptsLeft),
+                    total: attemptsAllowed,
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <h2>{t('lab.recordings')}</h2>
@@ -348,6 +376,9 @@ export function VideoLabPage() {
             <span>
               {mb(r.bytes)} · {r.quality} · {r.mimeType || '?'}
               {r.status !== 'done' && ` · ${t(`lab.status.${r.status}`)}`}
+              {r.endReason &&
+                r.endReason !== 'stopped' &&
+                ` · ${t(`lab.endReason.${r.endReason}`)}`}
             </span>
           </button>
         ))}

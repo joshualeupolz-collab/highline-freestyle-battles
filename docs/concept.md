@@ -95,6 +95,7 @@ A person can hold several roles (e.g. athlete + judge).
 
 - **Recording only inside the app**, no upload from the gallery.
 - **Attempt limit:** pressing Start uses up an attempt. The recording is kept and cannot be discarded. Target level "moderately secure": prevent casual cheating; a watertight lock is not required.
+- **Leaving the app ends the attempt (decided 2026-10-11):** switching apps, locking the phone or losing the camera stops the recording; the video up to that moment is kept and the attempt counts as used. No pause/resume, because a pause could hide a fall. If the recording was cut off by accident, the athlete can send the cut-off video to the opponent with a request for an extra attempt (goodwill, section 5); the video shows that it simply ends rather than ending with a fall. Sending it comes with the upload (step 8).
 - **Best of N (decided):** all attempts of a battle are uploaded. Before the videos are unlocked, the athlete chooses which attempt counts; the opponent and the reviewers only rate that one. The other attempts are deleted after the battle by default, unless the athlete chooses to keep them (e.g. good trick footage for the video database), with their own visibility.
 - On start, an attempt record with a timestamp is created and checked at upload. Optionally a random code or the time can be overlaid on the video.
 - **Quality levels** chosen before recording: Data saver / Normal / HD. Recording happens directly at that quality, without re-compressing on the phone. A hint explains that HD is worthwhile for training videos.

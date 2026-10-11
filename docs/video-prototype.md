@@ -21,7 +21,8 @@ Use a phone (iPhone with Safari, Android with Chrome). Ideally test outside at a
    - Quality **Normal**, everything else automatic.
    - Quality **HD**.
    - Quality **Data saver**.
-4. For one recording: while it runs, switch to another app for a few seconds, then come back and stop.
+4. For one recording: while it runs, switch to another app. The recording should end by itself
+   and a notice should say so; check that the video up to that moment plays.
 5. For another recording: close the browser/app **while recording**, open the page again. A notice
    about an interrupted recording should appear; check whether it plays.
 6. Open each recording, play it, then cut a piece: pause → **Start here**, pause later → **End here**
@@ -42,6 +43,8 @@ Use a phone (iPhone with Safari, Android with Chrome). Ideally test outside at a
 | Recording | `MediaRecorder` with the bit rates of the quality level (`apps/web/src/video/quality.ts`); format preference H.264/MP4, then WebM (`recorder.ts`) |
 | Keyframes | `videoKeyFrameIntervalDuration` = 1 s (Chrome 113+; others ignore it). Selectable: 1 s, 2 s, browser default |
 | Attempt limit | Pressing Start uses up an attempt (counter on the page, resettable for testing) |
+| Camera view | Full screen with one record button (red circle = start, red square = stop); controls at the bottom in portrait, on the right in landscape |
+| Leaving the app | Ends the recording (`visibilitychange`/`pagehide`, or the video track ends or is muted); the camera is released. The record keeps `endReason` (`app_left`, `camera_lost`) |
 | Local storage | Every 1-second chunk goes into IndexedDB immediately (`storage.ts`), as ArrayBuffer (old Safari cannot store Blobs). `navigator.storage.persist()` is requested before the first recording |
 | Crash recovery | Recordings still marked "recording" on page load are marked "interrupted"; their chunks form a readable file up to the last stored chunk |
 | Cutting | Own small parsers/writers, no library, no re-encoding (`mp4.ts`, `webm.ts`, `trim.ts`). The cut starts at the last keyframe at or before the chosen start. Output: classic MP4 (moov first) or WebM with duration and cues |
@@ -66,6 +69,18 @@ Checked in desktop Chromium with a fake camera (`/lab/video`, Playwright):
 - Recording, preview, cutting (a few milliseconds for a few seconds of video) and crash recovery
   work for both MP4 and WebM.
 
+**Android, Chrome 154 (owner, 2026-10-11):**
+
+- Records H.264 + AAC in MP4 (`avc1.64001f`), all MP4/WebM variants supported.
+- Keyframe every ~1.0 s (our option works); a chunk is stored every second; persistent storage granted.
+- Normal quality, 60 s landscape: 1280×720 at 30 fps, **19.9 MB/min** (expected 19). Rewriting the
+  whole 60 s file for the preview took 80 ms; a cut takes a few ms.
+- Holding the phone upright gives a portrait video (720×1280), landscape gives 1280×720.
+- **Switching apps during a recording froze the picture** while the sound continued (the camera
+  pauses in the background; ~350 of 1800 frames were missing), and after returning the picture
+  stayed frozen. → Decision: leaving the app ends the attempt (concept section 6), implemented.
+- Feedback: in landscape the Start button was out of reach → full-screen camera view, implemented.
+
 Open, to be answered by the phone tests:
 
 1. Safari (iPhone): which format and codec, keyframe interval (Safari ignores our option), does a
@@ -73,7 +88,8 @@ Open, to be answered by the phone tests:
 2. Real file sizes per quality level (MB/min) and actual resolution/frame rate.
 3. Does IndexedDB keep large recordings (HD, 60 s ≈ 45 MB) on iPhones, and is persistent storage granted?
 4. Cutting time and memory for 60 s HD files on older phones.
-5. What happens to the recording when the app goes to the background (iOS stops the camera).
+5. iPhone: does the recording end cleanly when the app is left, and do the events show up in the report?
+6. Android: HD file sizes and the crash test (close the browser while recording).
 
 ## 4. Next steps after the tests
 
