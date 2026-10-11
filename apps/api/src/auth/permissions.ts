@@ -2,7 +2,7 @@
  * All permission rules in one place (CLAUDE.md, architecture rule 5).
  * Routes ask these functions instead of checking roles themselves.
  */
-import type { CurrentUser, Role } from '@hfb/shared';
+import type { CurrentUser, Role, VideoVisibility } from '@hfb/shared';
 
 export function hasRole(user: CurrentUser | null, ...roles: Role[]): boolean {
   return !!user && user.status === 'active' && roles.some((r) => user.roles.includes(r));
@@ -26,3 +26,28 @@ export const can = {
   createPasswordResetCode: (user: CurrentUser | null, targetUserId: string) =>
     hasRole(user, 'federation', 'admin') && user?.id !== targetUserId,
 };
+
+/**
+ * Who may watch a video (concept sections 5.4 and 12):
+ * - the owner, always;
+ * - a video that counts in a battle, once the videos are unlocked: the participants, and other
+ *   logged-in users unless it is "review only" (visibility `public` is treated like `logged_in`
+ *   until there are public pages; reviewers of levels 2–3 follow in stage 2);
+ * - the opponent, for a cut-off video attached to a request for an extra attempt.
+ * Attempts that do not count stay private.
+ */
+export function canViewVideo(input: {
+  viewerId: string | null;
+  ownerId: string;
+  isParticipant: boolean;
+  submitted: boolean;
+  unlocked: boolean;
+  visibility: VideoVisibility;
+  sharedWithOpponent: boolean;
+}): boolean {
+  if (input.viewerId === null) return false;
+  if (input.viewerId === input.ownerId) return true;
+  if (input.isParticipant && input.sharedWithOpponent) return true;
+  if (!input.submitted || !input.unlocked) return false;
+  return input.isParticipant || input.visibility !== 'review_only';
+}

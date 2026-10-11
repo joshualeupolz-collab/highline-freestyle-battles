@@ -18,6 +18,7 @@ import { ResetPasswordPage } from './pages/ResetPassword';
 import { UserProfilePage } from './pages/UserProfile';
 import { VideoLabPage } from './pages/VideoLab';
 import './styles.css';
+import { startUploadQueue } from './video/uploadQueue';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } },
@@ -68,6 +69,9 @@ if ('serviceWorker' in navigator) {
     if (hadWorker) window.location.reload();
   });
 }
+
+// Battle videos recorded offline are uploaded whenever the app is open and online.
+startUploadQueue();
 
 const root = document.getElementById('root');
 if (root) {

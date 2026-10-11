@@ -6,7 +6,14 @@
  * So we ask for a keyframe every second: it makes cutting precise and crash recovery useful.
  */
 import type { QualityPreset } from './quality';
-import { addChunk, type EndReason, type StoredRecording, saveRecording } from './storage';
+import {
+  addChunk,
+  type BattleAttempt,
+  type EndReason,
+  type StoredRecording,
+  saveRecording,
+  updateRecording,
+} from './storage';
 
 /** Preferred first: H.264 in MP4 plays everywhere (iPhone, Android, desktop, ffmpeg). */
 export const MIME_CANDIDATES = [
@@ -61,6 +68,8 @@ export interface RecordOptions {
   keyFrameIntervalMs: number | undefined;
   timesliceMs: number;
   attempt: number;
+  /** For a battle: the attempt (its id becomes the recording id) and where it belongs. */
+  battle?: { attemptId: string } & Omit<BattleAttempt, 'synced'>;
 }
 
 export interface RecordProgress {
@@ -96,7 +105,7 @@ export async function startRecording(
     recorderOptions.videoKeyFrameIntervalDuration = options.keyFrameIntervalMs;
   const recorder = new MediaRecorder(stream, recorderOptions);
 
-  const id = crypto.randomUUID();
+  const id = options.battle?.attemptId ?? crypto.randomUUID();
   const t0 = performance.now();
   const chunkTimes: number[] = [];
   const events: string[] = [];
@@ -112,6 +121,15 @@ export async function startRecording(
     bytes: 0,
     durationMs: 0,
     diagnostics: {},
+    ...(options.battle && {
+      battle: {
+        battleId: options.battle.battleId,
+        partIndex: options.battle.partIndex,
+        round: options.battle.round,
+        synced: false,
+      },
+      upload: { state: 'waiting', visibility: 'public', keep: false },
+    }),
   };
   const diagnostics = () => {
     const gaps = chunkTimes.slice(1).map((time, i) => time - (chunkTimes[i] as number));
@@ -134,6 +152,19 @@ export async function startRecording(
     };
   };
   await saveRecording(recording);
+  // Later saves only touch the recorder's own fields: the upload queue may change the rest
+  // (e.g. mark the attempt as synced) while the recording runs.
+  const persist = () =>
+    updateRecording(id, (current) => ({
+      ...current,
+      status: recording.status,
+      endReason: recording.endReason,
+      mimeType: recording.mimeType,
+      chunkCount: recording.chunkCount,
+      bytes: recording.bytes,
+      durationMs: recording.durationMs,
+      diagnostics: recording.diagnostics,
+    }));
 
   let index = 0;
   let writes = Promise.resolve();
@@ -150,7 +181,8 @@ export async function startRecording(
     writes = writes
       .then(async () => {
         await addChunk(id, i, await data.arrayBuffer());
-        await saveRecording({ ...recording, diagnostics: diagnostics() });
+        recording.diagnostics = diagnostics();
+        await persist();
       })
       .catch((error) => {
         events.push(`${at()}: storing chunk ${i} failed: ${String(error)}`);
@@ -173,8 +205,7 @@ export async function startRecording(
         recording.endReason = reason;
         recording.durationMs = Math.round(performance.now() - t0);
         recording.diagnostics = diagnostics();
-        await saveRecording(recording);
-        resolve(recording);
+        resolve((await persist()) ?? recording);
       };
       if (recorder.state === 'inactive') recorder.onstop(new Event('stop'));
       else recorder.stop();

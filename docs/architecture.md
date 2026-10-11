@@ -133,6 +133,7 @@ Notes:
 - `battle_proposals` implements core principle 2 ("everything can be changed if both sides agree") once, for settings changes, on-site results, draw confirmation, cancellation and goodwill. `proposal_responses` also works for n people.
 - Added after the first deployment (all additive): `formats.approved_at/approved_by/review_note` (format proposals; `approved_at` NULL = proposal), `battle_messages` (chat) and `battle_participants.last_read_message_at` (unread marker).
 - `video_files` is the replaceable storage layer: "delete everywhere" means processing every row of a video.
+- Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
 ### Later additions (additive only)
@@ -178,6 +179,44 @@ open ──accept──▶ active ─────────────▶ rev
 
 ---
 
+## 4b. Recording and upload (implemented in step 8)
+
+```
+Start pressed ──▶ attempt (id from the phone, IndexedDB) ──▶ POST /battles/:id/attempts (limit check)
+Stop ──▶ cut + visibility ──▶ upload queue: POST /videos ─▶ PUT bytes ─▶ POST /videos/:id/complete
+Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶ everyone chose ─▶ reviewing
+```
+
+- **Offline first:** a recording is stored chunk by chunk in IndexedDB (`apps/web/src/video/`);
+  its id is the attempt id (UUIDv7). `uploadQueue.ts` registers attempts and uploads videos
+  whenever the app is open and online (start, `online` event, app shown again, every minute).
+  After a successful upload the local copy is deleted. The battle page and the few answers it needs
+  are kept as offline copies in `localStorage` (`api.ts`), so a battle can be opened at the line.
+- **Attempt limit:** `attemptsPerVideo` per part; goodwill extra attempts are one pool for the
+  whole battle (`attemptsLeft` in `packages/shared/src/videos.ts`, used by phone and server).
+  Attempts started before the deadline count even if they arrive later, while the battle runs.
+- **Cut** without re-encoding before the upload (also makes the file seekable). If the phone
+  cannot cut a file, it uploads the whole recording with the cut points (`trim_start_ms`,
+  `trim_end_ms`) for the server to cut later.
+- **Storage layer** (`apps/api/src/storage/videoStore.ts`): with an R2 access key, the phone
+  uploads to a pre-signed R2 URL (valid 1 h) and plays from a pre-signed URL (6 h), so the bytes
+  never touch the Worker. Without the key (local development, tests), the bytes go through the
+  Worker (`PUT /videos/:id/upload`, `GET /videos/:id/file` with byte ranges), limited to 95 MB.
+  `POST /videos/:id/complete` checks that the stored size matches. The hourly job removes files
+  of uploads never completed after 2 days.
+- **Choosing and unlocking:** the athlete picks one uploaded attempt per part; the choice can be
+  changed until everyone has chosen. Then the battle moves to `reviewing` and the chosen videos
+  unlock. Who may watch what is decided in one place, `canViewVideo` (`auth/permissions.ts`):
+  the owner always; videos that count after unlocking for participants, and for other logged-in
+  users unless *review only*; attempts that do not count stay private.
+- **Cut-off recordings:** leaving the app ends the attempt. Such a video can be sent along with a
+  request for an extra attempt (`extra_attempt` proposal with `change: 1` and `videoId`); the
+  opponent may then watch it, and accepting grants the attempt.
+- **Not yet:** deleting attempts that do not count after the battle, deleting *review only* videos
+  after the review and public pages for *public* videos follow in step 12; the review in step 9.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |
@@ -191,7 +230,7 @@ open ──accept──▶ active ─────────────▶ rev
 | 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | done (plus deployment, `docs/deployment.md`) |
 | 6b | Feedback round 1: password minimum 8, free attempts/time window, Lichess-like format tiles, format proposals, extra attempt confirmation and take-back, profiles, format rankings (step 10 pulled forward), chat | done |
 | 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | test page built (`/lab/video`, `docs/video-prototype.md`); waiting for results from real phones |
-| 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | |
+| 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | done (§4b); waiting for real-phone tests |
 | 9 | Review level 1, result → rating update in the Worker, rating history | |
 | 10 | Format rankings | done (pulled forward, with profiles) |
 | 11 | On-site results with confirmation by both sides | |

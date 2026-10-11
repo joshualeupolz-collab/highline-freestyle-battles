@@ -2,5 +2,7 @@ export * from './auth';
 export * from './battles';
 export * from './deadline';
 export * from './formats';
+export * from './ids';
 export * from './roles';
 export * from './rulesets';
+export * from './videos';

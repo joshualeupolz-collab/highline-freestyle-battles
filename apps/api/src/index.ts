@@ -2,6 +2,8 @@ import { createApp } from './app';
 import { getDb } from './db/client';
 import type { Env } from './env';
 import { resolveAbandonedDeadlines } from './services/battles';
+import { removeStaleUploads } from './services/videos';
+import { videoStore } from './storage/videoStore';
 
 const app = createApp();
 
@@ -10,9 +12,13 @@ export default {
 
   /** Cron trigger (wrangler.jsonc, hourly): background clean-up that needs no user action. */
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    const db = getDb(env.DB);
     ctx.waitUntil(
-      resolveAbandonedDeadlines(getDb(env.DB)).then((n) =>
-        console.log(`resolved ${n} abandoned battles`),
+      resolveAbandonedDeadlines(db).then((n) => console.log(`resolved ${n} abandoned battles`)),
+    );
+    ctx.waitUntil(
+      removeStaleUploads(db, videoStore(env)).then((n) =>
+        console.log(`removed ${n} unfinished uploads`),
       ),
     );
   },

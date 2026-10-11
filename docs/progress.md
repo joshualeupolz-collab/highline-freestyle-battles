@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-11 (end of the second session: video prototype).
+Last updated: 2026-10-11 (end of the third session: step 8, upload and unlocking).
 
 ---
 
@@ -13,12 +13,14 @@ free tier, D1 database in Western Europe). Every merge into `main` is published 
 `.github/workflows/deploy.yml` (setup: `docs/deployment.md`).
 
 **Branch / PRs:** session 1 = PRs #1–#4 (branch `claude/nice-sagan-akpprj`). Session 2 = the video
-prototype on branch `claude/wonderful-ramanujan-50o2jk` (see its PR). A new session can start a
-fresh branch from `main`.
+prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3 = step 8 on branch
+`claude/serene-cori-tl2ap4`. A new session can start a fresh branch from `main`.
 
-**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 80 API tests (Workers runtime + local D1), lint, typecheck and
-build all pass in CI. Browser flows were checked by hand with Playwright/Chromium against a local
-Worker (script not committed yet, see next steps).
+**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 92 API tests
+(Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
+was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
+one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
+which play for the opponent (script not committed yet, see next steps).
 
 ### Done (development stage 1)
 
@@ -33,13 +35,15 @@ Worker (script not committed yet, see next steps).
 | 6 Web app | React PWA: all of the above, Lichess-like format tiles, profiles, rankings, chat |
 | 10 Rankings | pulled forward: format ranking (r − 2·RD) and profiles |
 | 7 Video prototype (part 1) | test page `/lab/video` without login: recording, attempt counter, quality levels, IndexedDB chunks with crash recovery, cutting without re-encoding (own MP4/WebM code), test report. Guide and findings: `docs/video-prototype.md` |
+| 8 Upload and unlocking | recording on the battle page (attempt registered at Start, limit checked on phone and server), offline storage + upload queue, cut before upload, visibility/keep per video, R2 storage layer (signed URLs, or through the Worker without access key), choosing the attempt that counts, unlocking when everyone chose (`reviewing`), cut-off video with extra-attempt request, offline copies of battle data. Details: `docs/architecture.md` §4b |
 
 ### Not started yet
 
-Step 7 is waiting for results from real phones. Steps 8 (offline storage, R2 upload, unlocking), 9 (review level 1 → result →
-rating), 11 (on-site results), 12 (replay job, account deletion, visibility enforcement).
-**Right now ratings only change through a forfeit or a missed deadline**, because the review
-after uploading videos does not exist yet.
+Step 7/8 are waiting for results from real phones. Steps 9 (review level 1 → result → rating),
+11 (on-site results), 12 (replay job, account deletion, deleting videos after the battle,
+visibility enforcement for public pages).
+**Right now ratings only change through a forfeit or a missed deadline**: battles where both
+delivered stay in `reviewing` until step 9 exists.
 
 ---
 
@@ -74,11 +78,19 @@ after uploading videos does not exist yet.
 | Leaving the app ends the attempt; a cut-off video can be sent to the opponent with a request for an extra attempt | Owner's decision after the Android test: the camera freezes in the background, and pause/resume would allow hiding a fall |
 | Full-screen camera with one record button (portrait: controls at the bottom, landscape: on the right) | Owner's feedback: in landscape the Start button was hard to reach |
 | Ask MediaRecorder for a keyframe every second | Chrome otherwise writes one keyframe per recording (no cutting, no crash recovery) |
+| Step 8: signed R2 URLs when an R2 access key exists, otherwise uploads through the Worker (≤ 95 MB) | Documented decision (bytes never touch the Worker); the fallback makes local development and the time before the key is set up work |
+| Step 8: bucket `hfb-videos` and its CORS rules are created by the deploy workflow | One manual step less for the owner; needs R2 permission on the deploy token |
+| Step 8 defaults (owner to confirm): extra attempts are one pool for all parts; the choice can be changed until everyone chose; attempts started before the deadline count when uploaded later; *public* videos are visible to logged-in users until public pages exist | Simple, fair defaults; see `docs/concept.md` section 6 |
+| `newId` (UUIDv7) moved to `@hfb/shared` | The phone creates attempt ids too |
 
 ---
 
 ## 3. Open questions for the project owner
 
+0. **R2 setup (step 8):** check that the deploy step *Video bucket and its CORS rules* passes (if
+   not: add *Workers R2 Storage → Edit* to the Cloudflare API token), then create the R2 access
+   key and the GitHub secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
+   (`docs/deployment.md`, "Videos"). Confirm the step 8 defaults in section 2.
 1. Video test results from iPhones (friends of the owner; guide in `docs/video-prototype.md` §1).
    Android still to check: HD over 60 s, landscape with rotation lock (see `docs/video-prototype.md` §3).
 2. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
@@ -92,14 +104,13 @@ after uploading videos does not exist yet.
 
 ## 4. Next steps
 
-1. **Evaluate the iPhone test reports (step 7)**; Android (Chrome) is tested and works
-   (`docs/video-prototype.md` §3). Then decide format strategy, keyframe interval and bit rates.
-2. **Upload and unlocking (step 8):** signed R2 uploads (needs R2 enabled on the Cloudflare
-   account, which requires a payment method but stays free within 10 GB), upload queue, choosing
-   the attempt that counts, unlocking when both have submitted.
-3. **Review level 1 and rating (step 9):** 5-point votes by both athletes, result → existing
-   `services/rating.ts`.
-4. **Commit the browser test** (Playwright against a local Worker) so UI flows are checked in CI.
+1. **Test step 8 on real phones** (a real battle between two people, one recording without
+   connection at the line). Also the iPhone reports of step 7 (`docs/video-prototype.md` §1).
+2. **Review level 1 and rating (step 9):** 5-point votes by both athletes on `reviewing` battles,
+   result → existing `services/rating.ts`.
+3. **Commit the browser test** (Playwright against a local Worker) so UI flows are checked in CI.
+4. Later in step 12: delete attempts that do not count after the battle (unless kept), *review only*
+   videos after the review; multipart upload if large HD uploads fail on mobile connections.
 5. Measure PBKDF2 CPU time on Cloudflare and raise `PASSWORD_ITERATIONS` if there is headroom.
 
 Then: on-site results (step 11), replay job and account deletion (step 12), stage 2.

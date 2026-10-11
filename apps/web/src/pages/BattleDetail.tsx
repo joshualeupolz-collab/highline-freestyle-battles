@@ -5,6 +5,12 @@ import { useParams } from 'react-router';
 import { api, type Battle, type Proposal } from '../api';
 import { useMe } from '../auth';
 import { partsText, SettingsFields, StatusBadge, settingsText, useFormats } from '../battleHelpers';
+import {
+  BattleVideos,
+  OpponentProgress,
+  UnlockedVideos,
+  VideoPlayer,
+} from '../components/BattleVideos';
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
 import { RatingText, UserLink } from '../components/UserLink';
@@ -81,6 +87,7 @@ export function BattleDetailPage() {
               {p.displayName}: {t('battle.extraAttempts', { n: p.extraAttempts ?? 0 })}
             </p>
           ))}
+        {mine && <OpponentProgress battle={battle} myId={me.id} />}
       </div>
 
       {(battle.status === 'open' || battle.status === 'negotiating') && (
@@ -112,27 +119,27 @@ export function BattleDetailPage() {
         </section>
       )}
 
-      {battle.status === 'active' && mine && (
+      {battle.status === 'active' && mine && battle.deadlinePassed && (
         <div className="card notice">
-          {battle.deadlinePassed ? t('battle.deadlinePassed') : t('battle.recordingLater')}
-          {battle.deadlinePassed && (
-            <div className="actions">
-              <button
-                type="button"
-                onClick={() => run('deadline-decision', { choice: 'claim_win' })}
-              >
-                {t('battle.claimWin')}
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => run('deadline-decision', { choice: 'cancel' })}
-              >
-                {t('battle.cancelUnrated')}
-              </button>
-            </div>
-          )}
+          {t('battle.deadlinePassed')}
+          <div className="actions">
+            <button type="button" onClick={() => run('deadline-decision', { choice: 'claim_win' })}>
+              {t('battle.claimWin')}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => run('deadline-decision', { choice: 'cancel' })}
+            >
+              {t('battle.cancelUnrated')}
+            </button>
+          </div>
         </div>
+      )}
+      {battle.status === 'reviewing' && <p className="card notice">{t('battle.reviewLater')}</p>}
+      {format && <UnlockedVideos battle={battle} format={format} />}
+      {battle.status === 'active' && mine && format && (
+        <BattleVideos battle={battle} format={format} myId={me.id} />
       )}
 
       <div className="actions">
@@ -267,7 +274,9 @@ function ProposalCard({
       : proposal.kind === 'extension'
         ? t('battle.proposal.extension', { date: formatDate(proposal.payload.deadlineAt ?? 0) })
         : proposal.kind === 'extra_attempt'
-          ? t('battle.proposal.takeBack')
+          ? proposal.payload.change === 1
+            ? t('battle.proposal.extraAttempt')
+            : t('battle.proposal.takeBack')
           : t('battle.proposal.cancel');
   const own = proposal.proposedBy === myId;
   const base = `proposals/${proposal.id}`;
@@ -275,6 +284,7 @@ function ProposalCard({
     <div className="card">
       <div>{text}</div>
       <div className="muted">{t('battle.proposedBy', { name: name(proposal.proposedBy) })}</div>
+      {proposal.payload.videoId && <VideoPlayer id={proposal.payload.videoId} />}
       <div className="actions">
         {own ? (
           <button type="button" className="secondary" onClick={() => onAction(`${base}/withdraw`)}>

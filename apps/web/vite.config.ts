@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   plugins: [
     react(),
-    // Installable app with an offline app shell. Video storage offline follows in step 8.
+    // Installable app with an offline app shell. Videos are kept offline in IndexedDB (src/video/).
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],

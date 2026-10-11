@@ -29,6 +29,38 @@ export interface StoredRecording {
   durationMs: number;
   /** Everything useful for the test report (requested vs actual settings, chunk timing, errors). */
   diagnostics: Record<string, unknown>;
+  /** Set for battle recordings; the recording id is then the attempt id. Missing on the test page. */
+  battle?: BattleAttempt;
+  /** Upload state of a battle recording (see uploadQueue.ts). */
+  upload?: UploadState;
+}
+
+export interface BattleAttempt {
+  battleId: string;
+  partIndex: number;
+  round: number;
+  /** The server knows about the attempt (it counts towards the limit there too). */
+  synced: boolean;
+}
+
+export interface UploadState {
+  /**
+   * waiting: recorded, the athlete has not decided on the cut yet;
+   * queued: will be uploaded as soon as there is a connection;
+   * done: on the server, the local copy can go; failed: the server refused it (see error).
+   */
+  state: 'waiting' | 'queued' | 'done' | 'failed';
+  /** Cut points in seconds (start/end of the recording if not set). */
+  trimStart?: number;
+  trimEnd?: number;
+  visibility: 'public' | 'logged_in' | 'review_only';
+  keep: boolean;
+  /** Ask the opponent for an extra attempt and show them this video (cut-off recordings). */
+  askExtraAttempt?: boolean;
+  videoId?: string;
+  error?: string;
+  /** 0–1 while bytes are being sent. */
+  progress?: number;
 }
 
 const DB_NAME = 'hfb-video';
@@ -66,10 +98,40 @@ function result<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+const listeners = new Set<() => void>();
+
+/** Called after every change to a recording record (to refresh lists and upload progress). */
+export function onRecordingsChanged(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function changed() {
+  for (const listener of listeners) listener();
+}
+
 export async function saveRecording(recording: StoredRecording): Promise<void> {
   const tx = (await db()).transaction(RECORDINGS, 'readwrite');
   tx.objectStore(RECORDINGS).put(recording);
   await done(tx);
+  changed();
+}
+
+export async function getRecording(id: string): Promise<StoredRecording | undefined> {
+  const tx = (await db()).transaction(RECORDINGS, 'readonly');
+  return result(tx.objectStore(RECORDINGS).get(id) as IDBRequest<StoredRecording | undefined>);
+}
+
+/** Changes some fields of a stored recording (no-op if it is gone). */
+export async function updateRecording(
+  id: string,
+  change: (recording: StoredRecording) => StoredRecording,
+): Promise<StoredRecording | undefined> {
+  const current = await getRecording(id);
+  if (!current) return undefined;
+  const next = change(current);
+  await saveRecording(next);
+  return next;
 }
 
 export async function addChunk(
@@ -117,6 +179,14 @@ export async function deleteRecording(recordingId: string): Promise<void> {
   tx.objectStore(RECORDINGS).delete(recordingId);
   tx.objectStore(CHUNKS).delete(chunkRange(recordingId));
   await done(tx);
+  changed();
+}
+
+/** Removes the video bytes but keeps the record (after a successful upload). */
+export async function deleteChunks(recordingId: string): Promise<void> {
+  const tx = (await db()).transaction(CHUNKS, 'readwrite');
+  tx.objectStore(CHUNKS).delete(chunkRange(recordingId));
+  await done(tx);
 }
 
 /**
@@ -126,7 +196,7 @@ export async function deleteRecording(recordingId: string): Promise<void> {
 export async function markInterruptedRecordings(): Promise<number> {
   let count = 0;
   for (const r of await listRecordings()) {
-    if (r.status !== 'recording') continue;
+    if (r.status !== 'recording' || r.battle) continue;
     await saveRecording({ ...r, status: 'interrupted' });
     count++;
   }

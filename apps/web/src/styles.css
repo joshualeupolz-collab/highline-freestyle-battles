@@ -503,3 +503,14 @@ a.button {
 .lab-item span {
   display: block;
 }
+
+/* Battle videos: one line per attempt (components/BattleVideos.tsx). */
+.attempt {
+  border-top: 1px solid var(--border);
+  padding: 0.5rem 0;
+}
+
+.attempt.counts {
+  border-left: 4px solid var(--primary);
+  padding-left: 0.5rem;
+}

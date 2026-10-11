@@ -515,6 +515,11 @@ export const videos = sqliteTable(
     durationMs: integer('duration_ms'),
     trimStartMs: integer('trim_start_ms'),
     trimEndMs: integer('trim_end_ms'),
+    /**
+     * Why the recording ended: stopped, or cut off by leaving the app / losing the camera
+     * (validated by the app, see VIDEO_END_REASONS in @hfb/shared). NULL for older rows.
+     */
+    endReason: text('end_reason'),
     status: text('status', { enum: VIDEO_STATUSES }).notNull().default('pending_upload'),
     recordedAt: integer('recorded_at').notNull(),
     uploadedAt: integer('uploaded_at'),
@@ -545,6 +550,8 @@ export const videoFiles = sqliteTable(
     /** Backend-specific location: R2 object key, Telegram message id, disk path. */
     locator: text('locator').notNull(),
     sizeBytes: integer('size_bytes'),
+    /** MIME type of the stored file, e.g. video/mp4. */
+    contentType: text('content_type'),
     createdAt: integer('created_at').notNull(),
     deletedAt: integer('deleted_at'),
   },

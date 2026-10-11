@@ -44,11 +44,17 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/battles/:id/accept` | Accept a request |
 | POST | `/api/battles/:id/retract` | Take back my open request |
 | POST | `/api/battles/:id/start` | Start with the negotiated settings (accepting side) |
-| POST | `/api/battles/:id/proposals` | Propose a change: `settings`, `extension`, `cancel` |
+| POST | `/api/battles/:id/proposals` | Propose a change: `settings`, `extension`, `cancel`, `extra_attempt` |
 | POST | `/api/battles/:id/proposals/:pid/respond` | Accept or reject a proposal |
 | POST | `/api/battles/:id/proposals/:pid/withdraw` | Withdraw my proposal |
 | POST | `/api/battles/:id/grant-attempt` | Give the opponent one extra attempt |
 | POST | `/api/battles/:id/deadline-decision` | After a missed deadline: `claim_win` or `cancel` |
+| POST | `/api/battles/:id/attempts` | Register an attempt (pressing Start); checks the attempt limit |
+| POST | `/api/battles/:id/submissions` | Choose the attempt that counts; unlocks the videos once everyone has chosen |
+| POST | `/api/videos` | Announce an upload; returns where to send the bytes |
+| PUT | `/api/videos/:id/upload` | Upload through the Worker (only without R2 access key, e.g. locally) |
+| POST | `/api/videos/:id/complete` | Check the stored file and mark the video as uploaded |
+| GET | `/api/videos/:id/file` | Watch a video (redirect to a signed R2 URL, or the bytes) |
 
 Errors always look like `{ "error": "code", "message"?, "details"? }`.
 
@@ -58,8 +64,11 @@ Errors always look like `{ "error": "code", "message"?, "details"? }`.
 |---|---|
 | `PASSWORD_PEPPER` | Secret mixed into every password hash. Set once, never change it. |
 | `SETUP_TOKEN` | Whoever registers with it while no admin exists becomes the first admin. |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID` | Optional: R2 access key for signed upload/download URLs. Without them, video bytes go through the Worker (fine locally; max 95 MB per video). |
 
-Locally they come from `.dev.vars`; in production: `wrangler secret put PASSWORD_PEPPER`.
+Locally they come from `.dev.vars`; in production the deploy workflow sets them
+(`docs/deployment.md`). Videos are stored in the R2 bucket `hfb-videos` (binding `VIDEOS`);
+locally Wrangler simulates it in `.wrangler/`. All access goes through `src/storage/videoStore.ts`.
 
 ## Database
 
