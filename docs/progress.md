@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-11 (end of the first development session).
+Last updated: 2026-10-11 (end of the second session: video prototype).
 
 ---
 
@@ -12,11 +12,11 @@ Last updated: 2026-10-11 (end of the first development session).
 free tier, D1 database in Western Europe). Every merge into `main` is published automatically by
 `.github/workflows/deploy.yml` (setup: `docs/deployment.md`).
 
-**Branch / PRs:** everything is merged into `main` (PRs #1–#3 with the code, PR #4 with this
-handover). No open PR, nothing half-finished. The working branch of the first session was `claude/nice-sagan-akpprj`; a new
-session can start a fresh branch from `main`.
+**Branch / PRs:** session 1 = PRs #1–#4 (branch `claude/nice-sagan-akpprj`). Session 2 = the video
+prototype on branch `claude/wonderful-ramanujan-50o2jk` (see its PR). A new session can start a
+fresh branch from `main`.
 
-**Tests:** 41 rating engine tests and 80 API tests (Workers runtime + local D1), lint, typecheck and
+**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 80 API tests (Workers runtime + local D1), lint, typecheck and
 build all pass in CI. Browser flows were checked by hand with Playwright/Chromium against a local
 Worker (script not committed yet, see next steps).
 
@@ -32,10 +32,11 @@ Worker (script not committed yet, see next steps).
 | 5 Battle flow | requests, direct challenges, fixed/negotiable rules, proposals, goodwill attempt (+ take-back), give up, deadlines, hourly job for expired/abandoned battles, rating update on decided battles |
 | 6 Web app | React PWA: all of the above, Lichess-like format tiles, profiles, rankings, chat |
 | 10 Rankings | pulled forward: format ranking (r − 2·RD) and profiles |
+| 7 Video prototype (part 1) | test page `/lab/video` without login: recording, attempt counter, quality levels, IndexedDB chunks with crash recovery, cutting without re-encoding (own MP4/WebM code), test report. Guide and findings: `docs/video-prototype.md` |
 
 ### Not started yet
 
-Steps 7 (video prototype), 8 (offline storage, R2 upload, unlocking), 9 (review level 1 → result →
+Step 7 is waiting for results from real phones. Steps 8 (offline storage, R2 upload, unlocking), 9 (review level 1 → result →
 rating), 11 (on-site results), 12 (replay job, account deletion, visibility enforcement).
 **Right now ratings only change through a forfeit or a missed deadline**, because the review
 after uploading videos does not exist yet.
@@ -65,28 +66,32 @@ after uploading videos does not exist yet.
 | Profiles and rankings visible to logged-in users only | Privacy |
 | Free attempts (1–99 or unlimited) | Requested |
 | Claude may merge its own PRs once CI is green | Owner's decision, for faster iterations |
+| Level 1: s = mean of both mirrored assessments (only when both agree on the side) | Owner left it to Claude (session 2); simple and uses the margin information of both |
+| Video test page public at `/lab/video`, no login | Owner's decision: testers (friends with iPhones) need no account |
+| Cut at the keyframe before the chosen start; if cutting fails on a platform, upload uncut + cut times and cut on the server | Owner agreed (session 2) |
+| Own small MP4/WebM cutting code instead of ffmpeg.wasm/mp4box.js | ffmpeg.wasm is ~30 MB and slow on phones; copying samples needs only a few hundred lines |
+| Ask MediaRecorder for a keyframe every second | Chrome otherwise writes one keyframe per recording (no cutting, no crash recovery) |
 
 ---
 
 ## 3. Open questions for the project owner
 
-1. Level 1 review: is s the mean of both (mirrored) assessments (concept §7.5)? Needed for step 9.
-2. Video prototype test group: who records test clips on iPhone and Android, and roughly how many?
-3. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
+1. Video test results: the owner tests on Android, friends on iPhones (guide in
+   `docs/video-prototype.md` §1). Reports are sent to the owner and brought into the next session.
+2. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
    needed before prototyping it.
-4. Optional housekeeping: mark the GitGuardian finding on PR #1 (`PASSWORD_ITERATIONS = 50_000`)
+3. Optional housekeeping: mark the GitGuardian finding on PR #1 (`PASSWORD_ITERATIONS = 50_000`)
    as a false positive in the GitGuardian dashboard.
-5. Google login is postponed: it needs a Google Cloud OAuth client created by the owner. Still wanted?
-6. Further open questions of the concept are listed in `docs/concept.md` §15.
+4. Google login is postponed: it needs a Google Cloud OAuth client created by the owner. Still wanted?
+5. Further open questions of the concept are listed in `docs/concept.md` §15.
 
 ---
 
 ## 4. Next steps
 
-1. **Video prototype (step 7)** as a separate test page in the app: in-app recording
-   (MediaRecorder), attempt counter, quality levels, trimming without re-encoding, local storage
-   (IndexedDB) that survives a crash. Test on real iPhones and Android phones; collect file sizes
-   and problems. This is the biggest technical risk.
+1. **Evaluate the video test reports (step 7)** from Android and iPhones
+   (`docs/video-prototype.md` §3 lists the open questions); fix what breaks on real phones, decide
+   format strategy, keyframe interval and bit rates.
 2. **Upload and unlocking (step 8):** signed R2 uploads (needs R2 enabled on the Cloudflare
    account, which requires a payment method but stays free within 10 GB), upload queue, choosing
    the attempt that counts, unlocking when both have submitted.

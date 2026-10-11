@@ -136,7 +136,7 @@ A person can hold several roles (e.g. athlete + judge).
 ### 7.5 Hand-off to the rating
 - Win/loss only: s = 1 / 0.
 - With margin: s from the 5-point scale (1 · 0.75 · 0.5 · 0.25 · 0) or from points (rating specification section 3).
-- Proposal for level 1: s = mean of the two (mirrored) assessments. Example: "A clearly" (1) and "A somewhat" (0.75) give s(A) = 0.875. To be confirmed.
+- Level 1 (decided 2026-10-11): s = mean of the two (mirrored) assessments. Example: "A clearly" (1) and "A somewhat" (0.75) give s(A) = 0.875. This only applies when both agree on the side (7.1); otherwise the battle goes to level 2. With "win/loss only", agreement gives s = 1 / 0.
 
 ---
 
@@ -256,14 +256,13 @@ Current progress and next steps: [`docs/progress.md`](progress.md).
 
 ## 15. Open questions
 
-1. Level 1: confirm how s is computed from the two assessments (proposal in 7.5).
-2. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
-3. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
-4. Archiving: after how many weeks to Telegram?
-5. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones.
-6. Exchange format for trick list / scoring formula with the other developer.
-7. Type and scope of federation penalties.
-8. What happens to open battles when an account is deleted?
+1. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
+2. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
+3. Archiving: after how many weeks to Telegram?
+4. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones (test page `/lab/video` exists, see [`docs/video-prototype.md`](video-prototype.md)).
+5. Exchange format for trick list / scoring formula with the other developer.
+6. Type and scope of federation penalties.
+7. What happens to open battles when an account is deleted?
 
 ---
 

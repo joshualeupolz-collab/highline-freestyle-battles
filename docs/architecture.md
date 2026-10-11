@@ -190,7 +190,7 @@ open ──accept──▶ active ─────────────▶ rev
 | 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines | done |
 | 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | done (plus deployment, `docs/deployment.md`) |
 | 6b | Feedback round 1: password minimum 8, free attempts/time window, Lichess-like format tiles, format proposals, extra attempt confirmation and take-back, profiles, format rankings (step 10 pulled forward), chat | done |
-| 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | |
+| 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | test page built (`/lab/video`, `docs/video-prototype.md`); waiting for results from real phones |
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | |
 | 9 | Review level 1, result → rating update in the Worker, rating history | |
 | 10 | Format rankings | done (pulled forward, with profiles) |
