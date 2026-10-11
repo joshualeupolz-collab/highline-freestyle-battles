@@ -1,73 +1,79 @@
-# CLAUDE.md – Arbeitsanweisungen für dieses Repo
+# CLAUDE.md – Working instructions for this repository
 
-## Projekt in einem Satz
+## The project in one sentence
 
-Kostenlose, offene Web-App für Highline-Freestyle-Battles mit Video-Aufnahme, gestufter Bewertung und
-Glicko-2-Rating pro Format. Vollständiges Konzept: `docs/konzept.md`. Rating: `rating/rating-spezifikation.md`.
+A free, open web app for highline freestyle battles with in-app video recording, tiered review and a
+Glicko-2 rating per format. Full concept: `docs/concept.md`. Rating: `rating/rating-specification.md`.
 
-**Lies vor jeder größeren Aufgabe die relevanten Abschnitte dieser beiden Dokumente.** Sie sind die
-verbindliche Grundlage. Weicht der Code davon ab, ist das ein Fehler – oder das Dokument muss in
-Absprache angepasst werden.
+**Read the relevant sections of these two documents before any larger task.** They are the binding
+basis. If the code deviates from them, that is a bug – or the document needs to be updated after
+agreement.
 
-## Arbeitsweise
+## Language
 
-- **Änderungsvorschläge erst bewerten, dann umsetzen.** Bei Änderungen am Konzept, an Regeln oder an der
-  Architektur: Vorschlag und Bewertung (Aufwand, Risiken, Alternativen) vorlegen, auf Bestätigung warten.
-  Offensichtliche Kleinigkeiten (Bugfixes, Tippfehler, klare Verbesserungen ohne Seiteneffekte) direkt umsetzen.
-- **Ausbaustufen einhalten** (`docs/konzept.md` Abschnitt 14). Nicht vorgreifen, aber spätere Stufen beim
-  Datenmodell mitdenken, damit kein Umbau nötig wird.
-- **Kosten:** Betrieb muss im Gratis-Rahmen von Cloudflare/GitHub bleiben. Alles, was laufende Kosten
-  verursachen könnte, vorher ansprechen.
-- **Mitentwickler:** Code und Doku so schreiben, dass Fremde einsteigen können. Kommentare und Doku auf
-  Deutsch, Bezeichner im Code auf Englisch.
-- Teilaufgaben, die sich gut abtrennen lassen (z. B. Rechtstexte, Rating-Mathematik), lieber in eigene
-  Chats/Sessions auslagern und darauf hinweisen.
-- Dokumente nach Entscheidungen aktualisieren: Neue Entscheidungen kommen in `docs/konzept.md`,
-  erledigte offene Punkte werden dort aus Abschnitt 15 entfernt.
+- **Everything in the repository is in English:** code, identifiers, comments, docs, commit messages,
+  issues, PR descriptions and all user-facing text in the app (the app should be easy to localize later).
+- The project owner may write to you in German. Reply in the language they write in.
 
-## Technik-Stack
+## How to work
 
-| Bereich | Wahl |
+- **Evaluate change proposals before implementing them.** For changes to the concept, rules or
+  architecture: present the proposal and an assessment (effort, risks, alternatives) and wait for
+  confirmation. Obvious small things (bug fixes, typos, clear improvements without side effects) can be
+  done directly.
+- **Follow the development stages** (`docs/concept.md` section 14). Don't jump ahead, but design the
+  data model with later stages in mind so no rebuild is needed.
+- **Costs:** operation must stay within the free tiers of Cloudflare and GitHub. Raise anything that
+  could cause ongoing costs before doing it.
+- **Contributors:** write code and docs so newcomers can get started.
+- Suggest moving self-contained sub-tasks (e.g. legal texts, rating maths) into separate sessions.
+- Keep the docs up to date: record new decisions in `docs/concept.md` and remove resolved items from
+  its section 15.
+
+## Tech stack
+
+| Area | Choice |
 |---|---|
-| Sprache | TypeScript (strict) |
-| App | PWA, offlinefähig (Service Worker, IndexedDB für Videos) |
+| Language | TypeScript (strict) |
+| App | PWA, offline-capable (service worker, IndexedDB for videos) |
 | Hosting | Cloudflare Pages (`*.pages.dev`) |
 | API | Cloudflare Workers |
-| Datenbank | Cloudflare D1 (SQLite), Migrationen versioniert im Repo |
-| Videos | Cloudflare R2, Upload direkt vom Handy per signierter URL |
-| Hintergrund-Jobs | GitHub Actions (Videoverarbeitung, Archivierung, Rating-Replay) |
+| Database | Cloudflare D1 (SQLite), versioned migrations in the repo |
+| Videos | Cloudflare R2, uploaded directly from the phone via signed URL |
+| Background jobs | GitHub Actions (video processing, archiving, rating replay) |
 | Tests | Vitest |
 
-Gratis-Limits beachten: Workers Free = 100.000 Anfragen/Tag und sehr wenig CPU-Zeit pro Anfrage →
-nichts Rechenintensives im Worker (kein Video, kein kompletter Rating-Replay). D1 Free = 5 Mio.
-gelesene / 100.000 geschriebene Zeilen pro Tag → Indizes setzen, keine Full-Table-Scans.
+Mind the free-tier limits: Workers Free = 100,000 requests/day and very little CPU time per request →
+nothing compute-heavy in the Worker (no video, no full rating replay). D1 Free = 5 million rows read /
+100,000 rows written per day → use indexes, avoid full table scans.
 
-## Architektur-Regeln
+## Architecture rules
 
-1. **Rohdaten sind die Wahrheit.** Battles, Ergebnisse, Einstufungen und Regelversionen werden
-   gespeichert; Ratings sind abgeleitet und jederzeit per Replay reproduzierbar.
-2. **Regeln sind Daten.** Formate, Rating-Parameter (`RuleSet`), später Trickliste und Bewertungsformel
-   sind versionierte Datensätze, nicht hart codiert. Jedes Battle speichert die verwendete Version.
-3. **Rating-Engine** (`packages/rating` o. ä.): reines Modul ohne Datenbank- oder Netzwerkzugriff.
-   Eingabe: Events, Einschätzungen, RuleSet. Ausgabe: RatingState, RatingHistory. Unit-Tests gegen
-   `rating/rating-spezifikation.md` Abschnitt 11. `rating/glicko_sim.py` ist die Referenz – Ergebnisse
-   müssen auf ±1 Punkt übereinstimmen.
-4. **Speicherschicht austauschbar** (Interface für Videospeicher: R2, später Telegram-Archiv).
-5. **Rechte zentral prüfen.** Rollen: Gast, Athlet, Judge, Orga, Verband, Admin. Befangenheitsregel:
-   Niemand entscheidet in einer Sonderrolle über eigene Battles. Sportliche Eingriffe des Admins nur mit
-   Verbandsfreigabe. Jede Aktion mit Sonderrechten ins Protokoll.
-6. **Datenschutz:** DSGVO als Maßstab. Sichtbarkeit pro Video (öffentlich / eingeloggt / nur Bewertung),
-   Löschungen müssen in allen Speichern greifen. Keine Geheimnisse (API-Keys, Tokens) ins Repo – nur über
-   Cloudflare-/GitHub-Secrets.
+1. **Raw data is the source of truth.** Battles, results, initial estimates and rule versions are
+   stored; ratings are derived and reproducible at any time via replay.
+2. **Rules are data.** Formats, rating parameters (`RuleSet`), and later the trick list and scoring
+   formula are versioned records, not hard-coded. Every battle stores the version it used.
+3. **Rating engine** (`packages/rating` or similar): a pure module without database or network access.
+   Input: events, estimates, RuleSet. Output: RatingState, RatingHistory. Unit tests against
+   `rating/rating-specification.md` section 11. `rating/glicko_sim.py` is the reference – results must
+   match within ±1 point.
+4. **Replaceable storage layer** (interface for video storage: R2, later a Telegram archive).
+5. **Check permissions centrally.** Roles: guest, athlete, judge, organizer, federation, admin.
+   Conflict-of-interest rule: nobody decides on their own battles in a special role. Sport-related
+   admin interventions only with federation approval. Every action using special permissions goes into
+   the audit log.
+6. **Privacy:** GDPR is the benchmark. Visibility per video (public / logged-in / review only);
+   deletions must apply to every storage location. No secrets (API keys, tokens) in the repo – only via
+   Cloudflare / GitHub secrets.
 
-## Repo-Struktur (Zielbild, wird beim Start angelegt)
+## Repository structure (target, created at project start)
 
 ```
-docs/          Konzept und weitere Doku
-rating/        Rating-Spezifikation und Python-Referenz
-apps/web/      PWA (Frontend)
-apps/api/      Cloudflare Worker (API)
-packages/rating/  Rating-Engine (TypeScript, rein)
-db/migrations/ D1-Migrationen
-.github/workflows/  CI und Hintergrund-Jobs
+docs/               concept and further documentation
+rating/             rating specification and Python reference
+apps/web/           PWA (frontend)
+apps/api/           Cloudflare Worker (API)
+packages/rating/    rating engine (TypeScript, pure)
+db/migrations/      D1 migrations
+.github/workflows/  CI and background jobs
 ```

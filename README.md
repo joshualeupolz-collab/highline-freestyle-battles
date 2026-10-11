@@ -1,47 +1,47 @@
 # Highline Freestyle Battles
 
-Eine kostenlose, offene Web-App für Highline-Freestyle-Battles – ähnlich wie Online-Schach:
-Athleten fordern sich weltweit heraus, filmen ihre Runs in der App, bewerten sich gegenseitig
-und sammeln ein Rating pro Battle-Format.
+A free, open web app for highline freestyle battles – similar to online chess:
+athletes challenge each other worldwide, film their runs in the app, review each other
+and build up a rating per battle format.
 
-> **Status:** Konzeptphase – noch kein App-Code. Die Planung steht, die Umsetzung startet mit Ausbaustufe 1.
+> **Status:** concept phase – no app code yet. Planning is done; implementation starts with stage 1.
 
-## Kernideen
+## Key ideas
 
-- **Battles per Video** – offene Anfragen nach Rating-Nähe, Aufnahme direkt in der App mit Versuchslimit, offlinefähig
-- **Gestufte Bewertung** – erst die beiden Athleten, bei Uneinigkeit ein Athletenpool, zuletzt zertifizierte Judges
-- **Rating pro Format** – gewichtetes Glicko-2 mit Unsicherheit („?“), Inaktivität lässt im Ranking abrutschen, ohne Punkte zu vernichten
-- **Kombi-Rankings** – frei zusammenstellbar aus beliebigen Formaten, z. B. für eine konkrete Competition
-- **Vor-Ort-Battles, Gruppenbattles, offizielle Competitions** – alles fließt ins selbe Rating
-- **Vertrauensbasis** – die Community kennt sich; alles ist änderbar, wenn beide Seiten zustimmen
+- **Battles by video** – open requests matched by rating, recording directly in the app with an attempt limit, works offline
+- **Tiered review** – first the two athletes, then a pool of athletes if they disagree, finally certified judges
+- **Rating per format** – weighted Glicko-2 with uncertainty ("?"); inactivity lowers your ranking without destroying points
+- **Combined rankings** – freely assembled from any formats, e.g. for a specific competition
+- **On-site battles, group battles, official competitions** – all feed into the same rating
+- **Built on trust** – the community knows each other; anything can be changed if both sides agree
 
-## Dokumente
+## Documents
 
-| Datei | Inhalt |
+| File | Contents |
 |---|---|
-| [`docs/konzept.md`](docs/konzept.md) | Gesamtkonzept: Rollen, Battle-Ablauf, Aufnahme, Bewertung, Speicher, Datenschutz, Technik, Ausbaustufen, offene Punkte |
-| [`rating/rating-spezifikation.md`](rating/rating-spezifikation.md) | Rating-System (Glicko-2-Variante): Formeln, Parameter, Testwerte |
-| [`rating/glicko_sim.py`](rating/glicko_sim.py) | Referenz-Implementierung und Simulation des Rating-Systems |
-| [`CLAUDE.md`](CLAUDE.md) | Arbeitsanweisungen für die Entwicklung mit Claude Code |
+| [`docs/concept.md`](docs/concept.md) | Overall concept: roles, battle flow, recording, review, storage, privacy, technology, development stages, open questions |
+| [`rating/rating-specification.md`](rating/rating-specification.md) | Rating system (Glicko-2 variant): formulas, parameters, test values |
+| [`rating/glicko_sim.py`](rating/glicko_sim.py) | Reference implementation and simulation of the rating system |
+| [`CLAUDE.md`](CLAUDE.md) | Working instructions for development with Claude Code |
 
-## Technik (geplant)
+## Technology (planned)
 
-PWA in TypeScript · Cloudflare Pages + Workers + D1 + R2 · GitHub Actions für Hintergrund-Jobs ·
-Betriebskosten zum Start 0 €.
+PWA in TypeScript · Cloudflare Pages + Workers + D1 + R2 · GitHub Actions for background jobs ·
+running costs at launch: €0.
 
-Referenz-Simulation ausprobieren:
+Try the reference simulation:
 
 ```bash
 pip install numpy
-python rating/glicko_sim.py beispiele
+python rating/glicko_sim.py examples
 ```
 
-## Mitmachen
+## Contributing
 
-Das Projekt ist Open Source und freut sich über Mitentwickler. Bitte zuerst `docs/konzept.md` und
-`CLAUDE.md` lesen. Größere Änderungen am Konzept oder an den Regeln bitte vorher als Issue zur
-Diskussion stellen.
+This is an open-source project and contributors are welcome. Please read `docs/concept.md` and
+`CLAUDE.md` first. Please open an issue to discuss larger changes to the concept or the rules
+before implementing them.
 
-## Lizenz
+## License
 
 [MIT](LICENSE)

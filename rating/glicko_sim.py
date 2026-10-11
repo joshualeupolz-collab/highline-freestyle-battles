@@ -1,12 +1,12 @@
 """
-Highline-Battle-Rating: gewichtetes Glicko-2 + Inaktivitaets-Modell + Simulation
+Highline battle rating: weighted Glicko-2 + inactivity model + simulation
 
-Aufruf:
-  python glicko_sim.py              -> Rechenbeispiele + Simulation
-  python glicko_sim.py beispiele    -> nur Rechenbeispiele
-  python glicko_sim.py sim 7        -> nur Simulation mit Seed 7
+Usage:
+  python glicko_sim.py              -> worked examples + simulation
+  python glicko_sim.py examples     -> worked examples only
+  python glicko_sim.py sim 7        -> simulation only, with seed 7
 
-Alle Stellschrauben stehen im Block PARAMETER. Einfach aendern und neu laufen lassen.
+All tuning knobs are in the PARAMETERS block. Change them and run again.
 """
 import math
 import random
@@ -15,30 +15,30 @@ from collections import defaultdict
 
 import numpy as np
 
-# ============================ PARAMETER ============================
-SCALE = 173.7178          # Glicko-2-Umrechnung (= 400/ln10), nicht aendern
-TAU = 0.5                 # wie schnell sich die Volatilitaet aendern darf (0.3-1.2)
-SIGMA_START = 0.06        # Start-Volatilitaet
-RD_START = 200            # Unsicherheit nach Admin-Ersteinstufung
-RD_MAX = 350              # Obergrenze Unsicherheit (= "voellig unbekannt")
-GRACE_DAYS = 30           # Karenzzeit ohne Inaktivitaets-Effekt
-C_INACT = 0.94            # RD = sqrt(RD_last^2 + (C_INACT * (Tage - Karenz))^2)
-K_DISPLAY = 2.0           # Ranking-Wert = Wertung - K_DISPLAY * RD
-PROVISIONAL_RD = 110      # darueber gilt ein Rating als vorlaeufig ("?")
+# ============================ PARAMETERS ============================
+SCALE = 173.7178          # Glicko-2 conversion (= 400/ln10), do not change
+TAU = 0.5                 # how fast volatility may change (0.3-1.2)
+SIGMA_START = 0.06        # initial volatility
+RD_START = 200            # uncertainty after initial admin estimate
+RD_MAX = 350              # upper limit of uncertainty (= "completely unknown")
+GRACE_DAYS = 30           # grace period without inactivity effect
+C_INACT = 0.94            # RD = sqrt(RD_last^2 + (C_INACT * (days - grace))^2)
+K_DISPLAY = 2.0           # ranking value = rating - K_DISPLAY * RD
+PROVISIONAL_RD = 110      # above this a rating is provisional ("?")
 MIN_GAMES_ESTABLISHED = 5
-WEIGHT = {1: 0.25, 2: 0.5, 3: 1.0, 4: 1.5, 5: 2.0}  # Battle-Stufe -> Faktor
-K_POINTS = 2.0            # Punkte -> Score: s = a^k / (a^k + b^k)
-CLAMP = "winner"          # "none" | "winner" (Sieger verliert nie) | "both" (+ Verlierer gewinnt nie)
+WEIGHT = {1: 0.25, 2: 0.5, 3: 1.0, 4: 1.5, 5: 2.0}  # battle level -> factor
+K_POINTS = 2.0            # points -> score: s = a^k / (a^k + b^k)
+CLAMP = "winner"          # "none" | "winner" (winner never loses) | "both" (+ loser never gains)
 
 # Simulation
 N_PLAYERS = 120
 N_FORMATS = 3
-WEEKS = 104               # 1 Rating-Periode = 1 Woche
+WEEKS = 104               # 1 rating period = 1 week
 SEED = 1
-ADMIN_NOISE = 150         # Fehler der Admin-Ersteinstufung (Standardabw.)
-COMMUNITY_SIZE = 20       # diese Gruppe wird systematisch ...
-COMMUNITY_BIAS = 250      # ... um so viele Punkte zu hoch eingestuft
-GRADED_SHARE = 0.5        # Anteil Battles mit abgestufter Deutlichkeit
+ADMIN_NOISE = 150         # error of the initial admin estimate (std. dev.)
+COMMUNITY_SIZE = 20       # this group is systematically ...
+COMMUNITY_BIAS = 250      # ... rated this many points too high
+GRADED_SHARE = 0.5        # share of battles with graded margin
 LEVEL_PROBS = {1: .25, 2: .25, 3: .35, 4: .10, 5: .05}
 # ===================================================================
 
@@ -80,8 +80,8 @@ def new_sigma(sigma, phi, v, delta, tau=TAU, eps=1e-6):
 
 
 def glicko2_update(r, rd, sigma, games):
-    """games: Liste von (r_gegner, rd_gegner, score 0..1, gewicht).
-    Gewicht w wirkt wie 'dieses Battle zaehlt w-mal' (gewichtete Likelihood)."""
+    """games: list of (r_opponent, rd_opponent, score 0..1, weight).
+    Weight w acts like 'this battle counts w times' (weighted likelihood)."""
     if not games:
         return r, rd, sigma
     mu, phi = (r - 1500) / SCALE, rd / SCALE
@@ -108,7 +108,7 @@ def rd_effective(rd_last, days_inactive):
 
 
 def clamp_delta(r_old, r_new, outcome):
-    """outcome = Summe(w*(s-0.5)) des Events: >0 gewonnen, <0 verloren"""
+    """outcome = sum(w*(s-0.5)) of the event: >0 won, <0 lost"""
     if CLAMP in ("winner", "both") and outcome > 0 and r_new < r_old:
         return r_old
     if CLAMP == "both" and outcome < 0 and r_new > r_old:
@@ -117,41 +117,41 @@ def clamp_delta(r_old, r_new, outcome):
 
 
 def score_from_points(a, b, k=K_POINTS):
-    """Punkte -> Score 0..1. k=1: a/(a+b). k>1 spreizt staerker."""
+    """points -> score 0..1. k=1: a/(a+b). k>1 spreads more."""
     if a + b == 0:
         return 0.5
     return a ** k / (a ** k + b ** k)
 
 
-# ============================ BEISPIELE ============================
-def beispiele():
-    print("=== Rechenbeispiele (ein einzelnes Battle, Gewicht 1) ===")
+# ============================ EXAMPLES ============================
+def examples():
+    print("=== Worked examples (a single battle, weight 1) ===")
 
-    def zeige(titel, r, rd, o, ord_, s):
+    def show(title, r, rd, o, ord_, s):
         r2, rd2, _ = glicko2_update(r, rd, SIGMA_START, [(o, ord_, s, 1.0)])
         o2, ord2, _ = glicko2_update(o, ord_, SIGMA_START, [(r, rd, 1 - s, 1.0)])
         e = expected(r, o, ord_)
-        print(f"{titel:34s} Erwartung {e:.3f} | Du {r:.0f}±{rd:.0f} -> {r2:.0f}±{rd2:.0f} ({r2 - r:+.0f})"
-              f" | Gegner {o:.0f}±{ord_:.0f} -> {o2:.0f}±{ord2:.0f} ({o2 - o:+.0f})")
+        print(f"{title:34s} Expected {e:.3f} | You {r:.0f}±{rd:.0f} -> {r2:.0f}±{rd2:.0f} ({r2 - r:+.0f})"
+              f" | Opponent {o:.0f}±{ord_:.0f} -> {o2:.0f}±{ord2:.0f} ({o2 - o:+.0f})")
 
     rd_in = rd_effective(50, 210)
-    print(f"(RD nach 7 Monaten Inaktivitaet, vorher 50: {rd_in:.0f})")
-    zeige("3000 aktiv vs 2000, Sieg", 3000, 50, 2000, 50, 1)
-    zeige("3000 aktiv vs 2000, Niederlage", 3000, 50, 2000, 50, 0)
-    zeige("3000 inaktiv vs 2000, Sieg", 3000, rd_in, 2000, 50, 1)
-    zeige("3000 inaktiv vs 2000, Niederlage", 3000, rd_in, 2000, 50, 0)
-    zeige("3000 inaktiv vs 2000, knapp 0.25", 3000, rd_in, 2000, 50, 0.25)
-    zeige("1600 vs 1500, Sieg", 1600, 60, 1500, 60, 1)
-    zeige("1600 vs 1500, Niederlage", 1600, 60, 1500, 60, 0)
-    zeige("Neuling 1600±200 vs 1500±60, Sieg", 1600, 200, 1500, 60, 1)
+    print(f"(RD after 7 months of inactivity, previously 50: {rd_in:.0f})")
+    show("3000 active vs 2000, win", 3000, 50, 2000, 50, 1)
+    show("3000 active vs 2000, loss", 3000, 50, 2000, 50, 0)
+    show("3000 inactive vs 2000, win", 3000, rd_in, 2000, 50, 1)
+    show("3000 inactive vs 2000, loss", 3000, rd_in, 2000, 50, 0)
+    show("3000 inactive vs 2000, close 0.25", 3000, rd_in, 2000, 50, 0.25)
+    show("1600 vs 1500, win", 1600, 60, 1500, 60, 1)
+    show("1600 vs 1500, loss", 1600, 60, 1500, 60, 0)
+    show("Newcomer 1600±200 vs 1500±60, win", 1600, 200, 1500, 60, 1)
 
-    print("\n=== Inaktivitaet (vorher RD 50) ===")
-    print("Tage  RD   Abzug im Ranking (Wertung bleibt)")
+    print("\n=== Inactivity (previously RD 50) ===")
+    print("Days  RD   Ranking deduction (rating unchanged)")
     for d in (30, 60, 90, 120, 180, 270, 365, 540):
         rd = rd_effective(50, d)
         print(f"{d:4d}  {rd:4.0f}  -{K_DISPLAY * (rd - 50):.0f}")
 
-    print("\n=== Punkte -> Score ===")
+    print("\n=== Points -> score ===")
     for a, b in ((150, 80), (100, 90), (200, 50), (80, 0)):
         print(f"{a}:{b}  k=1 -> {score_from_points(a, b, 1):.2f}   k=2 -> {score_from_points(a, b, 2):.2f}")
 
@@ -175,7 +175,7 @@ def simulate(seed=SEED):
             s = rng.randint(0, 90)
             breaks[i] = (s, s + rng.randint(8, 40))
     top = max(range(N), key=lambda i: true_base[i])
-    breaks[top] = (40, 80)  # Topspieler pausiert Woche 40-80
+    breaks[top] = (40, 80)  # top player takes a break in weeks 40-80
 
     st = [[None] * F for _ in range(N)]
     for i in range(N):
@@ -194,7 +194,7 @@ def simulate(seed=SEED):
         games = defaultdict(list)
 
         def flush():
-            # Sofortige Aktualisierung: alle Beteiligten eines Events gleichzeitig
+            # Immediate update: all participants of an event simultaneously
             for (i, f), gl in games.items():
                 s = st[i][f]
                 rd0 = rd_now(s, week)
@@ -214,7 +214,7 @@ def simulate(seed=SEED):
 
         active = [i for i in range(N) if not (i in breaks and breaks[i][0] <= week < breaks[i][1])]
 
-        # 1) Einzelbattles, grob nach Rating gepaart
+        # 1) Single battles, roughly paired by rating
         for f in range(F):
             part = [i for i in active if rng.random() < activity[i] / F * 1.5]
             part.sort(key=lambda i: st[i][f]["r"] + rng.gauss(0, 150))
@@ -228,7 +228,7 @@ def simulate(seed=SEED):
                 add_pair(a, b, f, s, WEIGHT[lvl])
                 flush()
 
-        # 2) Gruppenbattle (4 Personen, Stufe 2) alle 2 Wochen, 3) Competition (12, nur Platzierungen, Stufe 5) alle 8 Wochen
+        # 2) Group battle (4 people, level 2) every 2 weeks, 3) competition (12, placements only, level 5) every 8 weeks
         events = []
         if week % 2 == 0:
             events.append((4, 2))
@@ -254,12 +254,12 @@ def simulate(seed=SEED):
         rdn = rd_now(s, week)
         top_traj.append((week, s["r"], rdn, s["r"] - K_DISPLAY * rdn))
 
-    # ---------------- Auswertung ----------------
+    # ---------------- Evaluation ----------------
     W = WEEKS
-    print(f"\n=== Simulation: {N} Spieler, {F} Formate, {W} Wochen, Seed {seed} ===")
+    print(f"\n=== Simulation: {N} players, {F} formats, {W} weeks, seed {seed} ===")
 
-    print("\n[1] Inflation/Deflation: mittlere Abweichung Wertung - wahre Staerke")
-    print("Woche  ohne Community  alle")
+    print("\n[1] Inflation/deflation: mean deviation rating - true strength")
+    print("Week   w/o community   all")
     for w in (0, 13, 26, 52, 78, W - 1):
         print(f"{w:5d}  {drift[w][0]:+8.0f}      {drift[w][1]:+6.0f}")
 
@@ -267,31 +267,31 @@ def simulate(seed=SEED):
         s = st[i][f]
         return s["n"] >= MIN_GAMES_ESTABLISHED and rd_now(s, W) < PROVISIONAL_RD
 
-    print("\n[2] Genauigkeit am Ende (nur etablierte Ratings)")
+    print("\n[2] Accuracy at the end (established ratings only)")
     for f in range(F):
         idx = [i for i in range(N) if established(i, f)]
         disp = [st[i][f]["r"] - K_DISPLAY * rd_now(st[i][f], W) for i in idx]
         err = [abs(st[i][f]["r"] - true[i][f]) for i in idx]
-        print(f"Format {f}: {len(idx):3d} etabliert, Rangkorrelation {spearman(disp, [true[i][f] for i in idx]):.2f},"
-              f" mittl. Fehler {np.mean(err):.0f} Punkte")
+        print(f"Format {f}: {len(idx):3d} established, rank correlation {spearman(disp, [true[i][f] for i in idx]):.2f},"
+              f" mean error {np.mean(err):.0f} points")
 
-    print("\n[3] Erkennung Ueber-Einstufung (Spieler-Format-Eintraege mit >=10 Battles)")
+    print("\n[3] Over-rating detection (player-format entries with >=10 battles)")
     for name, grp in (("normal", [i for i in range(N) if i not in community]), ("Community", list(community))):
         d = [st[i][f]["r"] - st[i][f]["init"] for i in grp for f in range(F) if st[i][f]["n"] >= 10]
         res = [st[i][f]["res"] / st[i][f]["resw"] for i in grp for f in range(F) if st[i][f]["n"] >= 10]
         if len(d) < 2:
-            print(f"{name}: zu wenig Daten")
+            print(f"{name}: not enough data")
             continue
         z = np.mean(d) / (np.std(d, ddof=1) / math.sqrt(len(d)))
-        print(f"{name:10s} n={len(d):3d}  Wertung-Start {np.mean(d):+5.0f}  (z={z:+.1f})"
-              f"  Residuum erste 10 Battles {np.mean(res):+.3f}")
+        print(f"{name:10s} n={len(d):3d}  rating-start {np.mean(d):+5.0f}  (z={z:+.1f})"
+              f"  residual first 10 battles {np.mean(res):+.3f}")
 
-    print(f"\n[4] Topspieler P{top:03d} (Format 0), Pause Woche 40-80")
-    print("Woche  Wertung   RD  Ranking-Wert")
+    print(f"\n[4] Top player P{top:03d} (format 0), break weeks 40-80")
+    print("Week    Rating   RD  Ranking value")
     for w, r, rd, disp in top_traj[36:W:4]:
         print(f"{w:5d}  {r:7.0f}  {rd:4.0f}  {disp:7.0f}")
 
-    print("\n[5] Kombi-Ranking (z-Wert je Format, nur etablierte, Mittel ueber >=2 Formate)")
+    print("\n[5] Combined ranking (z-value per format, established only, mean over >=2 formats)")
     z = {}
     for f in range(F):
         idx = [i for i in range(N) if established(i, f)]
@@ -301,10 +301,10 @@ def simulate(seed=SEED):
             z.setdefault(i, []).append((v - m) / sd)
     comb = {i: float(np.mean(v)) for i, v in z.items() if len(v) >= 2}
     ids = list(comb)
-    print(f"{len(ids)} Spieler im Kombi-Ranking, Rangkorrelation mit wahrer Staerke "
+    print(f"{len(ids)} players in combined ranking, rank correlation with true strength "
           f"{spearman([comb[i] for i in ids], [true_base[i] for i in ids]):.2f}")
     true_rank = {i: k + 1 for k, i in enumerate(sorted(range(N), key=lambda i: -true_base[i]))}
-    print("Platz Spieler  Kombi  Formate  wahrer Platz")
+    print("Rank  Player   Combo  Formats  true rank")
     for k, i in enumerate(sorted(ids, key=lambda i: -comb[i])[:10], 1):
         tag = " (Community)" if i in community else ""
         print(f"{k:5d}  P{i:03d}   {comb[i]:+.2f}   {len(z[i])}        {true_rank[i]}{tag}")
@@ -312,7 +312,7 @@ def simulate(seed=SEED):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if not args or args[0] == "beispiele":
-        beispiele()
+    if not args or args[0] == "examples":
+        examples()
     if not args or args[0] == "sim":
         simulate(int(args[1]) if len(args) > 1 else SEED)
