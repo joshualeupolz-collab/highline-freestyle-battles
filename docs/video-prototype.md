@@ -83,10 +83,12 @@ Checked in desktop Chromium with a fake camera (`/lab/video`, Playwright):
 - After the change, switching apps, closing the browser and pressing the power button all ended the
   recording cleanly (`page hidden` → `stopped (app_left)` within 2 ms); the video up to that moment
   was complete. The "interrupted" rescue path was not needed in these cases.
-- HD (1920×1080, 30 fps): 57–61 MB/min in short clips (6–9 s); expected 46. Normal matched its
-  target over 60 s, so short clips probably overshoot – to be checked with a 60 s HD clip.
-- One clip the owner filmed in landscape came out as portrait (1080×1920). Possibly the phone's
-  rotation lock: the camera follows the screen orientation, not the sensor. To be checked.
+- HD (1920×1080, 30 fps), 62 s: **60.5 MB/min** (target 46): Chrome overshoots the 6 Mbit/s video
+  bit rate by about 30 %. Normal (2.5 Mbit/s) hit its target. If HD stays, lower its bit rate.
+- Rotating the phone during a recording keeps the file at the resolution it started with
+  (1920×1080); the picture inside is rotated/scaled. Final app: lock the orientation while recording.
+- Portrait vs landscape follows how the phone is held at the start (an earlier "portrait" clip was
+  in fact filmed upright).
 - The browser address bar takes space in landscape; it disappears when the app is installed to the
   home screen (PWA, `display: standalone`).
 
@@ -98,7 +100,7 @@ Open, to be answered by the phone tests:
 3. Does IndexedDB keep large recordings (HD, 60 s ≈ 45 MB) on iPhones, and is persistent storage granted?
 4. Cutting time and memory for 60 s HD files on older phones.
 5. iPhone: does the recording end cleanly when the app is left, and do the events show up in the report?
-6. Android: HD file size over 60 s; landscape with rotation lock on.
+6. Android: behaviour with the screen rotation lock on (optional).
 
 ## 4. Next steps after the tests
 

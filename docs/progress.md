@@ -92,7 +92,7 @@ delivered stay in `reviewing` until step 9 exists.
    key and the GitHub secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
    (`docs/deployment.md`, "Videos"). Confirm the step 8 defaults in section 2.
 1. Video test results from iPhones (friends of the owner; guide in `docs/video-prototype.md` §1).
-   Android still to check: HD over 60 s, landscape with rotation lock (see `docs/video-prototype.md` §3).
+   Android (Chrome) is fully tested (`docs/video-prototype.md` §3).
 2. Auto-cut (`docs/auto-cut.md`): 10–20 real test videos with roughly marked bounce bottoms are
    needed before prototyping it.
 3. Optional housekeeping: mark the GitGuardian finding on PR #1 (`PASSWORD_ITERATIONS = 50_000`)
