@@ -4,7 +4,8 @@ A free, open web app for highline freestyle battles – similar to online chess:
 athletes challenge each other worldwide, film their runs in the app, review each other
 and build up a rating per battle format.
 
-> **Status:** concept phase – no app code yet. Planning is done; implementation starts with stage 1.
+> **Status:** stage 1 in progress. The rating engine (`packages/rating`) is done; the API and the app follow.
+> Plan and progress: [`docs/architecture.md`](docs/architecture.md).
 
 ## Key ideas
 
@@ -22,12 +23,22 @@ and build up a rating per battle format.
 | [`docs/concept.md`](docs/concept.md) | Overall concept: roles, battle flow, recording, review, storage, privacy, technology, development stages, open questions |
 | [`rating/rating-specification.md`](rating/rating-specification.md) | Rating system (Glicko-2 variant): formulas, parameters, test values |
 | [`rating/glicko_sim.py`](rating/glicko_sim.py) | Reference implementation and simulation of the rating system |
+| [`docs/architecture.md`](docs/architecture.md) | Technical decisions, database schema, implementation order |
 | [`CLAUDE.md`](CLAUDE.md) | Working instructions for development with Claude Code |
 
-## Technology (planned)
+## Technology
 
-PWA in TypeScript · Cloudflare Pages + Workers + D1 + R2 · GitHub Actions for background jobs ·
-running costs at launch: €0.
+PWA in TypeScript (React) · one Cloudflare Worker for app + API, D1, R2 · GitHub Actions for
+background jobs · running costs at launch: €0.
+
+Development setup (Node 22 and pnpm):
+
+```bash
+pnpm install
+pnpm test          # all tests
+pnpm lint          # lint + formatting
+pnpm typecheck
+```
 
 Try the reference simulation:
 
