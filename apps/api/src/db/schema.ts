@@ -94,6 +94,9 @@ export const users = sqliteTable(
      * with it, the person can later have the videos they kept deleted too.
      */
     deletionTokenHash: text('deletion_token_hash'),
+    /** Version of the terms of use accepted (`TERMS_VERSION`) and when. */
+    termsVersion: text('terms_version'),
+    termsAcceptedAt: integer('terms_accepted_at'),
   },
   (t) => [
     uniqueIndex('users_username_unique').on(lower(t.username)),

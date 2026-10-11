@@ -2,12 +2,14 @@
  * Accounts and login (concept section 3): sign-up, login, logout, current user, passwords.
  */
 import {
+  acceptTermsRequestSchema,
   changePasswordRequestSchema,
   deleteAccountRequestSchema,
   deletionRequestSchema,
   loginRequestSchema,
   registerRequestSchema,
   resetPasswordRequestSchema,
+  TERMS_VERSION,
 } from '@hfb/shared';
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -81,6 +83,8 @@ authRoutes.post('/register', async (c) => {
     passwordHash,
     status: isSetupAdmin ? 'active' : 'pending',
     ageConfirmedAt: now,
+    termsVersion: TERMS_VERSION,
+    termsAcceptedAt: now,
     approvedAt: isSetupAdmin ? now : null,
     questionnaireJson: input.questionnaire ? JSON.stringify(input.questionnaire) : null,
     createdAt: now,
@@ -163,6 +167,24 @@ authRoutes.post('/logout', async (c) => {
 });
 
 authRoutes.get('/me', requireUser(), (c) => c.json({ user: c.get('user') }));
+
+/**
+ * Accept the current terms of use (accounts from before the terms existed, or after they
+ * changed). The app asks for it once before anything else.
+ */
+authRoutes.post('/accept-terms', requireUser(), async (c) => {
+  const { version } = await parseJson(c, acceptTermsRequestSchema);
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  // The app showed an older version (cached before a deployment): it must show the new one.
+  if (version !== TERMS_VERSION) apiError(409, 'terms_outdated');
+  const db = getDb(c.env.DB);
+  await db
+    .update(users)
+    .set({ termsVersion: TERMS_VERSION, termsAcceptedAt: Date.now() })
+    .where(eq(users.id, user.id));
+  return c.json({ user: await loadCurrentUser(db, user.id) });
+});
 
 /** Change one's own password. Other sessions (e.g. other devices) are logged out. */
 authRoutes.post('/password', requireUser(), async (c) => {

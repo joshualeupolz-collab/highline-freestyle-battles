@@ -8,6 +8,7 @@ import { ApprovalsPage } from './pages/Approvals';
 import { BattleDetailPage } from './pages/BattleDetail';
 import { BattlesPage } from './pages/Battles';
 import { DeletionRequestPage } from './pages/DeletionRequest';
+import { LegalPage } from './pages/Legal';
 import { LoginPage } from './pages/Login';
 import { NewBattlePage } from './pages/NewBattle';
 import { OnsiteResultPage } from './pages/OnsiteResult';
@@ -45,6 +46,10 @@ const router = createBrowserRouter([
   },
   // After deleting an account, and the deletion link: no login (concept section 12).
   { path: '/deletion-request', element: <DeletionRequestPage /> },
+  // Legal texts: public, linked from sign-up and every profile (concept section 12).
+  { path: '/privacy', element: <LegalPage doc="privacy" /> },
+  { path: '/terms', element: <LegalPage doc="terms" /> },
+  { path: '/imprint', element: <LegalPage doc="imprint" /> },
   // Video prototype for testers, no login needed (docs/video-prototype.md).
   { path: '/lab/video', element: <VideoLabPage /> },
   {

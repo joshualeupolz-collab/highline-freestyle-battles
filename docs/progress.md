@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-11 (end of the third session: steps 8, 9, 11, 12 and two UI rounds – all stage 1 features exist).
+Last updated: 2026-10-11 (fourth session: legal texts and terms acceptance).
 
 ---
 
@@ -15,9 +15,10 @@ free tier, D1 database in Western Europe). Every merge into `main` is published 
 **Branch / PRs:** session 1 = PRs #1–#4 (branch `claude/nice-sagan-akpprj`). Session 2 = the video
 prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3 = branch
 `claude/serene-cori-tl2ap4`: PRs #10 (step 8), #11 (step 9), #12 (step 11), #13 (step 12),
-#14 and #15 (UI rounds 1 and 2), all merged and deployed. A new session starts a fresh branch from `main`.
+#14 and #15 (UI rounds 1 and 2), all merged and deployed. Session 4 = branch
+`claude/gallant-ritchie-r1n4tv`: legal texts. A new session starts a fresh branch from `main`.
 
-**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 112 API tests
+**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 115 API tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
@@ -41,6 +42,7 @@ Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 | 12 Clean-up, deletion, replay | hourly job deletes unneeded videos 7 days after a battle (from R2 too); account deletion with "keep videos" (default) and deletion link; replay as GitHub Action (daily if requested, or by hand) plus admin request button. Details: `docs/architecture.md` §4e |
 | 11 On-site results | enter format, opponent, date, weight, scoring and result; the opponent confirms, rejects or enters a different result; withdraw; expires after 14 days; rating on confirmation. Details: `docs/architecture.md` §4d |
 | 9 Review level 1 | 5-point vote by both athletes, hidden until both voted, changeable; agreement decides and updates the ratings (s = mean of both votes); after 7 days a single vote for one side decides, otherwise unrated; result shows the rating change. Details: `docs/architecture.md` §4c |
+| Legal texts (session 4) | privacy policy, terms of use and legal notice in English and German (`/privacy`, `/terms`, `/imprint`, `apps/web/src/legal/`); sign-up requires accepting the terms (version stored, migration 0009); existing accounts accept once in the app; links on login/sign-up and in the profile. Details: `docs/architecture.md` §4f |
 | 8 Upload and unlocking | recording on the battle page (attempt registered at Start, limit checked on phone and server), offline storage + upload queue, cut before upload, visibility/keep per video, R2 storage layer (signed URLs, or through the Worker without access key), choosing the attempt that counts, unlocking when everyone chose (`reviewing`), cut-off video with extra-attempt request, offline copies of battle data. Details: `docs/architecture.md` §4b |
 
 ### Not started yet
@@ -101,12 +103,20 @@ profile button for members waiting for approval, confirmation before approving.
 | UI: tab bar at the bottom, "next step" per battle, rare actions folded away; English only (owner) | The owner found the interface confusing; thumb reach on phones |
 | Step 12 (owner): deleting an account counts running battles as given up; keeping videos is preselected; unneeded videos are deleted 7 days after the battle | Deleting must not avoid a loss; videos are valuable for the community |
 | Step 11 defaults (confirmed by the owner): no draw on site; confirmation within 14 days; date up to 60 days back; rejecting keeps the battle open for another result; either side can withdraw | Same 5-point scale and no-draw rule as the online review |
+| Legal texts: operator = the owner as a private person with home address; EN + DE, German version of the terms prevails; checkbox at sign-up and one-time acceptance for existing accounts (owner, session 4) | Needed before inviting beta testers; DE is usual for an operator in Germany |
+| Operator stays the owner for now; a later move to the international federation (Switzerland) is kept possible (concept §12) | GDPR applies anyway (users in the EU), so the move is about responsibility and an official operator, not less data protection |
+| Fixed: the camera's `.segmented` style applied to every segmented control (format part types looked like the camera bar) | Found while styling the language switch |
 | Step 9 (owner): on disagreement both may change their vote; no draw in stage 1; after 7 days a single vote for one side decides, otherwise unrated | Level 2 (pool) does not exist yet; whoever takes part is not punished |
 
 ---
 
 ## 3. Open questions for the project owner
 
+00. **Legal texts:** operator data is filled in (`apps/web/src/legal/operator.ts`); the contact
+    e-mail is still the owner's private address – replace it with a separate address for the app
+    when it exists. A short check of the texts by someone qualified is recommended (Claude is not
+    a lawyer). If the texts change in a way people must agree to, raise `TERMS_VERSION` in
+    `packages/shared/src/auth.ts`.
 0. **R2 setup (step 8):** check that the deploy step *Video bucket and its CORS rules* passes (if
    not: add *Workers R2 Storage → Edit* to the Cloudflare API token), then create the R2 access
    key and the GitHub secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
@@ -127,8 +137,8 @@ profile button for members waiting for approval, confirmation before approving.
 ## 4. Next steps
 
 1. **More UI feedback** from the owner (announced for the next session).
-2. **Legal texts** (privacy policy, legal notice / Impressum, terms of use) before inviting more
-   people – best in a separate session (concept §16), then link them in the app (sign-up, profile).
+2. **Legal texts:** done except the operator data (open question 00). Keep the privacy policy in
+   line with new features (push, public video pages, Telegram archive, Google login, e-mails).
 3. **Real-use tests:** iPhone reports of step 7 (`docs/video-prototype.md` §1); camera zoom works
    on Android (owner, 2026-10-11).
 4. **Commit the browser tests** (Playwright against a local Worker: video battle with offline

@@ -54,6 +54,7 @@ export async function loadCurrentUser(db: Database, userId: string): Promise<Cur
     email: user.email,
     status: user.status,
     roles: roles.map((r) => r.role as Role).sort(),
+    termsVersion: user.termsVersion,
   };
 }
 

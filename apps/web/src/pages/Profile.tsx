@@ -7,6 +7,7 @@ import { hasRole, useMe, useSetMe } from '../auth';
 import { ErrorText } from '../components/ErrorText';
 import { usePendingCount } from '../components/Layout';
 import { t } from '../i18n';
+import { LegalLinks } from './Legal';
 
 export function ProfilePage() {
   const { data: me } = useMe();
@@ -133,6 +134,7 @@ export function ProfilePage() {
           </button>
         </form>
       </details>
+      <LegalLinks />
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { TERMS_VERSION } from '@hfb/shared';
 import { describe, expect, it } from 'vitest';
 import { LOCK_DURATION } from '../src/routes/auth';
 import { call, PASSWORD, register, registerAdmin, registerAthlete, sessionToken } from './helpers';
@@ -37,6 +38,15 @@ describe('sign-up', () => {
     expect(
       (await call('/api/auth/register', { body: { username: 'x', password: 'short' } })).status,
     ).toBe(400);
+  });
+
+  it('requires accepting the terms and stores their version', async () => {
+    const res = await call('/api/auth/register', {
+      body: { username: 'anna', displayName: 'Anna', password: PASSWORD, ageConfirmed: true },
+    });
+    expect(res.status).toBe(400);
+    const { user } = await register('anna');
+    expect(user).toMatchObject({ termsVersion: TERMS_VERSION });
   });
 
   it('rejects a username that differs only in case', async () => {
@@ -299,5 +309,30 @@ describe('user search', () => {
     expect(plan.results.map((r) => r.detail).join(' ')).toMatch(
       /USING INDEX users_username_unique/,
     );
+  });
+});
+
+describe('terms of use', () => {
+  it('lets an account accept the current version once more', async () => {
+    const { user, session } = await register('anna');
+    // An account from before the terms existed.
+    await env.DB.prepare('UPDATE users SET terms_version = NULL WHERE id = ?').bind(user.id).run();
+    const me = await call('/api/auth/me', { session });
+    expect(((await me.json()) as { user: { termsVersion: null } }).user.termsVersion).toBeNull();
+
+    const old = await call('/api/auth/accept-terms', { session, body: { version: '2000-01-01' } });
+    expect(old.status).toBe(409);
+    const res = await call('/api/auth/accept-terms', { session, body: { version: TERMS_VERSION } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ user: { termsVersion: TERMS_VERSION } });
+    const row = await env.DB.prepare('SELECT terms_accepted_at FROM users WHERE id = ?')
+      .bind(user.id)
+      .first<{ terms_accepted_at: number }>();
+    expect(row?.terms_accepted_at).toBeGreaterThan(0);
+  });
+
+  it('needs a login', async () => {
+    const res = await call('/api/auth/accept-terms', { body: { version: TERMS_VERSION } });
+    expect(res.status).toBe(401);
   });
 });

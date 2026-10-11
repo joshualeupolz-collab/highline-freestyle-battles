@@ -199,7 +199,7 @@ A person can hold several roles (e.g. athlete + judge).
   - Decided 2026-10-11 (step 12): keeping the videos is preselected. Running battles count as given up (a win for the opponent, so deleting is no way to avoid a loss); open requests and unconfirmed results are cancelled. Chat messages are deleted.
 - **Videos no longer needed** (attempts that did not count and were not kept, *review only* videos) are deleted 7 days after the battle ended (decided 2026-10-11).
 - Minimum age 16 by self-declaration; exceptions case by case with parental consent. If we learn of an under-16 user without consent, the account is suspended or deleted.
-- Required: privacy policy (EN + DE), legal notice ("Impressum", operated from Germany), terms of use. To be drafted separately and briefly checked by someone qualified.
+- Privacy policy, terms of use and legal notice ("Impressum", operated from Germany) exist in English and German (`/privacy`, `/terms`, `/imprint`; decided 2026-10-11). The operator is the project owner as a private person. Sign-up requires accepting the terms of use; existing accounts and accounts after a change of the terms accept once in the app. The German version of the terms prevails. A short check by someone qualified is still recommended. Later the international federation (based in Switzerland) may become the operator; then the operator data, Swiss law and the Swiss supervisory authority go into the texts, the GitHub repository moves to the federation's organization (built-in transfer), and the Cloudflare account may stay with the owner as processor under a data processing agreement. A custom domain would keep the app's address when moving to another account.
 
 ---
 
@@ -279,6 +279,6 @@ Current progress and next steps: [`docs/progress.md`](progress.md).
 | Rating system | separate chat (v1.0 done) | Opus |
 | Main development | Claude Code, public GitHub repository | Opus for architecture and tricky parts, Sonnet for implementation |
 | Video prototype (recording, trimming, offline) | Claude Code, separate branch or mini repo | Sonnet |
-| Legal texts (privacy policy, legal notice, terms) | separate chat | Sonnet |
+| Legal texts (privacy policy, legal notice, terms) | done in Claude Code (2026-10-11); check by someone qualified recommended | Sonnet |
 | Trick list / exchange format | coordination with the other developer, possibly a separate chat | Sonnet |
 | AI trick recognition | later, separate chat or Claude Code | Opus |

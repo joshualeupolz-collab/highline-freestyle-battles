@@ -38,7 +38,14 @@ export const PASSWORD = 'a-long-test-password';
 
 export async function register(username: string, extra: Record<string, unknown> = {}) {
   const res = await call('/api/auth/register', {
-    body: { username, displayName: username, password: PASSWORD, ageConfirmed: true, ...extra },
+    body: {
+      username,
+      displayName: username,
+      password: PASSWORD,
+      ageConfirmed: true,
+      termsAccepted: true,
+      ...extra,
+    },
   });
   const body = (await res.json()) as {
     user: { id: string; status: string; roles: string[] };

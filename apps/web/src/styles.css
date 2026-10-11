@@ -712,7 +712,7 @@ details.more {
 .camera-top > * {
   pointer-events: auto;
 }
-.segmented {
+.camera-top .segmented {
   margin: 0;
   border: none;
   display: flex;
@@ -787,4 +787,19 @@ details.more {
   background: var(--danger);
   color: #fff;
   font-size: 0.8rem;
+}
+
+/* Legal texts (pages/Legal.tsx). */
+.legal-lang {
+  grid-template-columns: repeat(2, auto);
+}
+.legal h1 {
+  margin-top: 1.5rem;
+}
+.legal li {
+  margin-bottom: 0.35rem;
+}
+.legal-links {
+  text-align: center;
+  margin-top: 2rem;
 }
