@@ -1,9 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
-import { Link, Navigate, NavLink, Outlet } from 'react-router';
+import { TERMS_VERSION } from '@hfb/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router';
 import { api } from '../api';
 import { hasRole, useMe } from '../auth';
 import { t } from '../i18n';
 import { nextStep } from '../nextStep';
+import { LegalLinks } from '../pages/Legal';
+import { ErrorText } from './ErrorText';
 
 /** Small line icons for the tab bar (24×24, drawn with the text color). */
 const ICONS = {
@@ -36,6 +39,7 @@ export function Layout() {
     refetchInterval: 60_000,
   });
   const pending = usePendingCount(active && hasRole(user, 'athlete', 'federation', 'admin'));
+  const { pathname } = useLocation();
   if (isLoading) return <main className="muted">{t('common.loading')}</main>;
   if (!user) return <Navigate to="/login" replace />;
 
@@ -62,7 +66,12 @@ export function Layout() {
         </Link>
       </header>
       <main className="with-tabs">
-        <Outlet />
+        {/* The profile stays reachable, so someone who does not agree can delete the account. */}
+        {user.termsVersion === TERMS_VERSION || pathname === '/profile' ? (
+          <Outlet />
+        ) : (
+          <TermsGate changed={user.termsVersion !== null} />
+        )}
       </main>
       {active && (
         <nav className="tabs">
@@ -97,7 +106,31 @@ export function PublicLayout() {
     <main>
       <h1 style={{ textAlign: 'center', marginTop: '2rem' }}>{t('appName')}</h1>
       <Outlet />
+      <LegalLinks />
     </main>
+  );
+}
+
+/** Asks to accept the current terms of use before anything else (new or changed terms). */
+function TermsGate({ changed }: { changed: boolean }) {
+  const queryClient = useQueryClient();
+  const accept = useMutation({
+    mutationFn: () => api.acceptTerms(TERMS_VERSION),
+    onSuccess: (res) => queryClient.setQueryData(['me'], res.user),
+  });
+  return (
+    <div className="card">
+      <h1>{t('terms.gateTitle')}</h1>
+      <p>{t(changed ? 'terms.gateChanged' : 'terms.gateNew')}</p>
+      <LegalLinks />
+      <ErrorText error={accept.error} />
+      <button type="button" disabled={accept.isPending} onClick={() => accept.mutate()}>
+        {t('terms.accept')}
+      </button>
+      <p className="muted">
+        <Link to="/profile">{t('terms.decline')}</Link>
+      </p>
+    </div>
   );
 }
 

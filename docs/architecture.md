@@ -135,6 +135,7 @@ Notes:
 - `video_files` is the replaceable storage layer: "delete everywhere" means processing every row of a video.
 - Added after step 12 (additive): `battle_messages.event_json` (the chat documents proposals, answers, extra attempts, choices and votes).
 - Added in step 12 (additive): `battles.ended_at`, `users.deletion_token_hash`.
+- Added with the legal texts (additive, migration 0009): `users.terms_version`, `users.terms_accepted_at`.
 - Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
@@ -273,6 +274,21 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 
 ---
 
+## 4f. Legal texts and terms acceptance
+
+- Privacy policy, terms of use and legal notice are React pages in English and German
+  (`apps/web/src/legal/`, routes `/privacy`, `/terms`, `/imprint`, public). The operator's name,
+  address and e-mail live in one place, `apps/web/src/legal/operator.ts`. The texts describe what
+  the app really does: a feature that processes new personal data (push notifications, public
+  video pages, Telegram archive, Google login, e-mails) must update the privacy policy too.
+- Sign-up requires `termsAccepted: true`; the account stores `TERMS_VERSION`
+  (`packages/shared/src/auth.ts`) and the time. When `users.terms_version` differs from
+  `TERMS_VERSION` (accounts from before, or after raising it), the app shows only a request to
+  accept (`POST /auth/accept-terms`); the profile stays reachable so the person can delete the
+  account instead. Raise `TERMS_VERSION` only for changes people must agree to.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |
@@ -291,5 +307,6 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 | 10 | Format rankings | done (pulled forward, with profiles) |
 | 11 | On-site results with confirmation by both sides | done (§4d) |
 | 12 | Replay job, deployment pipeline, enforcing visibility, account deletion | done (§4e) |
+| – | Legal texts (privacy policy, terms of use, legal notice) and terms acceptance | done (§4f); operator data to be filled in, short check by someone qualified recommended |
 
 The video prototype (step 7) is the biggest technical risk (trimming without re-encoding in the browser) and can be started early in a separate session (concept §16).

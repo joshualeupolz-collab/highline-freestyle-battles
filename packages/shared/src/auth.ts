@@ -10,6 +10,12 @@ export const PASSWORD_MIN = 8;
 /** Upper bound so nobody can make the server hash megabytes. */
 export const PASSWORD_MAX = 128;
 
+/**
+ * Version of the terms of use (the date they were last changed, `apps/web/src/legal/`). Raising
+ * it makes every account accept the new terms once more before using the app.
+ */
+export const TERMS_VERSION = '2026-10-11';
+
 export const usernameSchema = z
   .string()
   .trim()
@@ -40,11 +46,16 @@ export const registerRequestSchema = z.object({
   email: z.email().max(254).optional(),
   /** "I am at least 16 years old." Must be ticked. */
   ageConfirmed: z.literal(true),
+  /** "I accept the terms of use" for this version. Must be ticked. */
+  termsAccepted: z.literal(true),
   questionnaire: questionnaireSchema.optional(),
   /** One-time setup secret that makes the very first account an admin. */
   setupToken: z.string().max(200).optional(),
 });
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
+
+/** Accept the terms of use; `version` is the one the person was shown. */
+export const acceptTermsRequestSchema = z.object({ version: z.string().max(20) });
 
 export const loginRequestSchema = z.object({
   username: z.string().trim().min(1).max(USERNAME_MAX),

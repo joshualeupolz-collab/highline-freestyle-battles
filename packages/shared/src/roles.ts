@@ -13,4 +13,6 @@ export interface CurrentUser {
   email: string | null;
   status: UserStatus;
   roles: Role[];
+  /** Version of the terms of use the person accepted (`TERMS_VERSION`), or null. */
+  termsVersion: string | null;
 }

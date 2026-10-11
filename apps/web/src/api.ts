@@ -315,6 +315,7 @@ export const api = {
   login: (body: { username: string; password: string }) => post<UserResponse>('/auth/login', body),
   register: (body: unknown) => post<UserResponse>('/auth/register', body),
   logout: () => post<{ ok: true }>('/auth/logout'),
+  acceptTerms: (version: string) => post<UserResponse>('/auth/accept-terms', { version }),
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
     post('/auth/password', body),
   resetPassword: (body: { code: string; newPassword: string }) =>

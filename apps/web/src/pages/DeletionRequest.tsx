@@ -3,6 +3,7 @@ import { Link, useLocation, useSearchParams } from 'react-router';
 import { api } from '../api';
 import { ErrorText } from '../components/ErrorText';
 import { t } from '../i18n';
+import { LegalLinks } from './Legal';
 
 /**
  * Public page after deleting an account, and the target of the deletion link (concept section
@@ -49,6 +50,7 @@ export function DeletionRequestPage() {
       <p>
         <Link to="/login">{t('appName')}</Link>
       </p>
+      <LegalLinks />
     </main>
   );
 }

@@ -7,6 +7,29 @@ import { useSetMe } from '../auth';
 import { ErrorText } from '../components/ErrorText';
 import { t } from '../i18n';
 
+/** "I accept the terms of use and have read the privacy policy", with both as links. */
+function TermsSentence() {
+  // Split the translated sentence at its placeholders so the links stay inside it.
+  const parts = t('register.terms').split(/(\{terms\}|\{privacy\})/);
+  return (
+    <>
+      {parts.map((part) =>
+        part === '{terms}' ? (
+          <Link key={part} to="/terms" target="_blank">
+            {t('legal.termsLink')}
+          </Link>
+        ) : part === '{privacy}' ? (
+          <Link key={part} to="/privacy" target="_blank">
+            {t('legal.privacyLink')}
+          </Link>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
 export function RegisterPage() {
   const setMe = useSetMe();
   // The setup field only appears with ?setup in the address (first admin).
@@ -18,6 +41,7 @@ export function RegisterPage() {
     password: '',
     email: '',
     ageConfirmed: false,
+    termsAccepted: false,
     freestyleSince: '',
     community: '',
     note: '',
@@ -40,6 +64,7 @@ export function RegisterPage() {
       password: form.password,
       email: form.email.trim() || undefined,
       ageConfirmed: form.ageConfirmed,
+      termsAccepted: form.termsAccepted,
       questionnaire: Object.keys(questionnaire).length ? questionnaire : undefined,
       setupToken: form.setupToken || undefined,
     });
@@ -110,6 +135,17 @@ export function RegisterPage() {
           />
           <span>
             {t('register.age')} <span className="hint">{t('register.ageHint')}</span>
+          </span>
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={form.termsAccepted}
+            onChange={set('termsAccepted')}
+            required
+          />
+          <span>
+            <TermsSentence />
           </span>
         </label>
         <ErrorText error={register.error} />
