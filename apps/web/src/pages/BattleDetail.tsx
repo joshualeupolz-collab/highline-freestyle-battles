@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { useParams } from 'react-router';
 import { api, type Battle, type Proposal } from '../api';
 import { useMe } from '../auth';
-import { partsText, SettingsFields, StatusBadge, settingsText, useFormats } from '../battleHelpers';
+import {
+  compactSettings,
+  SettingsFields,
+  StatusBadge,
+  settingsText,
+  useFormats,
+} from '../battleHelpers';
 import {
   BattleVideos,
   OpponentProgress,
@@ -15,7 +21,8 @@ import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
 import { ReviewCard } from '../components/Review';
 import { RatingText, UserLink } from '../components/UserLink';
-import { formatDate, type MessageKey, t } from '../i18n';
+import { formatDate, formatShort, type MessageKey, t } from '../i18n';
+import { nextStep, todoOf } from '../nextStep';
 
 const DAY = 86_400_000;
 
@@ -51,64 +58,104 @@ export function BattleDetailPage() {
   const name = (userId: string) =>
     battle.participants.find((p) => p.userId === userId)?.displayName ?? '?';
 
+  const opponent = battle.participants.find((p) => p.userId !== me.id);
+  const step =
+    mine && format ? nextStep(battle, todoOf(battle, me.id, format.parts.length), me.id) : null;
+  const myProposalsOnly = battle.proposals.length > 0;
+  const meta = onsite
+    ? [
+        t('meta.onsite', { date: formatShort(battle.playedAt ?? battle.createdAt) }),
+        t('meta.weight', { n: battle.settings.level }),
+        battle.settings.scoring === 'scale' ? t('meta.margin') : t('meta.winLoss'),
+      ].join(' · ')
+    : compactSettings(battle.settings, format);
+
   return (
     <>
       <div className="row">
         <h1 style={{ margin: 0 }}>{format?.name ?? '…'}</h1>
         <StatusBadge status={battle.status} mode={battle.mode} />
       </div>
-      {format && <p className="muted">{partsText(format)}</p>}
-
-      <div className="card">
-        <div className="versus">
-          {battle.participants.map((p, i) => (
-            <span key={p.userId}>
-              {i > 0 && <span className="muted"> {t('battles.vs')} </span>}
-              <strong>
-                <UserLink id={p.userId} name={p.displayName} />
-              </strong>{' '}
-              <RatingText rating={p.rating} />
-            </span>
-          ))}
-        </div>
+      <div className="versus">
+        {battle.participants.map((p, i) => (
+          <span key={p.userId}>
+            {i > 0 && <span className="muted"> {t('battles.vs')} </span>}
+            <strong>
+              <UserLink id={p.userId} name={p.displayName} />
+            </strong>{' '}
+            <RatingText rating={p.rating} />
+          </span>
+        ))}
         {battle.participants.length < 2 && (
-          <span className="muted"> – {t('battles.waitingForOpponent')}</span>
+          <span className="muted">
+            {' '}
+            –{' '}
+            {battle.invitedUserId === me.id
+              ? t('battle.challengesYou')
+              : t('battles.waitingForOpponent')}
+          </span>
         )}
-        <p className="muted" style={{ margin: '0.25rem 0 0' }}>
-          {onsite
-            ? `${t('onsite.played', { date: formatDate(battle.playedAt ?? battle.createdAt) })} · ${settingsText({ level: battle.settings.level, scoring: battle.settings.scoring })}`
-            : settingsText(battle.settings)}
-        </p>
-        {battle.deadlineAt && battle.status === 'active' && (
-          <p style={{ margin: '0.25rem 0 0' }}>
-            {t('battle.deadline')}: {formatDate(battle.deadlineAt)}
-          </p>
-        )}
-        {battle.participants
-          .filter((p) => (p.extraAttempts ?? 0) > 0)
-          .map((p) => (
-            <p key={p.userId} className="muted" style={{ margin: 0 }}>
-              {p.displayName}: {t('battle.extraAttempts', { n: p.extraAttempts ?? 0 })}
-            </p>
-          ))}
-        {mine && <OpponentProgress battle={battle} myId={me.id} />}
       </div>
+      <p className="battle-meta">{meta}</p>
+      {battle.participants
+        .filter((p) => (p.extraAttempts ?? 0) > 0)
+        .map((p) => (
+          <p key={p.userId} className="battle-meta">
+            {p.displayName}: {t('battle.extraAttempts', { n: p.extraAttempts ?? 0 })}
+          </p>
+        ))}
 
-      {!onsite && (battle.status === 'open' || battle.status === 'negotiating') && (
-        <div className={`card ${battle.settingsFlexible ? '' : 'notice'}`}>
-          <span className={`badge ${battle.settingsFlexible ? 'negotiating' : 'fixed'}`}>
-            {battle.settingsFlexible ? t('rules.flexible') : t('rules.fixed')}
-          </span>{' '}
-          {battle.settingsFlexible ? t('rules.flexibleHint') : t('rules.fixedHint')}
+      <Result battle={battle} name={name} />
+      {battle.status === 'cancelled' && (
+        <p className="card">
+          {battle.cancelReason === 'no_agreement'
+            ? t('review.noAgreement')
+            : battle.cancelReason === 'onsite_withdrawn'
+              ? t('onsite.withdrawn')
+              : t('battle.cancelled')}
+        </p>
+      )}
+
+      {step && (
+        <div className={`card next-step${step.urgent ? ' urgent' : ''}`}>
+          <span className="next-label">{t('battle.nextStep')}</span>
+          <strong>{t(step.key, { opponent: opponent?.displayName ?? '' })}</strong>
+          {mine && <OpponentProgress battle={battle} myId={me.id} />}
+        </div>
+      )}
+      <ErrorText error={action.error} />
+
+      {/* What to do now, right under the next step. */}
+      {battle.status === 'open' && !isCreator && (
+        <div className="card">
+          <p className="hint" style={{ marginTop: 0 }}>
+            {battle.settingsFlexible ? t('rules.flexibleHint') : t('rules.fixedHint')}
+          </p>
+          <button
+            type="button"
+            className="wide"
+            onClick={() =>
+              (battle.settingsFlexible || window.confirm(t('battle.bindingConfirm'))) &&
+              run('accept')
+            }
+          >
+            {battle.settingsFlexible ? t('battle.acceptNegotiable') : t('battle.accept')}
+          </button>
+        </div>
+      )}
+      {!onsite && battle.status === 'negotiating' && mine?.seat === 1 && (
+        <div className="actions">
+          <button
+            type="button"
+            onClick={() => window.confirm(t('battle.bindingConfirm')) && run('start')}
+          >
+            {t('battle.start')}
+          </button>
         </div>
       )}
 
-      <Result battle={battle} name={name} />
-      <ErrorText error={action.error} />
-
-      {battle.proposals.length > 0 && (
+      {myProposalsOnly && (
         <section>
-          <h2>{t('battle.proposals')}</h2>
           {battle.proposals.map((p) => (
             <ProposalCard
               key={p.id}
@@ -130,8 +177,10 @@ export function BattleDetailPage() {
       )}
 
       {onsite && battle.status === 'negotiating' && mine && (
-        <div className="card notice">
-          {t('onsite.pending', { date: formatDate(battle.deadlineAt ?? Date.now()) })}
+        <div className="card">
+          <p className="hint" style={{ marginTop: 0 }}>
+            {t('onsite.pending', { date: formatDate(battle.deadlineAt ?? Date.now()) })}
+          </p>
           <div className="actions">
             <button
               type="button"
@@ -151,8 +200,7 @@ export function BattleDetailPage() {
           {panel === 'result' && (
             <div className="vote-options">
               {[2, 1, -1, -2].map((value) => {
-                const other = battle.participants.find((p) => p.userId !== me.id);
-                const who = value > 0 ? me.displayName : (other?.displayName ?? '?');
+                const who = value > 0 ? me.displayName : (opponent?.displayName ?? '?');
                 return (
                   <button
                     key={value}
@@ -168,12 +216,10 @@ export function BattleDetailPage() {
           )}
         </div>
       )}
-      {battle.status === 'cancelled' && battle.cancelReason === 'onsite_withdrawn' && (
-        <p className="card">{t('onsite.withdrawn')}</p>
-      )}
+
       {battle.status === 'active' && mine && battle.deadlinePassed && (
-        <div className="card notice">
-          {t('battle.deadlinePassed')}
+        <div className="card">
+          <p style={{ marginTop: 0 }}>{t('battle.deadlinePassed')}</p>
           <div className="actions">
             <button type="button" onClick={() => run('deadline-decision', { choice: 'claim_win' })}>
               {t('battle.claimWin')}
@@ -188,6 +234,10 @@ export function BattleDetailPage() {
           </div>
         </div>
       )}
+
+      {battle.status === 'active' && mine && format && (
+        <BattleVideos battle={battle} format={format} myId={me.id} />
+      )}
       {format && <UnlockedVideos battle={battle} format={format} />}
       {battle.status === 'reviewing' && mine && (
         <ReviewCard
@@ -197,104 +247,86 @@ export function BattleDetailPage() {
           onVote={(value) => run('vote', { value })}
         />
       )}
-      {battle.status === 'cancelled' && battle.cancelReason === 'no_agreement' && (
-        <p className="card">{t('review.noAgreement')}</p>
-      )}
-      {battle.status === 'active' && mine && format && (
-        <BattleVideos battle={battle} format={format} myId={me.id} />
-      )}
-
-      <div className="actions">
-        {battle.status === 'open' && !isCreator && (
-          <button
-            type="button"
-            onClick={() =>
-              (battle.settingsFlexible || window.confirm(t('battle.bindingConfirm'))) &&
-              run('accept')
-            }
-          >
-            {battle.settingsFlexible ? t('battle.acceptNegotiable') : t('battle.accept')}
-          </button>
-        )}
-        {battle.status === 'open' && isCreator && (
-          <button type="button" className="danger" onClick={() => run('retract')}>
-            {t('battle.retract')}
-          </button>
-        )}
-        {!onsite && battle.status === 'negotiating' && mine?.seat === 1 && (
-          <button
-            type="button"
-            onClick={() => window.confirm(t('battle.bindingConfirm')) && run('start')}
-          >
-            {t('battle.start')}
-          </button>
-        )}
-        {running && mine && (
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => setPanel(panel === 'settings' ? 'none' : 'settings')}
-          >
-            {t('battle.proposeSettings')}
-          </button>
-        )}
-        {battle.status === 'active' && mine && (
-          <>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setPanel(panel === 'extension' ? 'none' : 'extension')}
-            >
-              {t('battle.proposeExtension')}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() =>
-                window.confirm(t('battle.grantAttemptConfirm')) && run('grant-attempt')
-              }
-            >
-              {t('battle.grantAttempt')}
-            </button>
-            {battle.participants.some((p) => p.userId !== me.id && (p.extraAttempts ?? 0) > 0) && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => run('proposals', { kind: 'extra_attempt', change: -1 })}
-              >
-                {t('battle.takeBackAttempt')}
-              </button>
-            )}
-          </>
-        )}
-        {running && mine && (
-          <button
-            type="button"
-            className="danger"
-            onClick={() =>
-              window.confirm(t('battle.giveUpConfirm')) && run('proposals', { kind: 'cancel' })
-            }
-          >
-            {t('battle.giveUp')}
-          </button>
-        )}
-      </div>
 
       {mine && battle.participants.length > 1 && (
         <Chat battleId={battle.id} myId={me.id} participants={battle.participants} />
       )}
 
-      {panel === 'settings' && (
-        <SettingsProposal
-          battle={battle}
-          onSend={(changes) => run('proposals', { kind: 'settings', changes })}
-        />
-      )}
-      {panel === 'extension' && (
-        <ExtensionProposal
-          battle={battle}
-          onSend={(deadlineAt) => run('proposals', { kind: 'extension', deadlineAt })}
-        />
+      {/* Rarely needed: kept out of the way. */}
+      {((running && mine) || (battle.status === 'open' && isCreator)) && (
+        <details className="card more">
+          <summary>{t('battle.moreOptions')}</summary>
+          <div className="actions">
+            {battle.status === 'open' && isCreator && (
+              <button type="button" className="danger" onClick={() => run('retract')}>
+                {t('battle.retract')}
+              </button>
+            )}
+            {running && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setPanel(panel === 'settings' ? 'none' : 'settings')}
+              >
+                {t('battle.proposeSettings')}
+              </button>
+            )}
+            {battle.status === 'active' && (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setPanel(panel === 'extension' ? 'none' : 'extension')}
+                >
+                  {t('battle.proposeExtension')}
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() =>
+                    window.confirm(t('battle.grantAttemptConfirm')) && run('grant-attempt')
+                  }
+                >
+                  {t('battle.grantAttempt')}
+                </button>
+                {battle.participants.some(
+                  (p) => p.userId !== me.id && (p.extraAttempts ?? 0) > 0,
+                ) && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => run('proposals', { kind: 'extra_attempt', change: -1 })}
+                  >
+                    {t('battle.takeBackAttempt')}
+                  </button>
+                )}
+              </>
+            )}
+            {running && (
+              <button
+                type="button"
+                className="danger"
+                onClick={() =>
+                  window.confirm(t('battle.giveUpConfirm')) && run('proposals', { kind: 'cancel' })
+                }
+              >
+                {t('battle.giveUp')}
+              </button>
+            )}
+          </div>
+          {panel === 'settings' && (
+            <SettingsProposal
+              battle={battle}
+              onSend={(changes) => run('proposals', { kind: 'settings', changes })}
+            />
+          )}
+          {panel === 'extension' && (
+            <ExtensionProposal
+              battle={battle}
+              onSend={(deadlineAt) => run('proposals', { kind: 'extension', deadlineAt })}
+            />
+          )}
+        </details>
       )}
     </>
   );

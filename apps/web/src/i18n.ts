@@ -4,11 +4,11 @@
  */
 const en = {
   appName: 'Highline Battles',
-  'nav.battles': 'My battles',
-  'nav.open': 'Open requests',
-  'nav.new': 'New battle',
+  'nav.battles': 'Battles',
+  'nav.open': 'Requests',
+  'nav.new': 'New',
   'nav.rankings': 'Rankings',
-  'nav.approvals': 'Approvals',
+  'nav.approvals': 'Approve new members',
   'nav.admin': 'Admin',
   'nav.profile': 'Profile',
 
@@ -52,11 +52,38 @@ const en = {
   'battles.finished': 'Finished',
   'battles.vs': 'vs.',
   'battles.waitingForOpponent': 'waiting for an opponent',
+  'battles.until': 'until {date}',
+  'battle.nextStep': 'Next step',
+  'battle.challengesYou': 'challenges you',
+  'meta.attempts': '{n} attempts',
+  'meta.attempt': '1 attempt',
+  'meta.unlimited': 'unlimited attempts',
+  'meta.weight': 'weight {n}',
+  'meta.margin': 'with margin',
+  'meta.winLoss': 'win/loss only',
+  'meta.onsite': 'on site, {date}',
+  'battle.moreOptions': 'More options (more time, extra attempt, give up …)',
+  'battle.cancelled': 'This battle was cancelled and does not count.',
+  'battle.howItWorks': 'How recording works',
+  'rating.provisional': 'provisional',
+  'rating.new': 'new',
+  'next.challenged': 'You were challenged: accept or ignore',
+  'next.waitingForOpponent': 'Waiting for someone to accept',
+  'next.confirmResult': 'Confirm the result',
+  'next.waitingForConfirmation': 'Waiting for {opponent} to confirm the result',
+  'next.answerProposal': 'Answer the proposal',
+  'next.startOrPropose': 'Start the battle or propose other settings',
+  'next.waitingAgree': 'Waiting for {opponent} to agree on the settings',
+  'next.deadlinePassed': 'Deadline passed: decide how the battle ends',
+  'next.record': 'Record your attempts and choose the one that counts',
+  'next.waitingVideos': 'Waiting for the videos of {opponent}',
+  'next.vote': 'Watch both videos and vote',
+  'next.waitingVote': 'Waiting for the vote of {opponent}',
+  'next.noAgreement': 'No agreement yet: compare your votes',
   'open.title': 'Open requests',
   'open.empty': 'No open requests right now.',
   'open.accept': 'Accept',
   'open.direct': 'Challenge to you',
-  'open.unrated': 'unrated',
   'new.title': 'New battle',
   'new.format': 'Format',
   'new.opponent': 'Challenge someone directly (optional)',
@@ -250,7 +277,7 @@ const en = {
 
   'rankings.title': 'Rankings',
   'rankings.hint':
-    'Sorted by rating minus twice the uncertainty, so a long break lowers the position. "?" = provisional (fewer than 5 battles or high uncertainty).',
+    'Sorted by rating minus twice the uncertainty (±), so a long break lowers the position. "Provisional" = fewer than 5 battles or high uncertainty.',
   'rankings.empty': 'No rated battles in this format yet.',
   'rankings.athlete': 'Athlete',
   'rankings.rating': 'Rating',
@@ -368,10 +395,11 @@ const en = {
   'lab.showReport': 'Show report',
   'lab.device': 'Device and browser details',
 
-  'videos.title': 'Your videos',
+  'videos.title': 'Your attempts',
   'videos.intro':
     'Record every attempt here in the app. Pressing the red button uses up an attempt. Videos are stored on this phone first and uploaded as soon as there is a connection (keep the app open). Then choose the attempt that counts. Both sides see the videos once both have chosen.',
   'videos.part': 'Part {n}',
+  'videos.qualityTitle': 'Recording quality: {quality}',
   'videos.noAttempts': 'No attempts yet.',
   'videos.record': 'Record attempt',
   'videos.left': 'Attempts left: {n}',
@@ -468,4 +496,17 @@ export function errorText(code: string): string {
 
 export function formatDate(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/** Short date for compact lines, e.g. "Sun, 18 Oct, 05:00" (with the year only if not this year). */
+export function formatShort(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }

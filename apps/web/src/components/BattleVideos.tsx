@@ -131,7 +131,12 @@ export function BattleVideos({
   return (
     <section>
       <h2>{t('videos.title')}</h2>
-      {active && <p className="hint">{t('videos.intro')}</p>}
+      {active && (
+        <details className="hint">
+          <summary>{t('battle.howItWorks')}</summary>
+          {t('videos.intro')}
+        </details>
+      )}
       {!isRecordingSupported() && <p className="error">{t('lab.unsupported')}</p>}
       <ErrorText error={error} />
       {format.parts.map((part, i) => {
@@ -140,10 +145,11 @@ export function BattleVideos({
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a format version never change
           <div key={i} className="card">
-            <h3 style={{ marginTop: 0 }}>
-              {format.parts.length > 1 && `${t('videos.part', { n: i + 1 })}: `}
-              {partText(part)}
-            </h3>
+            {format.parts.length > 1 && (
+              <h3 style={{ marginTop: 0 }}>
+                {t('videos.part', { n: i + 1 })}: {partText(part)}
+              </h3>
+            )}
             {partRows.length === 0 && <p className="muted">{t('videos.noAttempts')}</p>}
             {partRows.map((row, k) => (
               <AttemptLine
@@ -172,29 +178,33 @@ export function BattleVideos({
           </div>
         );
       })}
+
       {active && (
-        <label>
-          {t('lab.quality')}
-          <select
-            value={quality}
-            onChange={(e) => {
-              const q = e.target.value as Quality;
-              setQuality(q);
-              try {
-                localStorage.setItem(QUALITY_KEY, q);
-              } catch {
-                // Not remembered in private mode.
-              }
-            }}
-          >
-            {QUALITIES.map((q) => (
-              <option key={q} value={q}>
-                {t(`lab.quality.${q}`)}
-              </option>
-            ))}
-          </select>
-          <span className="hint">{t('lab.hdHint')}</span>
-        </label>
+        <details className="hint">
+          <summary>{t('videos.qualityTitle', { quality: t(`lab.quality.${quality}`) })}</summary>
+          <label>
+            {t('lab.quality')}
+            <select
+              value={quality}
+              onChange={(e) => {
+                const q = e.target.value as Quality;
+                setQuality(q);
+                try {
+                  localStorage.setItem(QUALITY_KEY, q);
+                } catch {
+                  // Not remembered in private mode.
+                }
+              }}
+            >
+              {QUALITIES.map((q) => (
+                <option key={q} value={q}>
+                  {t(`lab.quality.${q}`)}
+                </option>
+              ))}
+            </select>
+            <span className="hint">{t('lab.hdHint')}</span>
+          </label>
+        </details>
       )}
 
       {recordPart !== null && (

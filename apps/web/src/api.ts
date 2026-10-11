@@ -257,6 +257,8 @@ export type BattleSummary = Omit<
   | 'playedAt'
 > & {
   unreadMessages: number;
+  /** What is left for me to do (see nextStep.ts). */
+  todo: import('./nextStep').Todo;
 };
 
 export interface Message {

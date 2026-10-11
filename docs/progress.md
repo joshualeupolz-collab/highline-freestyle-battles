@@ -46,8 +46,11 @@ Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 
 All stage 1 features exist. iPhone tests of step 7 are still open. Public pages for *public*
 videos come later (until then they are visible to logged-in users).
-**UI overhaul:** the owner finds the interface still somewhat confusing; to be reworked at the
-end of stage 1 (owner's wish), e.g. a clear "what to do next" per battle.
+**UI overhaul (first round, done):** tab bar at the bottom (Battles, Requests, New, Rankings)
+with a dot when something waits for you, profile button top right (approvals, admin, format
+proposals there); every battle shows its next step (`apps/web/src/nextStep.ts`) in the list and
+at the top of the battle page; rare actions under "More options"; compact settings line;
+"provisional" instead of "?". The app stays English only (owner, 2026-10-11).
 
 ---
 
@@ -86,6 +89,7 @@ end of stage 1 (owner's wish), e.g. a clear "what to do next" per battle.
 | Step 8: bucket `hfb-videos` and its CORS rules are created by the deploy workflow | One manual step less for the owner; needs R2 permission on the deploy token |
 | Step 8 defaults (owner to confirm): extra attempts are one pool for all parts; the choice can be changed until everyone chose; attempts started before the deadline count when uploaded later; *public* videos are visible to logged-in users until public pages exist | Simple, fair defaults; see `docs/concept.md` section 6 |
 | `newId` (UUIDv7) moved to `@hfb/shared` | The phone creates attempt ids too |
+| UI: tab bar at the bottom, "next step" per battle, rare actions folded away; English only (owner) | The owner found the interface confusing; thumb reach on phones |
 | Step 12 (owner): deleting an account counts running battles as given up; keeping videos is preselected; unneeded videos are deleted 7 days after the battle | Deleting must not avoid a loss; videos are valuable for the community |
 | Step 11 defaults (confirmed by the owner): no draw on site; confirmation within 14 days; date up to 60 days back; rejecting keeps the battle open for another result; either side can withdraw | Same 5-point scale and no-draw rule as the online review |
 | Step 9 (owner): on disagreement both may change their vote; no draw in stage 1; after 7 days a single vote for one side decides, otherwise unrated | Level 2 (pool) does not exist yet; whoever takes part is not punished |
@@ -114,8 +118,7 @@ end of stage 1 (owner's wish), e.g. a clear "what to do next" per battle.
 
 1. **Test step 8 on real phones** (a real battle between two people, one recording without
    connection at the line). Also the iPhone reports of step 7 (`docs/video-prototype.md` §1).
-2. **UI overhaul** (owner's wish): clearer battle page ("what to do next"), navigation, wording.
-   Then legal texts (privacy policy, legal notice, terms – separate session) before inviting
+2. **Feedback on the new UI** from real use; then legal texts (privacy policy, legal notice, terms – separate session) before inviting
    more people, and stage 2.
 3. **Commit the browser test** (Playwright against a local Worker) so UI flows are checked in CI.
 4. Later in step 12: delete attempts that do not count after the battle (unless kept), *review only*

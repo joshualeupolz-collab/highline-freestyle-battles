@@ -37,6 +37,7 @@ import {
   battleProposals,
   battles,
   formats,
+  formatVersions,
   proposalResponses,
   ratingHistory,
   ratingStates,
@@ -334,7 +335,9 @@ battleRoutes.get('/mine', async (c) => {
     .from(battles)
     .where(or(inArray(battles.id, mineIds), eq(battles.invitedUserId, user.id)))
     .orderBy(desc(battles.createdAt))
-    .limit(100);
+    // The ids go into IN (…) lists below; D1 allows at most 100 bound parameters per query.
+    .limit(90);
+  const ids = rows.map((b) => b.id);
   const people = rows.length
     ? await db
         .select({
@@ -347,12 +350,7 @@ battleRoutes.get('/mine', async (c) => {
         })
         .from(battleParticipants)
         .innerJoin(users, eq(users.id, battleParticipants.userId))
-        .where(
-          inArray(
-            battleParticipants.battleId,
-            rows.map((b) => b.id),
-          ),
-        )
+        .where(inArray(battleParticipants.battleId, ids))
         .orderBy(battleParticipants.seat)
     : [];
   // New chat messages from others since I last opened each battle.
@@ -369,20 +367,59 @@ battleRoutes.get('/mine', async (c) => {
         )
         .where(
           and(
-            inArray(
-              battleMessages.battleId,
-              rows.map((b) => b.id),
-            ),
+            inArray(battleMessages.battleId, ids),
             ne(battleMessages.senderId, user.id),
             sql`${battleMessages.createdAt} > coalesce(${battleParticipants.lastReadMessageAt}, 0)`,
           ),
         )
         .groupBy(battleMessages.battleId)
     : [];
+  // What is left for me to do (shown as the next step in the list).
+  const [mySubs, votes, proposalsForMe, versions] = rows.length
+    ? await Promise.all([
+        db
+          .select({ battleId: submissions.battleId, n: sql<number>`count(*)` })
+          .from(submissions)
+          .where(and(inArray(submissions.battleId, ids), eq(submissions.userId, user.id)))
+          .groupBy(submissions.battleId),
+        db
+          .select({ battleId: reviewVotes.battleId, voterId: reviewVotes.voterId })
+          .from(reviewVotes)
+          .where(and(inArray(reviewVotes.battleId, ids), eq(reviewVotes.reviewLevel, 1))),
+        db
+          .select({ battleId: battleProposals.battleId })
+          .from(battleProposals)
+          .where(
+            and(
+              inArray(battleProposals.battleId, ids),
+              eq(battleProposals.status, 'pending'),
+              ne(battleProposals.proposedBy, user.id),
+            ),
+          ),
+        db
+          .select({
+            formatId: formatVersions.formatId,
+            version: formatVersions.version,
+            partsJson: formatVersions.partsJson,
+          })
+          .from(formatVersions)
+          .where(inArray(formatVersions.formatId, [...new Set(rows.map((b) => b.formatId))])),
+      ])
+    : [[], [], [], []];
+  const partsOf = (b: (typeof rows)[number]) => {
+    const v = versions.find((x) => x.formatId === b.formatId && x.version === b.formatVersion);
+    return v ? (JSON.parse(v.partsJson) as unknown[]).length : 1;
+  };
   const now = Date.now();
   return c.json({
     battles: rows.map((b) => ({
       unreadMessages: unread.find((u) => u.battleId === b.id)?.n ?? 0,
+      todo: {
+        submittedAll: (mySubs.find((s) => s.battleId === b.id)?.n ?? 0) >= partsOf(b) * b.rounds,
+        iVoted: votes.some((v) => v.battleId === b.id && v.voterId === user.id),
+        votes: votes.filter((v) => v.battleId === b.id).length,
+        proposalForMe: proposalsForMe.some((p) => p.battleId === b.id),
+      },
       id: b.id,
       formatId: b.formatId,
       mode: b.mode,

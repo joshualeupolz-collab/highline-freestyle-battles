@@ -4,7 +4,7 @@
  */
 
 import type { Battle } from '../api';
-import { formatDate, t } from '../i18n';
+import { formatShort, t } from '../i18n';
 
 export function ReviewCard({
   battle,
@@ -64,7 +64,7 @@ export function ReviewCard({
       </div>
       {status && <p>{status}</p>}
       {review.endsAt && (
-        <p className="muted">{t('review.endsAt', { date: formatDate(review.endsAt) })}</p>
+        <p className="muted">{t('review.endsAt', { date: formatShort(review.endsAt) })}</p>
       )}
     </div>
   );

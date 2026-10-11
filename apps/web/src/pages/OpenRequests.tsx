@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { api } from '../api';
-import { settingsText, useFormatName } from '../battleHelpers';
+import { compactSettings, useFormats } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
 import { UserLink } from '../components/UserLink';
 import { t } from '../i18n';
@@ -9,7 +9,8 @@ import { t } from '../i18n';
 export function OpenRequestsPage() {
   const navigate = useNavigate();
   const requests = useQuery({ queryKey: ['openRequests'], queryFn: api.openRequests });
-  const formatName = useFormatName();
+  const formats = useFormats();
+  const formatOf = (id: string) => formats.data?.formats.find((f) => f.id === id);
   const accept = useMutation({
     mutationFn: (id: string) => api.battleAction(id, 'accept'),
     onSuccess: (res) => navigate(`/battles/${res.battle.id}`),
@@ -25,7 +26,7 @@ export function OpenRequestsPage() {
       {list.map((r) => (
         <div key={r.id} className="card">
           <div className="row">
-            <strong>{formatName(r.formatId)}</strong>
+            <strong>{formatOf(r.formatId)?.name ?? '…'}</strong>
             <span>
               {r.direct && <span className="badge active">{t('open.direct')}</span>}{' '}
               <span className={`badge ${r.settingsFlexible ? 'negotiating' : 'fixed'}`}>
@@ -38,10 +39,10 @@ export function OpenRequestsPage() {
             <span className="muted">
               {r.challenger.rating
                 ? `${Math.round(r.challenger.rating.r)} ±${Math.round(r.challenger.rating.rd)}`
-                : t('open.unrated')}
+                : t('rating.new')}
             </span>
           </div>
-          <div className="muted">{settingsText(r.settings)}</div>
+          <div className="muted">{compactSettings(r.settings, formatOf(r.formatId))}</div>
           <div className="hint">
             {r.settingsFlexible ? t('rules.flexibleHint') : t('rules.fixedHint')}
           </div>

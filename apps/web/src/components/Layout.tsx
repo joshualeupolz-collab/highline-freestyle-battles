@@ -1,37 +1,80 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link, Navigate, NavLink, Outlet } from 'react-router';
-import { hasRole, useMe } from '../auth';
+import { api } from '../api';
+import { useMe } from '../auth';
 import { t } from '../i18n';
+import { nextStep } from '../nextStep';
 
-/** Frame for logged-in pages: header with navigation. Redirects to login if needed. */
+/** Small line icons for the tab bar (24×24, drawn with the text color). */
+const ICONS = {
+  battles: 'M7 17 17 7M14 7h3v3M7 7l4 4M13 13l4 4M17 14v3h-3',
+  open: 'M4 6h16v12H4zM4 7l8 6 8-6',
+  new: 'M12 5v14M5 12h14',
+  rankings: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3',
+};
+
+function Icon({ path }: { path: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d={path} />
+    </svg>
+  );
+}
+
+/**
+ * Frame for logged-in pages: a slim header with the profile button and, on top of the screen
+ * bottom, a tab bar within thumb reach. Redirects to login if needed.
+ */
 export function Layout() {
   const { data: user, isLoading } = useMe();
+  const active = user?.status === 'active';
+  // Shared with the battle list (same query key): a dot when something waits for me.
+  const battles = useQuery({
+    queryKey: ['myBattles'],
+    queryFn: api.myBattles,
+    enabled: active,
+    refetchInterval: 60_000,
+  });
   if (isLoading) return <main className="muted">{t('common.loading')}</main>;
   if (!user) return <Navigate to="/login" replace />;
 
-  const active = user.status === 'active';
+  const waiting = (battles.data?.battles ?? []).some(
+    (b) => b.unreadMessages > 0 || nextStep(b, b.todo, user.id)?.urgent,
+  );
   return (
     <>
       <header className="header">
         <Link to="/" className="brand">
           {t('appName')}
         </Link>
-        <nav className="nav">
-          <NavLink to="/" end>
-            {t('nav.battles')}
-          </NavLink>
-          {active && <NavLink to="/open">{t('nav.open')}</NavLink>}
-          {active && <NavLink to="/new">{t('nav.new')}</NavLink>}
-          {active && <NavLink to="/rankings">{t('nav.rankings')}</NavLink>}
-          {hasRole(user, 'athlete', 'federation', 'admin') && (
-            <NavLink to="/approvals">{t('nav.approvals')}</NavLink>
-          )}
-          {hasRole(user, 'federation', 'admin') && <NavLink to="/admin">{t('nav.admin')}</NavLink>}
-          <NavLink to="/profile">{t('nav.profile')}</NavLink>
-        </nav>
+        <Link to="/profile" className="avatar" aria-label={t('nav.profile')}>
+          {user.displayName.slice(0, 1).toUpperCase()}
+        </Link>
       </header>
-      <main>
+      <main className="with-tabs">
         <Outlet />
       </main>
+      {active && (
+        <nav className="tabs">
+          <NavLink to="/" end>
+            <Icon path={ICONS.battles} />
+            {t('nav.battles')}
+            {waiting && <span className="dot" role="img" aria-label={t('battles.actionNeeded')} />}
+          </NavLink>
+          <NavLink to="/open">
+            <Icon path={ICONS.open} />
+            {t('nav.open')}
+          </NavLink>
+          <NavLink to="/new">
+            <Icon path={ICONS.new} />
+            {t('nav.new')}
+          </NavLink>
+          <NavLink to="/rankings">
+            <Icon path={ICONS.rankings} />
+            {t('nav.rankings')}
+          </NavLink>
+        </nav>
+      )}
     </>
   );
 }
