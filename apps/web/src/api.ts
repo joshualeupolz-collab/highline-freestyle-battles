@@ -40,7 +40,7 @@ export interface Format {
   description: string | null;
   status: 'relevant' | 'fun';
   version: number | null;
-  parts: { kind: string; count: number; label?: string }[];
+  parts: { kind: string; count?: number; label?: string }[];
 }
 
 export interface FormatProposal extends Format {

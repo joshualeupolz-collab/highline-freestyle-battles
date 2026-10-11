@@ -62,6 +62,7 @@ A person can hold several roles (e.g. athlete + judge).
   - "Response" (repeat your opponent and add something – back-and-forth formats)
 - A battle can therefore consist of several videos (e.g. Best Trick + 3-Trick Combo + 10-Bounce Combo) and several rounds.
 - Launch formats: 3-Trick Combo, 10-Bounce Combo, Best Trick.
+- **Parts (decided):** each part is one video and limits either a number of **tricks** (transition bounces between tricks are allowed; a best trick is 1 trick), a number of **bounces** (every bounce counts), or is **other** (described in free text). Name and free description explain the rest. More part types can be added once a need becomes clear.
 - **Format proposals (decided, already in stage 1):** every athlete can propose a format (name, description, parts). A proposal cannot be used until the federation or admin approves it, either as **official** (`relevant`, shown as a tile when creating a battle) or as **other format** (`fun`, under "more formats"), or rejects it with a note for the proposer. Promoting `fun` to `relevant` later is possible, optionally after a poll.
 - Similar formats can be merged for rating purposes (`merged_into`, see rating specification section 7).
 
@@ -70,7 +71,7 @@ A person can hold several roles (e.g. athlete + judge).
 ## 5. Battle flow (online)
 
 1. **Request:** an athlete posts an open request for a format. Others see matching requests sorted by rating proximity, including the challenger's rating. Accepting or ignoring is up to them. An athlete can also **challenge one person directly**; only that person can accept, and direct challenges are listed first.
-2. **Settings** (set by the challenger, or marked "flexible" so both agree on them):
+2. **Settings** (set by the challenger, or marked "flexible" so both agree on them). Requests show whether the rules are **fixed** (accepting starts the battle) or **negotiable**. Every step that makes the battle binding (accepting fixed rules, starting with the negotiated rules, accepting a rule proposal that starts the battle) asks for confirmation, because from then on giving up or missing the deadline can cost rating points:
    - Format
    - Attempts per video: any number (1–99) or unlimited
    - Deadline: a fixed **end date and time** (not a duration, so time spent waiting for an opponent counts), up to 60 days ahead, or no deadline. Default: in 7 days at **05:00 German time** (Europe/Berlin), so people in the Americas still have the whole previous day. The other side can propose a different deadline. Requests whose deadline passes before anyone accepts expire.

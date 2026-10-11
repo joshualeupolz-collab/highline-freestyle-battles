@@ -226,3 +226,21 @@ describe('format proposals', () => {
     ).toBe(429);
   });
 });
+
+describe('format parts', () => {
+  it('accepts tricks, bounces and free "other" parts, and checks they are complete', async () => {
+    const admin = await registerAdmin();
+    const anna = await registerAthlete('anna', admin.session);
+    const propose = (parts: unknown) =>
+      call('/api/formats/proposals', { session: anna.session, body: { name: 'Mixed', parts } });
+
+    const ok = await propose([
+      { kind: 'trick_combo', count: 1 },
+      { kind: 'bounce_combo', count: 10 },
+      { kind: 'other', label: 'Longest chain of the same trick' },
+    ]);
+    expect(ok.status).toBe(201);
+    expect((await propose([{ kind: 'other' }])).status).toBe(400);
+    expect((await propose([{ kind: 'trick_combo' }])).status).toBe(400);
+  });
+});

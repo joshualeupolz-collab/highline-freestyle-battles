@@ -115,12 +115,14 @@ function Formats() {
   const formats = useFormats();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'relevant' | 'fun'>('relevant');
   const [parts, setParts] = useState<FormatPart[]>([{ kind: 'trick_combo', count: 3 }]);
   const create = useMutation({
     mutationFn: api.createFormat,
     onSuccess: () => {
       setName('');
+      setDescription('');
       return queryClient.invalidateQueries({ queryKey: ['formats'] });
     },
   });
@@ -141,12 +143,26 @@ function Formats() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          create.mutate({ name: name.trim(), status, parts });
+          create.mutate({
+            name: name.trim(),
+            description: description.trim() || undefined,
+            status,
+            parts,
+          });
         }}
       >
         <label>
           {t('admin.name')}
           <input value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
+        </label>
+        <label>
+          {t('formats.description')}
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={500}
+            rows={3}
+          />
         </label>
         <label>
           {t('admin.kind')}

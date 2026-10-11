@@ -26,7 +26,12 @@ export function OpenRequestsPage() {
         <div key={r.id} className="card">
           <div className="row">
             <strong>{formatName(r.formatId)}</strong>
-            {r.direct && <span className="badge active">{t('open.direct')}</span>}
+            <span>
+              {r.direct && <span className="badge active">{t('open.direct')}</span>}{' '}
+              <span className={`badge ${r.settingsFlexible ? 'negotiating' : 'fixed'}`}>
+                {r.settingsFlexible ? t('rules.flexible') : t('rules.fixed')}
+              </span>
+            </span>
           </div>
           <div>
             <UserLink id={r.challenger.userId} name={r.challenger.displayName} />{' '}
@@ -37,9 +42,19 @@ export function OpenRequestsPage() {
             </span>
           </div>
           <div className="muted">{settingsText(r.settings)}</div>
+          <div className="hint">
+            {r.settingsFlexible ? t('rules.flexibleHint') : t('rules.fixedHint')}
+          </div>
           <div className="actions">
-            <button type="button" onClick={() => accept.mutate(r.id)} disabled={accept.isPending}>
-              {t('open.accept')}
+            <button
+              type="button"
+              onClick={() =>
+                (r.settingsFlexible || window.confirm(t('battle.bindingConfirm'))) &&
+                accept.mutate(r.id)
+              }
+              disabled={accept.isPending}
+            >
+              {r.settingsFlexible ? t('battle.acceptNegotiable') : t('open.accept')}
             </button>
           </div>
         </div>
