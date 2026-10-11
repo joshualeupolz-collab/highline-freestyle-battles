@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-11 (fourth session: legal texts and terms acceptance).
+Last updated: 2026-10-11 (fifth session, at night: browser tests in CI, stage 2 plan, roles + audit log).
 
 ---
 
@@ -16,13 +16,17 @@ free tier, D1 database in Western Europe). Every merge into `main` is published 
 prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3 = branch
 `claude/serene-cori-tl2ap4`: PRs #10 (step 8), #11 (step 9), #12 (step 11), #13 (step 12),
 #14 and #15 (UI rounds 1 and 2), all merged and deployed. Session 4 = branch
-`claude/gallant-ritchie-r1n4tv`: legal texts. A new session starts a fresh branch from `main`.
+`claude/gallant-ritchie-r1n4tv`: legal texts. Session 5 (night, owner asleep) = branch
+`claude/bold-planck-lrea7q`: PR #18 browser tests (merged); stage 2 plan + roles/audit log
+pushed on the same branch, **not merged – waiting for the owner's review**. A new session starts
+a fresh branch from `main`.
 
 **Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`) and 115 API tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
-which play for the opponent; both vote and the ratings change (script not committed yet, see next steps).
+which play for the opponent; both vote and the ratings change. These flows are now committed as
+browser tests (`e2e/`, `pnpm e2e`, CI job `e2e`; video battle, on-site result, sign-up + approval).
 Steps 8 and 9 were also tested by the owner on Android phones with direct R2 uploads: work.
 Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 
@@ -141,9 +145,13 @@ profile button for members waiting for approval, confirmation before approving.
    line with new features (push, public video pages, Telegram archive, Google login, e-mails).
 3. **Real-use tests:** iPhone reports of step 7 (`docs/video-prototype.md` §1); camera zoom works
    on Android (owner, 2026-10-11).
-4. **Commit the browser tests** (Playwright against a local Worker: video battle with offline
-   upload + vote, on-site result) so UI flows are checked in CI. The scripts so far lived only in
-   the session's scratch space.
+4. **Stage 2:** plan with order, chosen defaults and 10 questions in `docs/stage-2-plan.md` –
+   please read and answer. Part 2.1 (roles + audit log) is on branch `claude/bold-planck-lrea7q`
+   (API tests in `apps/api/test/roles.test.ts`). Night-session note: after merging PR #18 the
+   auto-mode safety check blocked running further commands ("merge without review"), so the
+   full test suite was not re-run after the last small refactor (`grantableRoles` in
+   `@hfb/shared`); typecheck and lint passed. Run `pnpm lint && pnpm typecheck && pnpm test`
+   first, then continue with 2.2 reports, 2.3 annulment, 2.4 initial estimates.
 5. Multipart upload if large HD uploads fail on mobile connections; measure PBKDF2 CPU time on
    Cloudflare and raise `PASSWORD_ITERATIONS` if there is headroom.
 6. Then **stage 2** (concept §14): filming by friends (athlete code, inbox), review levels 2–3,
