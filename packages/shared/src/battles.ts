@@ -68,6 +68,16 @@ export const proposalRequestSchema = z.discriminatedUnion('kind', [
     change: z.union([z.literal(-1), z.literal(1)]),
     videoId: z.uuid().optional(),
   }),
+  /** On-site battles: the result as the proposer sees it (5-point scale from seat 0, no draw). */
+  z.object({
+    kind: z.literal('result'),
+    value: z
+      .number()
+      .int()
+      .min(-2)
+      .max(2)
+      .refine((v) => v !== 0),
+  }),
 ]);
 export type ProposalRequest = z.infer<typeof proposalRequestSchema>;
 
@@ -104,3 +114,25 @@ export const reviewVoteSchema = z.object({ value: z.number().int().min(-2).max(2
  * unrated. Level 2 (athlete pool) takes over this case in stage 2.
  */
 export const REVIEW_DAYS = 7;
+
+/** On-site battles (concept section 8): the result counts once the other side confirms it. */
+export const ONSITE_CONFIRM_DAYS = 14;
+/** How far back an on-site battle may have taken place. */
+export const ONSITE_MAX_AGE_DAYS = 60;
+
+export const createOnsiteBattleSchema = z.object({
+  formatId: z.string().min(1).max(64),
+  opponentId: z.string().min(1).max(64),
+  /** When the battle took place (ms since the epoch). */
+  playedAt: z.number().int().positive(),
+  level: z.number().int().min(1).max(5).default(3),
+  scoring: z.enum(ONLINE_SCORINGS).default('scale'),
+  /** The result, 5-point scale seen from the person entering it (seat 0): +2 … −2, no draw. */
+  value: z
+    .number()
+    .int()
+    .min(-2)
+    .max(2)
+    .refine((v) => v !== 0, 'No draw'),
+});
+export type CreateOnsiteBattle = z.infer<typeof createOnsiteBattleSchema>;

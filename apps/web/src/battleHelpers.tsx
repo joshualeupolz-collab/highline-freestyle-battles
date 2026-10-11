@@ -79,8 +79,11 @@ export function settingsText(s: Partial<BattleSettings>): string {
   return parts.join(' · ');
 }
 
-export function StatusBadge({ status }: { status: BattleStatus }) {
-  return <span className={`badge ${status}`}>{t(`status.${status}`)}</span>;
+export function StatusBadge({ status, mode }: { status: BattleStatus; mode?: string }) {
+  // An on-site battle "negotiating" waits for the opponent to confirm the result.
+  const text =
+    mode === 'onsite' && status === 'negotiating' ? t('status.confirming') : t(`status.${status}`);
+  return <span className={`badge ${status}`}>{text}</span>;
 }
 
 /** Form fields for battle settings, used for new battles and for proposals. */

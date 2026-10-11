@@ -31,7 +31,8 @@ export function BattlesPage() {
     b.deadlinePassed ||
     b.unreadMessages > 0 ||
     (b.status === 'open' && b.invitedUserId === me?.id) ||
-    b.status === 'negotiating';
+    b.status === 'negotiating' ||
+    b.status === 'reviewing';
   const running = (b: BattleSummary) =>
     ['open', 'negotiating', 'active', 'reviewing'].includes(b.status);
   const groups = [
@@ -62,7 +63,7 @@ export function BattlesPage() {
                           {t('battles.newMessages', { n: b.unreadMessages })}
                         </span>
                       )}{' '}
-                      <StatusBadge status={b.status} />
+                      <StatusBadge status={b.status} mode={b.mode} />
                     </span>
                   </div>
                   <div className="muted">

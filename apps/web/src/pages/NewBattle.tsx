@@ -59,6 +59,9 @@ export function NewBattlePage() {
   return (
     <>
       <h1>{t('new.title')}</h1>
+      <p className="muted">
+        <Link to="/onsite">{t('new.onsite')}</Link>
+      </p>
       {formats.isLoading && <p className="muted">{t('common.loading')}</p>}
       {tiles(official)}
       {more.length > 0 && (

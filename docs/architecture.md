@@ -231,6 +231,21 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 
 ---
 
+## 4d. On-site results (implemented in step 11)
+
+- `POST /battles/onsite` creates a battle with `mode = onsite`, both participants and status
+  `negotiating`, plus a `result` proposal (5-point value seen from the proposer, no draw).
+  `playedAt` is the day of the battle; `deadlineAt` = now + `ONSITE_CONFIRM_DAYS` (14), after which
+  the hourly job lets it expire like an unaccepted request.
+- The other side accepts the proposal → decided (`decision_reason = onsite`, s from the value as in
+  the review, rating update in the same batch, event time = confirmation). Rejecting leaves the
+  battle open; both can enter a different `result`. `POST /battles/:id/withdraw-onsite` ends it
+  unrated (`onsite_withdrawn`).
+- Online-only actions (settings, extension, cancel, extra attempts, start) are refused for on-site
+  battles, and `result` proposals for online battles.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |
@@ -247,7 +262,7 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | done (§4b); waiting for real-phone tests |
 | 9 | Review level 1, result → rating update in the Worker, rating history | done (§4c) |
 | 10 | Format rankings | done (pulled forward, with profiles) |
-| 11 | On-site results with confirmation by both sides | |
+| 11 | On-site results with confirmation by both sides | done (§4d) |
 | 12 | Replay job, deployment pipeline, enforcing visibility, account deletion | |
 
 The video prototype (step 7) is the biggest technical risk (trimming without re-encoding in the browser) and can be started early in a separate session (concept §16).

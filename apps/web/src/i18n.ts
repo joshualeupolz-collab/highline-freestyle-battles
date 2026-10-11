@@ -66,6 +66,22 @@ const en = {
   'new.moreFormats': 'More formats ({n})',
   'new.lessFormats': 'Fewer formats',
   'new.proposeFormat': 'Missing a format? Propose one',
+  'new.onsite': 'Battled on site? Enter the result',
+  'onsite.title': 'On-site result',
+  'onsite.intro':
+    'For a battle you had in person. Enter the result; it counts for the rating once your opponent confirms it (within {days} days).',
+  'onsite.opponent': 'Opponent',
+  'onsite.date': 'Date of the battle',
+  'onsite.result': 'Result',
+  'onsite.submit': 'Send to {name} for confirmation',
+  'onsite.played': 'On site, {date}',
+  'onsite.proposal': 'Result: {result}',
+  'onsite.pending':
+    'On-site battle: the result counts once the other side confirms it. Not confirmed by {date}, it expires.',
+  'onsite.otherResult': 'Enter a different result',
+  'onsite.withdraw': 'Did not take place',
+  'onsite.withdrawConfirm': 'End this on-site battle without rating?',
+  'onsite.withdrawn': 'This on-site battle was withdrawn and does not count.',
 
   'settings.attempts': 'Attempts per video',
   'settings.unlimited': 'unlimited',
@@ -91,6 +107,7 @@ const en = {
   'status.decided': 'Decided',
   'status.cancelled': 'Cancelled',
   'status.annulled': 'Annulled',
+  'status.confirming': 'Waiting for confirmation',
 
   'battle.deadline': 'Deadline',
   'battle.deadlinePassed': 'The deadline has passed.',
@@ -151,6 +168,8 @@ const en = {
   'battle.reason.forfeit': 'by forfeit',
   'battle.reason.deadline': 'missed deadline',
   'battle.reason.review': 'by review',
+  'battle.reason.onsite': 'on site, confirmed by both',
+  'battle.reason.competition': 'competition result',
 
   'approvals.title': 'Approve new accounts',
   'approvals.empty': 'Nobody is waiting for approval.',
@@ -400,6 +419,9 @@ const en = {
   'error.video_too_large': 'The video is too large. Please cut it shorter.',
   'error.recording_empty': 'The recording is empty.',
   'error.upload_incomplete': 'The upload was incomplete.',
+  'error.played_in_future': 'The date is in the future.',
+  'error.played_too_long_ago': 'The battle is too long ago (at most 60 days).',
+  'error.cannot_challenge_yourself': 'You cannot battle yourself.',
   'error.not_in_review': 'Voting is not possible (any more) for this battle.',
   'error.not_uploaded_yet': 'This video has not been uploaded yet.',
   'error.slug_taken': 'This short id is already used.',
@@ -410,7 +432,10 @@ const en = {
 export type MessageKey = keyof typeof en;
 
 export function t(key: MessageKey, params: Record<string, string | number> = {}): string {
-  return en[key].replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? `{${name}}`));
+  // A missing text shows its key instead of breaking the page.
+  return (en[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
+    String(params[name] ?? `{${name}}`),
+  );
 }
 
 /** Translated text for an API error code (falls back to a generic message). */

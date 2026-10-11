@@ -2,7 +2,13 @@
  * Small typed client for the API. Every call returns the parsed JSON or throws an ApiError
  * with the stable error code from the server (see apps/api/src/lib/errors.ts).
  */
-import type { BattleSettings, CreateVideo, CurrentUser, UploadTarget } from '@hfb/shared';
+import type {
+  BattleSettings,
+  CreateOnsiteBattle,
+  CreateVideo,
+  CurrentUser,
+  UploadTarget,
+} from '@hfb/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -154,7 +160,7 @@ export type BattleStatus =
 
 export interface Proposal {
   id: string;
-  kind: 'settings' | 'extension' | 'cancel' | 'extra_attempt';
+  kind: 'settings' | 'extension' | 'cancel' | 'extra_attempt' | 'result';
   payload: {
     changes?: Partial<BattleSettings>;
     deadlineAt?: number;
@@ -162,6 +168,8 @@ export interface Proposal {
     change?: number;
     userId?: string;
     videoId?: string;
+    /** result (on-site): 5-point value seen from the proposer, +2 … −2. */
+    value?: number;
   };
   proposedBy: string;
   createdAt: number;
@@ -171,7 +179,10 @@ export interface Proposal {
 export interface Battle {
   id: string;
   formatId: string;
+  mode: 'online' | 'onsite';
   status: BattleStatus;
+  /** Online: when the videos unlocked; on-site: when the battle took place. */
+  playedAt: number | null;
   settings: BattleSettings;
   settingsFlexible: boolean;
   invitedUserId: string | null;
@@ -237,7 +248,13 @@ export interface BattleVideos {
 
 export type BattleSummary = Omit<
   Battle,
-  'settingsFlexible' | 'proposals' | 'cancelReason' | 'videos' | 'review' | 'ratingChanges'
+  | 'settingsFlexible'
+  | 'proposals'
+  | 'cancelReason'
+  | 'videos'
+  | 'review'
+  | 'ratingChanges'
+  | 'playedAt'
 > & {
   unreadMessages: number;
 };
@@ -315,6 +332,7 @@ export const api = {
   openRequests: () => get<{ requests: OpenRequest[] }>('/battles/open'),
   battle: (id: string) => get<BattleResponse>(`/battles/${id}`),
   createBattle: (body: unknown) => post<BattleResponse>('/battles', body),
+  createOnsiteBattle: (body: CreateOnsiteBattle) => post<BattleResponse>('/battles/onsite', body),
   messages: (battleId: string) => get<{ messages: Message[] }>(`/battles/${battleId}/messages`),
   sendMessage: (battleId: string, body: string) =>
     post<{ message: Message }>(`/battles/${battleId}/messages`, { body }),
