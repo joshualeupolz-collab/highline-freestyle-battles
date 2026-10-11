@@ -57,8 +57,17 @@ export const proposalRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('extension'), deadlineAt: z.number().int().positive() }),
   /** Give up the battle. The other side decides: count it as their win, or cancel unrated. */
   z.object({ kind: z.literal('cancel') }),
-  /** Take back one extra attempt given by mistake; the opponent who received it must agree. */
-  z.object({ kind: z.literal('extra_attempt'), change: z.literal(-1) }),
+  /**
+   * Extra attempts. `change: -1` takes back one given by mistake (the opponent who received it
+   * must agree). `change: 1` asks the opponent for one more attempt for myself, e.g. after a
+   * recording was cut off by leaving the app; the cut-off video can be attached and the
+   * opponent may then watch it.
+   */
+  z.object({
+    kind: z.literal('extra_attempt'),
+    change: z.union([z.literal(-1), z.literal(1)]),
+    videoId: z.uuid().optional(),
+  }),
 ]);
 export type ProposalRequest = z.infer<typeof proposalRequestSchema>;
 

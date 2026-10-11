@@ -39,6 +39,7 @@ import {
   ratingStates,
   submissions,
   users,
+  videos,
 } from '../db/schema';
 import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
@@ -50,6 +51,7 @@ import {
   requiredSubmissionsPerPerson,
 } from '../services/battles';
 import { displayParams, ratingView } from '../services/ratingView';
+import { battleVideosView } from '../services/videos';
 import { latestFormatVersion } from './formats';
 import { currentRuleset, parseRulesetParams } from './rulesets';
 
@@ -60,7 +62,7 @@ battleRoutes.use(requireUser({ active: true }));
 // Loading and response shape
 // ---------------------------------------------------------------------------------------------
 
-async function loadBattle(db: Database, id: string) {
+export async function loadBattle(db: Database, id: string) {
   const battle = await db.select().from(battles).where(eq(battles.id, id)).get();
   if (!battle) apiError(404, 'not_found');
   const participants = await db
@@ -110,7 +112,12 @@ async function pendingProposals(db: Database, battleId: string) {
   }));
 }
 
-async function battleResponse(db: Database, battleId: string, now = Date.now()) {
+export async function battleResponse(
+  db: Database,
+  battleId: string,
+  viewerId: string | null,
+  now = Date.now(),
+) {
   const { battle, participants } = await loadBattle(db, battleId);
   const [states, params] = await Promise.all([
     db
@@ -153,11 +160,17 @@ async function battleResponse(db: Database, battleId: string, now = Date.now()) 
       cancelReason: battle.cancelReason,
       participants: withRatings,
       proposals: await pendingProposals(db, battle.id),
+      videos: await battleVideosView(
+        db,
+        battle,
+        participants.map((p) => p.userId),
+        viewerId,
+      ),
     },
   };
 }
 
-function requireParticipant(participants: Participants, userId: string) {
+export function requireParticipant(participants: Participants, userId: string) {
   if (!participants.some((p) => p.userId === userId)) apiError(403, 'not_a_participant');
 }
 
@@ -217,7 +230,7 @@ battleRoutes.post('/', async (c) => {
     }),
     db.insert(battleParticipants).values({ battleId: id, userId: user.id, seat: 0, joinedAt: now }),
   ]);
-  return c.json(await battleResponse(db, id, now), 201);
+  return c.json(await battleResponse(db, id, user?.id ?? null, now), 201);
 });
 
 /**
@@ -362,7 +375,7 @@ battleRoutes.get('/mine', async (c) => {
 });
 
 battleRoutes.get('/:id', async (c) =>
-  c.json(await battleResponse(getDb(c.env.DB), c.req.param('id'))),
+  c.json(await battleResponse(getDb(c.env.DB), c.req.param('id'), c.get('user')?.id ?? null)),
 );
 
 /** Accept a request. Fixed settings start the battle; flexible ones lead to negotiation. */
@@ -397,7 +410,7 @@ battleRoutes.post('/:id/accept', async (c) => {
     if (String(err).includes('UNIQUE')) apiError(409, 'not_open');
     throw err;
   }
-  return c.json(await battleResponse(db, battle.id, now));
+  return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 
 /** The challenger takes back a request nobody has accepted yet. */
@@ -408,7 +421,7 @@ battleRoutes.post('/:id/retract', async (c) => {
   if (battle.createdBy !== user?.id) apiError(403, 'forbidden');
   if (battle.status !== 'open') apiError(409, 'not_open');
   await runBatch(db, cancelStatements(db, battle.id, 'retracted'));
-  return c.json(await battleResponse(db, battle.id));
+  return c.json(await battleResponse(db, battle.id, user?.id ?? null));
 });
 
 /** During negotiation: the accepting side agrees to the settings as they are. */
@@ -438,7 +451,7 @@ battleRoutes.post('/:id/start', async (c) => {
         ),
       ),
   ]);
-  return c.json(await battleResponse(db, battle.id, now));
+  return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -479,8 +492,18 @@ battleRoutes.post('/:id/proposals', async (c) => {
     const others = participants.filter((p) => p.userId !== user.id);
     const target = others.length === 1 ? others[0] : undefined;
     if (!target) apiError(400, 'unsupported_for_group_battles');
-    if (target.extraAttempts < 1) apiError(409, 'no_extra_attempt_to_take_back');
-    payload = { change: -1, userId: target.userId };
+    if (input.change === -1) {
+      if (target.extraAttempts < 1) apiError(409, 'no_extra_attempt_to_take_back');
+      payload = { change: -1, userId: target.userId };
+    } else {
+      // A request for myself, optionally with the cut-off video for the opponent to watch.
+      if (input.videoId) {
+        const video = await db.select().from(videos).where(eq(videos.id, input.videoId)).get();
+        if (!video || video.ownerId !== user.id || video.battleId !== battle.id)
+          apiError(404, 'video_not_found');
+      }
+      payload = { change: 1, userId: user.id, videoId: input.videoId };
+    }
   } else {
     const { kind: _, ...rest } = input;
     payload = rest;
@@ -510,7 +533,7 @@ battleRoutes.post('/:id/proposals', async (c) => {
       createdAt: now,
     }),
   ]);
-  return c.json(await battleResponse(db, battle.id, now), 201);
+  return c.json(await battleResponse(db, battle.id, user?.id ?? null, now), 201);
 });
 
 battleRoutes.post('/:id/proposals/:proposalId/withdraw', async (c) => {
@@ -528,7 +551,7 @@ battleRoutes.post('/:id/proposals/:proposalId/withdraw', async (c) => {
     .update(battleProposals)
     .set({ status: 'withdrawn', resolvedAt: Date.now() })
     .where(eq(battleProposals.id, proposal.id));
-  return c.json(await battleResponse(db, proposal.battleId));
+  return c.json(await battleResponse(db, proposal.battleId, user?.id ?? null));
 });
 
 /**
@@ -573,7 +596,7 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
       );
     }
     await runBatch(db, statements);
-    return c.json(await battleResponse(db, battle.id, now));
+    return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
   }
 
   const earlier = await db
@@ -586,7 +609,7 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
   const others = participants.filter((p) => p.userId !== proposal.proposedBy);
   if (!others.every((p) => accepted.has(p.userId))) {
     await response;
-    return c.json(await battleResponse(db, battle.id, now));
+    return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
   }
 
   const statements: BatchItem<'sqlite'>[] = [response, resolve('accepted')];
@@ -620,11 +643,15 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
     case 'cancel':
       statements.push(...cancelStatements(db, battle.id, 'agreed'));
       break;
-    case 'extra_attempt':
+    case 'extra_attempt': {
+      // -1: take back an extra attempt given by mistake; +1: grant a requested one.
+      const change = payload.change === 1 ? 1 : -1;
       statements.push(
         db
           .update(battleParticipants)
-          .set({ extraAttempts: sql`max(${battleParticipants.extraAttempts} - 1, 0)` })
+          .set({
+            extraAttempts: sql`max(${battleParticipants.extraAttempts} + ${change}, 0)`,
+          })
           .where(
             and(
               eq(battleParticipants.battleId, battle.id),
@@ -633,11 +660,12 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
           ),
       );
       break;
+    }
     default:
       apiError(400, 'unsupported_proposal');
   }
   await runBatch(db, statements);
-  return c.json(await battleResponse(db, battle.id, now));
+  return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -661,7 +689,7 @@ battleRoutes.post('/:id/grant-attempt', async (c) => {
     .where(
       and(eq(battleParticipants.battleId, battle.id), eq(battleParticipants.userId, target.userId)),
     );
-  return c.json(await battleResponse(db, battle.id));
+  return c.json(await battleResponse(db, battle.id, user?.id ?? null));
 });
 
 /**
@@ -697,7 +725,7 @@ battleRoutes.post('/:id/deadline-decision', async (c) => {
       ? cancelStatements(db, battle.id, 'deadline_missed')
       : await decideStatements(db, battle, winnerScores(seatOrder, user.id), 'deadline', now);
   await runBatch(db, statements);
-  return c.json(await battleResponse(db, battle.id, now));
+  return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 
 // ---------------------------------------------------------------------------------------------

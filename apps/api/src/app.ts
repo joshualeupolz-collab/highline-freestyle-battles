@@ -8,6 +8,7 @@ import { battleRoutes } from './routes/battles';
 import { formatRoutes } from './routes/formats';
 import { rulesetRoutes } from './routes/rulesets';
 import { userRoutes } from './routes/users';
+import { battleVideoRoutes, videoRoutes } from './routes/videos';
 
 /** The HTTP API. Every route lives under `/api`; everything else will be the web app. */
 export function createApp() {
@@ -26,6 +27,8 @@ export function createApp() {
   app.route('/auth', authRoutes);
   app.route('/users', userRoutes);
   app.route('/battles', battleRoutes);
+  app.route('/battles', battleVideoRoutes);
+  app.route('/videos', videoRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

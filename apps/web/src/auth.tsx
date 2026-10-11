@@ -1,7 +1,7 @@
 /** Who is logged in. `useMe()` is cached by TanStack Query and refreshed after login/logout. */
 import type { CurrentUser, Role } from '@hfb/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError, api } from './api';
+import { ApiError, api, clearOfflineCopies } from './api';
 
 export function useMe() {
   return useQuery({
@@ -24,6 +24,7 @@ export function useSetMe() {
     // Drop cached data of the previous user, but keep the 'me' query itself: mounted pages
     // observe it, and replacing it (e.g. with clear()) would leave them showing stale data.
     queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
+    clearOfflineCopies();
     queryClient.setQueryData(['me'], user);
   };
 }

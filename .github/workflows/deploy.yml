@@ -57,6 +57,15 @@ jobs:
           D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
         run: sed -i "s/00000000-0000-0000-0000-000000000000/$D1_DATABASE_ID/" apps/api/wrangler.jsonc
 
+      # Videos (docs/deployment.md, "Videos"). Creating the bucket needs R2 permission on the
+      # API token; the CORS rules let phones upload directly to R2 from the app's address.
+      - name: Video bucket and its CORS rules
+        working-directory: apps/api
+        run: |
+          pnpm exec wrangler r2 bucket info hfb-videos > /dev/null 2>&1 \
+            || pnpm exec wrangler r2 bucket create hfb-videos --location weur
+          pnpm exec wrangler r2 bucket cors set hfb-videos --file r2-cors.json --force
+
       - name: Apply database migrations
         working-directory: apps/api
         run: pnpm exec wrangler d1 migrations apply DB --remote
@@ -66,12 +75,23 @@ jobs:
         env:
           PASSWORD_PEPPER: ${{ secrets.PASSWORD_PEPPER }}
           SETUP_TOKEN: ${{ secrets.SETUP_TOKEN }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
+          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ]; then
+            echo "::warning::No R2 access key: videos are uploaded through the Worker (max 95 MB each). See docs/deployment.md, Videos."
+          fi
           # Secrets go into a temporary file outside the repository and are never printed.
           node -e '
-            const s = { PASSWORD_PEPPER: process.env.PASSWORD_PEPPER };
-            if (process.env.SETUP_TOKEN) s.SETUP_TOKEN = process.env.SETUP_TOKEN;
-            require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(s));
+            const e = process.env;
+            const s = { PASSWORD_PEPPER: e.PASSWORD_PEPPER };
+            if (e.SETUP_TOKEN) s.SETUP_TOKEN = e.SETUP_TOKEN;
+            if (e.R2_ACCESS_KEY_ID && e.R2_SECRET_ACCESS_KEY) {
+              s.R2_ACCESS_KEY_ID = e.R2_ACCESS_KEY_ID;
+              s.R2_SECRET_ACCESS_KEY = e.R2_SECRET_ACCESS_KEY;
+              s.R2_ACCOUNT_ID = e.CLOUDFLARE_ACCOUNT_ID;
+            }
+            require("fs").writeFileSync(e.RUNNER_TEMP + "/secrets.json", JSON.stringify(s));
           '
           pnpm exec wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json"
           rm "$RUNNER_TEMP/secrets.json"

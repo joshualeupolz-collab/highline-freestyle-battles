@@ -43,6 +43,13 @@
       "when": 1791725115392,
       "tag": "0005_battle_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791738370231,
+      "tag": "0006_video_upload",
+      "breakpoints": true
     }
   ]
 }

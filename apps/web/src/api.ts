@@ -2,7 +2,7 @@
  * Small typed client for the API. Every call returns the parsed JSON or throws an ApiError
  * with the stable error code from the server (see apps/api/src/lib/errors.ts).
  */
-import type { BattleSettings, CurrentUser } from '@hfb/shared';
+import type { BattleSettings, CreateVideo, CurrentUser, UploadTarget } from '@hfb/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -14,15 +14,58 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Offline copies of a few answers, so a battle can be opened and recorded at the line without a
+ * connection (concept section 6). Only on this device; removed at logout.
+ */
+const OFFLINE_PREFIX = 'hfb-offline:';
+const OFFLINE_PATHS = [/^\/auth\/me$/, /^\/formats$/, /^\/battles\/mine$/, /^\/battles\/[\w-]+$/];
+
+function readOffline(path: string): unknown {
+  try {
+    const stored = localStorage.getItem(OFFLINE_PREFIX + path);
+    return stored ? JSON.parse(stored) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeOffline(path: string, data: unknown) {
+  if (!OFFLINE_PATHS.some((p) => p.test(path))) return;
+  try {
+    localStorage.setItem(OFFLINE_PREFIX + path, JSON.stringify(data));
+  } catch {
+    // Storage full or blocked: works online anyway.
+  }
+}
+
+export function clearOfflineCopies() {
+  try {
+    for (const key of Object.keys(localStorage))
+      if (key.startsWith(OFFLINE_PREFIX)) localStorage.removeItem(key);
+  } catch {
+    // Nothing stored.
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    method,
-    credentials: 'same-origin',
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      credentials: 'same-origin',
+      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (error) {
+    // No connection: fall back to the last copy, if any.
+    const copy = method === 'GET' ? readOffline(path) : undefined;
+    if (copy !== undefined) return copy as T;
+    throw new ApiError(0, 'offline', String(error));
+  }
   const data = (await res.json().catch(() => ({}))) as { error?: string; details?: unknown };
   if (!res.ok) throw new ApiError(res.status, data.error ?? 'unknown_error', data.details);
+  if (method === 'GET') writeOffline(path, data);
   return data as T;
 }
 
@@ -112,7 +155,14 @@ export type BattleStatus =
 export interface Proposal {
   id: string;
   kind: 'settings' | 'extension' | 'cancel' | 'extra_attempt';
-  payload: { changes?: Partial<BattleSettings>; deadlineAt?: number };
+  payload: {
+    changes?: Partial<BattleSettings>;
+    deadlineAt?: number;
+    /** extra_attempt: -1 = take back, +1 = request for oneself (with an optional video). */
+    change?: number;
+    userId?: string;
+    videoId?: string;
+  };
   proposedBy: string;
   createdAt: number;
   acceptedBy: string[];
@@ -133,9 +183,51 @@ export interface Battle {
   cancelReason: string | null;
   participants: Participant[];
   proposals: Proposal[];
+  videos: BattleVideos;
 }
 
-export type BattleSummary = Omit<Battle, 'settingsFlexible' | 'proposals' | 'cancelReason'> & {
+export interface MyVideo {
+  id: string;
+  status: 'pending_upload' | 'uploaded' | 'processing' | 'ready' | 'deleted';
+  quality: string;
+  durationMs: number | null;
+  endReason: string | null;
+  visibility: string;
+  retention: string;
+  uploadedAt: number | null;
+  /** This is the attempt that counts for its part. */
+  counts: boolean;
+}
+
+export interface BattleVideos {
+  /** Everyone has chosen: the videos that count can be watched. */
+  unlocked: boolean;
+  /** Per person and part: attempts recorded/uploaded, chosen or not, and the video once unlocked. */
+  slots: {
+    userId: string;
+    partIndex: number;
+    round: number;
+    attempts: number;
+    uploaded: number;
+    submittedAt: number | null;
+    videoId: string | null;
+  }[];
+  /** My own attempts as the server knows them. */
+  mine: {
+    id: string;
+    partIndex: number;
+    round: number;
+    startedAt: number;
+    video: MyVideo | null;
+  }[];
+  /** Cut-off videos the opponent attached to a request for an extra attempt. */
+  sharedWithMe: { id: string; ownerId: string; partIndex: number; round: number }[];
+}
+
+export type BattleSummary = Omit<
+  Battle,
+  'settingsFlexible' | 'proposals' | 'cancelReason' | 'videos'
+> & {
   unreadMessages: number;
 };
 
@@ -217,4 +309,16 @@ export const api = {
     post<{ message: Message }>(`/battles/${battleId}/messages`, { body }),
   battleAction: (id: string, action: string, body?: unknown) =>
     post<BattleResponse>(`/battles/${id}/${action}`, body),
+
+  registerAttempt: (
+    battleId: string,
+    body: { id: string; partIndex: number; round: number; startedAt: number },
+  ) => post<BattleResponse>(`/battles/${battleId}/attempts`, body),
+  createVideo: (body: CreateVideo) =>
+    post<{ video: { id: string; status: string }; upload: UploadTarget }>('/videos', body),
+  completeVideo: (id: string) =>
+    post<{ video: { id: string; status: string } }>(`/videos/${id}/complete`),
 };
+
+/** Address of a video for <video src>; the server checks who may watch it. */
+export const videoFileUrl = (id: string) => `/api/videos/${id}/file`;

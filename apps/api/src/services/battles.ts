@@ -64,11 +64,16 @@ export function cancelStatements(
       .update(battles)
       .set({ status: 'cancelled', cancelReason: reason })
       .where(eq(battles.id, battleId)),
-    db
-      .update(battleProposals)
-      .set({ status: 'withdrawn', resolvedAt: now })
-      .where(and(eq(battleProposals.battleId, battleId), eq(battleProposals.status, 'pending'))),
+    cancelPendingProposalsStatement(db, battleId, now),
   ];
+}
+
+/** Withdraws every pending proposal of a battle (it ended or moved on). */
+export function cancelPendingProposalsStatement(db: Database, battleId: string, now: number) {
+  return db
+    .update(battleProposals)
+    .set({ status: 'withdrawn', resolvedAt: now })
+    .where(and(eq(battleProposals.battleId, battleId), eq(battleProposals.status, 'pending')));
 }
 
 /** Videos each person must submit: one per part of the format version and per round. */

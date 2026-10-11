@@ -10,6 +10,17 @@ export interface Env {
   PASSWORD_PEPPER: string;
   /** Optional one-time secret that turns the first registered account into an admin. */
   SETUP_TOKEN?: string;
+  /** R2 bucket with the videos (wrangler.jsonc). Only accessed through src/storage/videoStore.ts. */
+  VIDEOS: R2Bucket;
+  /** Name of that bucket, needed for signed URLs. */
+  R2_BUCKET_NAME: string;
+  /**
+   * R2 access key for signed upload/download URLs (secrets). Without them, video bytes go
+   * through the Worker instead (see videoStore.ts); fine locally, limited to 100 MB per upload.
+   */
+  R2_ACCESS_KEY_ID?: string;
+  R2_SECRET_ACCESS_KEY?: string;
+  R2_ACCOUNT_ID?: string;
 }
 
 /** Values set by middleware for the current request. */

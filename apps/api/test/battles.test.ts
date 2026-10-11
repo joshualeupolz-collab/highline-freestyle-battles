@@ -68,7 +68,7 @@ async function propose(who: Person, battleId: string, body: unknown) {
   return res.body.battle.proposals.at(-1)?.id as string;
 }
 
-/** Simulates a submitted video (step 8 will create these through the API). */
+/** Simulates a submitted video (the real flow is tested in videos.test.ts). */
 async function deliver(battleId: string, userId: string) {
   const now = Date.now();
   await env.DB.batch([

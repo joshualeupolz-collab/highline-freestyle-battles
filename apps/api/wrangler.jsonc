@@ -14,6 +14,9 @@
   "observability": { "enabled": true },
   // Hourly background job (src/index.ts → scheduled). Cron triggers are free.
   "triggers": { "crons": ["17 * * * *"] },
+  // Videos (src/storage/videoStore.ts). The deploy workflow creates the bucket if it is missing.
+  "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "hfb-videos" }],
+  "vars": { "R2_BUCKET_NAME": "hfb-videos" },
   "d1_databases": [
     {
       "binding": "DB",
