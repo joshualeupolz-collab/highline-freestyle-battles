@@ -17,6 +17,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@hfb/rating':
+        specifier: workspace:*
+        version: link:../../packages/rating
       '@hfb/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -36,9 +39,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^5.20261011.1
         version: 5.20261011.1
-      '@hfb/rating':
-        specifier: workspace:*
-        version: link:../../packages/rating
       drizzle-kit:
         specifier: ^0.31.11
         version: 0.31.11

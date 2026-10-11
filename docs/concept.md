@@ -69,7 +69,7 @@ A person can hold several roles (e.g. athlete + judge).
 
 ## 5. Battle flow (online)
 
-1. **Request:** an athlete posts an open request for a format. Others see matching requests sorted by rating proximity, including the challenger's rating. Accepting or ignoring is up to them.
+1. **Request:** an athlete posts an open request for a format. Others see matching requests sorted by rating proximity, including the challenger's rating. Accepting or ignoring is up to them. An athlete can also **challenge one person directly**; only that person can accept, and direct challenges are listed first.
 2. **Settings** (set by the challenger, or marked "flexible" so both agree on them):
    - Format
    - Attempts per video: 1, 2, 3 or unlimited
@@ -251,7 +251,8 @@ A person can hold several roles (e.g. athlete + judge).
 1. Level 1: confirm how s is computed from the two assessments (proposal in 7.5).
 2. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
 3. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
-4. Default values: time window, attempts, weight.
+4. Default values: time window, attempts, weight. *Provisional defaults in the app: best of 3 attempts, 7 days, weight 3, 5-point scale (`packages/shared/src/battles.ts`).*
+10. Missed deadline: if the side that delivered never decides (win or unrated), when should the app decide automatically, and how?
 5. Archiving: after how many weeks to Telegram?
 6. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones.
 7. Exchange format for trick list / scoring formula with the other developer.

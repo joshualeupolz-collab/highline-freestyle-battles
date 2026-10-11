@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import { loadUser } from './auth/middleware';
 import type { AppEnv } from './env';
 import { authRoutes } from './routes/auth';
+import { battleRoutes } from './routes/battles';
 import { formatRoutes } from './routes/formats';
 import { rulesetRoutes } from './routes/rulesets';
 import { userRoutes } from './routes/users';
@@ -24,6 +25,7 @@ export function createApp() {
   app.route('/rulesets', rulesetRoutes);
   app.route('/auth', authRoutes);
   app.route('/users', userRoutes);
+  app.route('/battles', battleRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

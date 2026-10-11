@@ -30,6 +30,25 @@ No Cloudflare account is needed for local development or tests.
 | GET | `/api/users/pending` | Accounts waiting for approval (approved athletes and up) |
 | POST | `/api/users/:id/approve` | Approve an account; it becomes an athlete |
 | POST | `/api/users/:id/password-reset-code` | One-time code to reset a password (federation/admin) |
+| GET | `/api/formats/:id` | One format with all versions |
+| POST | `/api/formats` | Create a format (federation/admin) |
+| PATCH | `/api/formats/:id` | Change name, description, status, kPoints (federation/admin) |
+| POST | `/api/formats/:id/versions` | New version of the parts (federation/admin) |
+| POST | `/api/formats/:id/archive` | Archive a format (federation/admin) |
+| GET | `/api/rulesets` | All RuleSet versions |
+| POST | `/api/rulesets` | New RuleSet version (federation/admin) |
+| POST | `/api/battles` | Open request or direct challenge |
+| GET | `/api/battles/open` | Requests I can accept, closest rating first |
+| GET | `/api/battles/mine` | My battles |
+| GET | `/api/battles/:id` | One battle with participants and pending proposals |
+| POST | `/api/battles/:id/accept` | Accept a request |
+| POST | `/api/battles/:id/retract` | Take back my open request |
+| POST | `/api/battles/:id/start` | Start with the negotiated settings (accepting side) |
+| POST | `/api/battles/:id/proposals` | Propose a change: `settings`, `extension`, `cancel` |
+| POST | `/api/battles/:id/proposals/:pid/respond` | Accept or reject a proposal |
+| POST | `/api/battles/:id/proposals/:pid/withdraw` | Withdraw my proposal |
+| POST | `/api/battles/:id/grant-attempt` | Give the opponent one extra attempt |
+| POST | `/api/battles/:id/deadline-decision` | After a missed deadline: `claim_win` or `cancel` |
 
 Errors always look like `{ "error": "code", "message"?, "details"? }`.
 

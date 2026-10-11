@@ -150,7 +150,33 @@ Notes:
 
 ---
 
-## 4. Implementation order (stage 1)
+## 4. Battle flow (implemented in step 5)
+
+```
+open ──accept──▶ active ─────────────▶ reviewing ─▶ decided
+  │      └─(flexible)─▶ negotiating ─start / accepted settings─▶ active
+  └─ retract / cancel ─▶ cancelled   (open, negotiating, active can end cancelled)
+```
+
+- **Request:** open for everyone or a direct challenge to one person. Settings default to
+  `DEFAULT_BATTLE_SETTINGS` (`packages/shared/src/battles.ts`). Weight 4–5 is refused until the
+  approval workflow exists (stage 2). The battle stores the format version and RuleSet version.
+- **Acceptance:** fixed settings start the battle and set the deadline (time window counted from
+  the start). Flexible settings lead to `negotiating`: the accepting side starts with the settings
+  as they are, or proposes changes; an accepted settings proposal applies and starts the battle.
+- **Proposals** (`battle_proposals`): settings, extension (new deadline) and cancel. They take
+  effect when every other participant accepted. Rejecting a **cancel** proposal means the battle
+  counts as a win for the rejecting side (concept §5.6), which updates the ratings immediately.
+- **Goodwill:** a participant can grant the opponent an extra attempt at any time.
+- **Missed deadline:** the side that delivered all videos chooses "count as my win" or "cancel
+  unrated"; if nobody delivered, it can only be cancelled.
+- **Rating:** every decided battle runs `services/rating.ts` in the same database batch:
+  states and history are written together with the result, or a replay request if the event
+  would be out of order.
+
+---
+
+## 5. Implementation order (stage 1)
 
 | # | Step | Status |
 |---|---|---|
@@ -158,8 +184,8 @@ Notes:
 | 1 | `packages/rating`: Glicko-2 core, inactivity, protection rule, scores, events (single/group/placement), estimates, merged formats, replay, format ranking; tests against spec §11 and the Python reference | done |
 | 2 | D1 schema (migrations 0000 + 0001), Worker skeleton with Hono, local development, seed data (RuleSet v1, launch formats) | done |
 | 3 | Login: sign-up with age confirmation, sessions, approval, admin bootstrap, audit log, password reset codes | done (Google login postponed, see §1) |
-| 4 | Formats and RuleSets (admin) | |
-| 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines (Workers cron trigger) | |
+| 4 | Formats and RuleSets (admin) | done |
+| 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines | done (automatic handling of abandoned deadlines open, concept §15.10) |
 | 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | |
 | 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | |
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | |
