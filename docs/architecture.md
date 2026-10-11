@@ -187,7 +187,7 @@ open ──accept──▶ active ─────────────▶ rev
 | 3 | Login: sign-up with age confirmation, sessions, approval, admin bootstrap, audit log, password reset codes | done (Google login postponed, see §1) |
 | 4 | Formats and RuleSets (admin) | done |
 | 5 | Battle lifecycle API: request, accept, settings, proposals, cancellation, deadlines | done |
-| 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | |
+| 6 | Web app skeleton: PWA shell, login, battle lists, request/accept | done (plus deployment, `docs/deployment.md`) |
 | 7 | Video prototype: recording, attempt limit, quality levels, trimming without re-encoding (real phones) | |
 | 8 | Offline storage (IndexedDB), upload queue, signed R2 uploads, choosing the attempt that counts, unlocking | |
 | 9 | Review level 1, result → rating update in the Worker, rating history | |

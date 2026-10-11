@@ -4,7 +4,8 @@ A free, open web app for highline freestyle battles – similar to online chess:
 athletes challenge each other worldwide, film their runs in the app, review each other
 and build up a rating per battle format.
 
-> **Status:** stage 1 in progress. The rating engine (`packages/rating`) is done; the API and the app follow.
+> **Status:** stage 1 in progress. Accounts, approval, battle requests and the rating engine work;
+> video recording and review follow.
 > Plan and progress: [`docs/architecture.md`](docs/architecture.md).
 
 ## Key ideas
@@ -24,6 +25,7 @@ and build up a rating per battle format.
 | [`rating/rating-specification.md`](rating/rating-specification.md) | Rating system (Glicko-2 variant): formulas, parameters, test values |
 | [`rating/glicko_sim.py`](rating/glicko_sim.py) | Reference implementation and simulation of the rating system |
 | [`docs/architecture.md`](docs/architecture.md) | Technical decisions, database schema, implementation order |
+| [`docs/deployment.md`](docs/deployment.md) | Publishing to Cloudflare (one-time setup, automatic deploys) |
 | [`CLAUDE.md`](CLAUDE.md) | Working instructions for development with Claude Code |
 
 ## Technology
@@ -38,6 +40,12 @@ pnpm install
 pnpm test          # all tests
 pnpm lint          # lint + formatting
 pnpm typecheck
+pnpm build         # web app
+
+cp apps/api/.dev.vars.example apps/api/.dev.vars    # once
+pnpm --filter @hfb/api db:migrate:local
+pnpm dev:api       # app + API on http://localhost:8787 (after `pnpm build`)
+pnpm dev:web       # or: web app with hot reload on http://localhost:5173
 ```
 
 Try the reference simulation:
