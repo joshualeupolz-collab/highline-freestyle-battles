@@ -468,8 +468,9 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
 - **Shown:** the athlete's attempt list says "filmed by …"; the opponent sees a "Filmed by
   friends" card with name and time – **not the code** (it would let the opponent use up the
   athlete's attempts).
-- **Defaults (owner to confirm):** friends' videos are uploaded as *review only*, not kept; the
-  athlete changes that per video (`POST /api/videos/:id/settings`, owner only). Whoever knows
+- **Defaults (owner, 2026-10-12):** friends' videos are uploaded as *public* (like the athlete's
+  own default), not kept if they do not count; the athlete changes that per video
+  (`POST /api/videos/:id/settings`, owner only). The code is secret: nobody else sees it. Whoever knows
   the code can use up the athlete's attempts; a short chosen code is easy to guess (the profile
   says so), so it can be changed at any time.
 - **Dropped again (owner, 2026-10-12):** offline filming with a description, the inbox and the

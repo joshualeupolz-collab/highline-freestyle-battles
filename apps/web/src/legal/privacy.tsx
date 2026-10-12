@@ -151,9 +151,9 @@ export function PrivacyEn() {
         <strong>Filming by friends.</strong> Every athlete has an athlete code, which they can
         choose themselves. Whoever knows it can film attempts for that athlete in the app without an
         account; they see the athlete's display name and running battles. Such videos belong to the
-        athlete and are visible for the review only until the athlete changes that. We store the
-        name the person filming gives (optional); the athletes of the battle see it. You can change
-        your code at any time.
+        athlete and are public (see above) until the athlete changes that. We store the name the
+        person filming gives (optional); the athletes of the battle see it. You can change your code
+        at any time.
       </p>
       <p>
         Please only film other people if they agree (see the terms of use). Legal basis: Art.
@@ -427,8 +427,8 @@ export function PrivacyDe() {
         <strong>Filmen durch Freunde.</strong> Jede Athletin und jeder Athlet hat einen
         Athleten-Code, den sie bzw. er selbst wählen kann. Wer ihn kennt, kann in der App ohne Konto
         Versuche für diese Person filmen und sieht dabei deren Anzeigenamen und laufende Battles.
-        Solche Videos gehören der Athletin bzw. dem Athleten und sind nur für das Review sichtbar,
-        bis sie bzw. er das ändert. Wir speichern den Namen, den die filmende Person angibt
+        Solche Videos gehören der Athletin bzw. dem Athleten und sind öffentlich (siehe oben), bis
+        sie bzw. er das ändert. Wir speichern den Namen, den die filmende Person angibt
         (freiwillig); die Beteiligten des Battles sehen ihn. Du kannst deinen Code jederzeit ändern.
       </p>
       <p>

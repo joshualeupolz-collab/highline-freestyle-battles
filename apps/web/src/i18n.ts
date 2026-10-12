@@ -794,7 +794,7 @@ const en = {
   'film.noBattles': 'No running battle right now.',
   'film.against': 'against {names}',
   'film.visibilityHint':
-    'The athlete decides later who may watch it. Until then it is only shown for the review.',
+    'The video is visible to everyone in the app. The athlete can change that later.',
   'film.onThisPhone': 'Recordings on this phone',
   'film.toApp': 'To the app',
   'film.filmedBy': 'filmed by {name}',

@@ -195,7 +195,12 @@ profile button for members waiting for approval, confirmation before approving.
    Remaining gap: the phone's clock (deadline) – reservations are only possible before the
    deadline, and their attempts must have started before it. Effort: about one session
    (attempt reservations table, release endpoint, phone-side store, UI). Waiting for the
-   owner's decision.
+   owner's decision. The owner asked whether the app can send something when it is closed or
+   uninstalled: not reliably – `pagehide` + `sendBeacon` only works with a connection,
+   uninstalling a PWA (or clearing its data) fires no event at all, and Background Sync is
+   Chrome-only and is deleted together with the app. Only signal: pushes to a removed device
+   get 404/410 later, but only if push was on, delayed and not on every platform. So the
+   reservation stays the robust solution.
 
 ---
 
@@ -205,10 +210,9 @@ profile button for members waiting for approval, confirmation before approving.
 2. **Legal texts:** done except the operator data (open question 00). Keep the privacy policy in
    line with new features (push, public video pages, Telegram archive, Google login, e-mails).
 3. **Stage 2, rest:** 2.12 over-rating warning later (needs ≥ 10 battles per estimated
-   person). Online group battles later. **Owner to confirm** the athlete-code defaults
-   (architecture §4m: friends' videos start as *review only*; unassigned inbox videos deleted
-   after 30 days; the opponent does not see the code) and test it with a friend's phone.
-   **Owner to test push** with Profile → Notifications → "Send a test" and report the message.
+   person). Online group battles later. Athlete-code defaults decided (owner): friends' videos
+   start as *public*; the code stays secret (the opponent does not see it).
+   **Owner to test** the notification tap on Android after PR #28.
 4. **Owner to confirm** the five review defaults (plan §3.2: ≥ 5 battles to review, anonymous and
    final, 14 days until the judge, judge sees earlier votes, voluntary) and test push on phones
    (Profile → Notifications; iPhone only in the installed app).

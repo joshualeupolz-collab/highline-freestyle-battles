@@ -135,8 +135,9 @@ export async function startRecording(
     }),
     ...(options.guest && {
       guest: (({ attemptId: _, ...g }) => ({ ...g, synced: false }))(options.guest),
-      // Someone else's video: only for the review unless the athlete changes it.
-      upload: { state: 'waiting', visibility: 'review_only', keep: false },
+      // Filmed by a friend: public like the athlete's own default (owner, 2026-10-12); the
+      // athlete can change it per video.
+      upload: { state: 'waiting', visibility: 'public', keep: false },
     }),
   };
   const diagnostics = () => {
