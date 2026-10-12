@@ -92,12 +92,28 @@ Checked in desktop Chromium with a fake camera (`/lab/video`, Playwright):
 - The browser address bar takes space in landscape; it disappears when the app is installed to the
   home screen (PWA, `display: standalone`).
 
+**iPhone, Safari 26.5 (owner, 2026-10-12, small screen 375×667, in the browser, not installed):**
+
+- Records H.264 + AAC in MP4. We ask for `avc1.640028` (High), Safari records `avc1.42000a`
+  (Baseline) – fine, every player plays it. All MP4 and WebM variants are reported as supported.
+- **Keyframe about every 1.03 s** (31 in 31 s) and a chunk every second (first after 2.1 s,
+  longest gap 1.05 s), so crash recovery and cutting work as on Android.
+- Normal quality, 31 s portrait: camera 720×1280 at 30 fps, stored as 1280×720 with a rotation
+  in the track header (our cutting code copies it). **18.4 MB/min** (target 19).
+- Cut 7.35–25.45 s → 7.19–25.48 s (starts 0.16 s early at the keyframe), took 17 ms;
+  rewriting the whole file for the preview took 17 ms.
+- **Persistent storage was not granted** in the browser (`persisted: false`). Safari may delete a
+  site's data after 7 days without use; the installed app (home screen) is exempt. → Ask iPhone
+  users to install the app before recording at the line, and keep uploading right away.
+
 Open, to be answered by the phone tests:
 
-1. Safari (iPhone): which format and codec, keyframe interval (Safari ignores our option), does a
-   chunk arrive every second, does the cut start close enough to the chosen start?
-2. Real file sizes per quality level (MB/min) and actual resolution/frame rate.
-3. Does IndexedDB keep large recordings (HD, 60 s ≈ 45 MB) on iPhones, and is persistent storage granted?
+1. ~~Safari (iPhone): format and codec, keyframe interval, chunk every second, cut start~~ –
+   answered above.
+2. Real file sizes per quality level (MB/min) and actual resolution/frame rate (iPhone: HD and
+   saver still open).
+3. Does IndexedDB keep large recordings (HD, 60 s ≈ 45 MB) on iPhones, and is persistent storage
+   granted in the installed app?
 4. Cutting time and memory for 60 s HD files on older phones.
 5. iPhone: does the recording end cleanly when the app is left, and do the events show up in the report?
 6. Android: behaviour with the screen rotation lock on (optional).

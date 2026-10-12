@@ -51,7 +51,9 @@ Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 
 ### Not started yet
 
-All stage 1 features exist. iPhone tests of step 7 are still open. Public pages for *public*
+All stage 1 features exist. First iPhone test of step 7 passed (Safari 26.5: H.264 MP4, keyframe
+every second, cutting works; `docs/video-prototype.md` §3); HD, the installed app and a real battle
+on the iPhone are still open. Public pages for *public*
 videos come later (until then they are visible to logged-in users).
 **UI overhaul (first round, done):** tab bar at the bottom (Battles, Requests, New, Rankings)
 with a dot when something waits for you, profile button top right (approvals, admin, format
