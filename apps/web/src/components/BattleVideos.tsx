@@ -29,6 +29,7 @@ import { trimVideo } from '../video/trim';
 import { kickUploads, onProgress, onServerChanged, uploadProgress } from '../video/uploadQueue';
 import { useCameraZoom } from '../video/zoom';
 import { ErrorText } from './ErrorText';
+import { ReportButton } from './ReportButton';
 
 const ROUND = 1; // multi-round formats come in stage 3
 const QUALITY_KEY = 'hfb-quality';
@@ -631,7 +632,10 @@ export function UnlockedVideos({ battle, format }: { battle: Battle; format: For
               <div key={p.userId}>
                 <strong>{p.displayName}</strong>
                 {slot?.videoId ? (
-                  <VideoPlayer id={slot.videoId} />
+                  <>
+                    <VideoPlayer id={slot.videoId} />
+                    <ReportButton targetType="video" targetId={slot.videoId} />
+                  </>
                 ) : (
                   <p className="muted">{t('videos.notVisible')}</p>
                 )}

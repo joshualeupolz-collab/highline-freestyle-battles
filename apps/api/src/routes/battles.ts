@@ -36,11 +36,13 @@ import {
   battleParticipants,
   battleProposals,
   battles,
+  federationApprovals,
   formats,
   formatVersions,
   proposalResponses,
   ratingHistory,
   ratingStates,
+  replayRequests,
   reviewVotes,
   submissions,
   users,
@@ -58,7 +60,7 @@ import {
   requiredSubmissionsPerPerson,
 } from '../services/battles';
 import { displayParams, ratingView } from '../services/ratingView';
-import { reviewView, settleReview } from '../services/review';
+import { reviewerRole, reviewView, settleReview } from '../services/review';
 import { battleVideosView } from '../services/videos';
 import { latestFormatVersion } from './formats';
 import { currentRuleset, parseRulesetParams } from './rulesets';
@@ -167,6 +169,7 @@ export async function battleResponse(
       decidedAt: battle.decidedAt,
       decisionReason: battle.decisionReason,
       cancelReason: battle.cancelReason,
+      annulment: await annulmentView(db, battle),
       participants: withRatings,
       proposals: await pendingProposals(db, battle.id),
       videos: await battleVideosView(
@@ -174,6 +177,13 @@ export async function battleResponse(
         battle,
         participants.map((p) => p.userId),
         viewerId,
+        (await reviewerRole(
+          db,
+          battle,
+          participants.map((p) => p.userId),
+          viewerId,
+          now,
+        )) !== null,
       ),
       review: await reviewView(
         db,
@@ -194,6 +204,41 @@ export async function battleResponse(
           : [],
     },
   };
+}
+
+/**
+ * Annulled: when, why and whether the ratings were recalculated yet. Decided: a pending
+ * annulment request waiting for the federation, if any.
+ */
+async function annulmentView(db: Database, battle: typeof battles.$inferSelect) {
+  if (battle.status === 'annulled') {
+    const open = await db
+      .select({ id: replayRequests.id })
+      .from(replayRequests)
+      .where(isNull(replayRequests.doneAt))
+      .get();
+    return {
+      state: 'annulled' as const,
+      at: battle.annulledAt,
+      reason: battle.annulReason,
+      ratingsPending: !!open,
+    };
+  }
+  if (battle.status !== 'decided') return null;
+  const pending = await db
+    .select({ reason: federationApprovals.reason, createdAt: federationApprovals.createdAt })
+    .from(federationApprovals)
+    .where(
+      and(
+        eq(federationApprovals.targetType, 'battle'),
+        eq(federationApprovals.targetId, battle.id),
+        eq(federationApprovals.status, 'pending'),
+      ),
+    )
+    .get();
+  return pending
+    ? { state: 'pending' as const, at: pending.createdAt, reason: pending.reason }
+    : null;
 }
 
 export function requireParticipant(participants: Participants, userId: string) {
@@ -437,6 +482,7 @@ battleRoutes.get('/mine', async (c) => {
         iVoted: votes.some((v) => v.battleId === b.id && v.voterId === user.id),
         votes: votes.filter((v) => v.battleId === b.id).length,
         proposalForMe: proposalsForMe.some((p) => p.battleId === b.id),
+        reviewLevel: b.reviewLevel,
       },
       id: b.id,
       formatId: b.formatId,

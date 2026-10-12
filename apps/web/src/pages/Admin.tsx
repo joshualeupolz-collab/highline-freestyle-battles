@@ -14,6 +14,7 @@ export function AdminPage() {
   return (
     <>
       <h1>{t('admin.title')}</h1>
+      <FederationApprovals />
       <Proposals />
       <ResetCode />
       <Formats />
@@ -299,5 +300,71 @@ function AuditLine({ entry }: { entry: AuditEntry }) {
       </div>
       {entry.reason && <div className="hint">{entry.reason}</div>}
     </div>
+  );
+}
+
+/** Sport-related admin actions waiting for a federation member (concept section 2). */
+function FederationApprovals() {
+  const queryClient = useQueryClient();
+  const list = useQuery({ queryKey: ['federationApprovals'], queryFn: api.federationApprovals });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['federationApprovals'] });
+  const decide = useMutation({
+    mutationFn: (v: { id: string; decision: 'approve' | 'reject'; note?: string }) =>
+      api.decideApproval(v.id, v.decision, v.note),
+    onSuccess: refresh,
+  });
+  const withdraw = useMutation({ mutationFn: api.withdrawApproval, onSuccess: refresh });
+  const approvals = list.data?.approvals ?? [];
+  return (
+    <section className="card">
+      <h2 style={{ marginTop: 0 }}>{t('approvals.federation')}</h2>
+      <p className="muted">{t('approvals.federationHint')}</p>
+      <ErrorText error={list.error ?? decide.error ?? withdraw.error} />
+      {list.isSuccess && approvals.length === 0 && <p className="muted">{t('approvals.none')}</p>}
+      {approvals.map((a) => (
+        <div key={a.id} className="card">
+          <Link to={`/battles/${a.targetId}`}>
+            {t('approvals.annulBattle', { reason: a.reason })}
+          </Link>
+          <div className="muted">
+            {t('approvals.requestedBy', { name: a.requestedBy.displayName })} ·{' '}
+            {formatDate(a.createdAt)}
+          </div>
+          <div className="actions">
+            {a.canDecide && (
+              <>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => decide.mutate({ id: a.id, decision: 'approve' })}
+                >
+                  {t('approvals.approveAction')}
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    const note = window.prompt(t('approvals.rejectPrompt'));
+                    if (note !== null)
+                      decide.mutate({
+                        id: a.id,
+                        decision: 'reject',
+                        note: note.trim() || undefined,
+                      });
+                  }}
+                >
+                  {t('approvals.reject')}
+                </button>
+              </>
+            )}
+            {a.canWithdraw && (
+              <button type="button" className="secondary" onClick={() => withdraw.mutate(a.id)}>
+                {t('approvals.withdraw')}
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }

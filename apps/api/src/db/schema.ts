@@ -28,10 +28,15 @@ import {
   COMPETITION_STATUSES,
   DECISION_REASONS,
   ESTIMATE_KINDS,
+  FEDERATION_APPROVAL_ACTIONS,
+  FEDERATION_APPROVAL_STATUSES,
   FORMAT_STATUSES,
   PROPOSAL_DECISIONS,
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,
+  REPORT_CATEGORIES,
+  REPORT_STATUSES,
+  REPORT_TARGETS,
   REVIEW_MODES,
   ROLES,
   STORAGE_BACKENDS,
@@ -324,6 +329,8 @@ export const battles = sqliteTable(
     reviewMode: text('review_mode', { enum: REVIEW_MODES }).notNull().default('quick'),
     /** Current review level 1 (athletes) … 3 (judges). */
     reviewLevel: integer('review_level').notNull().default(1),
+    /** Since when the battle is at its current review level 2 or 3 (pool window, timeouts). */
+    reviewLevelSince: integer('review_level_since'),
     rounds: integer('rounds').notNull().default(1),
     /** NULL = unlimited attempts per video. */
     attemptsPerVideo: integer('attempts_per_video'),
@@ -712,4 +719,70 @@ export const replayRequests = sqliteTable(
     doneAt: integer('done_at'),
   },
   (t) => [index('replay_requests_open_idx').on(t.doneAt)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Moderation
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Reports about a battle, a video or a profile (concept section 11). Handled by the federation
+ * and admins; closing one is audited.
+ */
+export const reports = sqliteTable(
+  'reports',
+  {
+    id: text('id').primaryKey(),
+    reporterId: text('reporter_id')
+      .notNull()
+      .references(() => users.id),
+    targetType: text('target_type', { enum: REPORT_TARGETS }).notNull(),
+    targetId: text('target_id').notNull(),
+    category: text('category', { enum: REPORT_CATEGORIES }).notNull(),
+    text: text('text').notNull(),
+    status: text('status', { enum: REPORT_STATUSES }).notNull().default('open'),
+    createdAt: integer('created_at').notNull(),
+    closedBy: text('closed_by').references(() => users.id),
+    closedAt: integer('closed_at'),
+    /** What was done; visible to federation and admins only. */
+    closeNote: text('close_note'),
+  },
+  (t) => [
+    index('reports_status_idx').on(t.status, t.createdAt),
+    index('reports_target_idx').on(t.targetType, t.targetId),
+    index('reports_reporter_idx').on(t.reporterId, t.createdAt),
+    oneOf('reports_target_type_check', t.targetType, REPORT_TARGETS),
+    oneOf('reports_category_check', t.category, REPORT_CATEGORIES),
+    oneOf('reports_status_check', t.status, REPORT_STATUSES),
+  ],
+);
+
+/**
+ * A sport-related action requested by an admin that waits for a federation member's approval
+ * (concept section 2), e.g. annulling a battle. Approving carries the action out.
+ */
+export const federationApprovals = sqliteTable(
+  'federation_approvals',
+  {
+    id: text('id').primaryKey(),
+    action: text('action', { enum: FEDERATION_APPROVAL_ACTIONS }).notNull(),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id').notNull(),
+    reason: text('reason').notNull(),
+    payloadJson: text('payload_json'),
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => users.id),
+    status: text('status', { enum: FEDERATION_APPROVAL_STATUSES }).notNull().default('pending'),
+    createdAt: integer('created_at').notNull(),
+    decidedBy: text('decided_by').references(() => users.id),
+    decidedAt: integer('decided_at'),
+    decisionNote: text('decision_note'),
+  },
+  (t) => [
+    index('federation_approvals_status_idx').on(t.status, t.createdAt),
+    index('federation_approvals_target_idx').on(t.targetType, t.targetId),
+    oneOf('federation_approvals_action_check', t.action, FEDERATION_APPROVAL_ACTIONS),
+    oneOf('federation_approvals_status_check', t.status, FEDERATION_APPROVAL_STATUSES),
+  ],
 );

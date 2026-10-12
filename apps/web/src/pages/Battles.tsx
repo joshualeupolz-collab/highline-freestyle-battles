@@ -4,7 +4,8 @@ import { api, type BattleSummary } from '../api';
 import { useMe } from '../auth';
 import { formatColor, StatusBadge, useFormatName } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
-import { formatShort, t } from '../i18n';
+import { useOpenReviews } from '../components/Layout';
+import { formatShort, type MessageKey, t } from '../i18n';
 import { nextStep } from '../nextStep';
 
 /** Start page: pending notice, or my battles grouped by what needs attention. */
@@ -41,6 +42,7 @@ export function BattlesPage() {
   return (
     <>
       <h1>{t('battles.title')}</h1>
+      <OpenReviews />
       <ErrorText error={battles.error} />
       {list.length === 0 && <p className="muted">{t('battles.empty')}</p>}
       {groups
@@ -105,5 +107,34 @@ export function BattlesPage() {
           </section>
         ))}
     </>
+  );
+}
+
+/** Battles of others waiting for my review (pool or judge), concept 7.2: shown when the app opens. */
+function OpenReviews() {
+  const reviews = useOpenReviews();
+  const formatName = useFormatName();
+  if (reviews.length === 0) return null;
+  return (
+    <section>
+      <h2>{t('reviews.title')}</h2>
+      <p className="hint">{t('reviews.hint')}</p>
+      {reviews.map((r) => (
+        <Link
+          key={r.battleId}
+          to={`/battles/${r.battleId}`}
+          className="card battle-card"
+          style={{ borderLeftColor: formatColor(r.formatId) }}
+        >
+          <div className="row">
+            <strong>{formatName(r.formatId)}</strong>
+            <span className="badge reviewing">{t(`reviews.level.${r.level}` as MessageKey)}</span>
+          </div>
+          <div className="muted">
+            {r.participants.map((p) => p.displayName).join(` ${t('battles.vs')} `)}
+          </div>
+        </Link>
+      ))}
+    </section>
   );
 }

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { api, type Battle, type Proposal } from '../api';
-import { useMe } from '../auth';
+import { hasRole, useMe } from '../auth';
 import {
   formatColor,
   partsText,
@@ -21,7 +21,8 @@ import {
 } from '../components/BattleVideos';
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
-import { ReviewCard } from '../components/Review';
+import { ReportButton } from '../components/ReportButton';
+import { ReviewCard, ReviewerCard } from '../components/Review';
 import { RatingText, UserLink } from '../components/UserLink';
 import { formatDate, formatShort, type MessageKey, t } from '../i18n';
 import { nextStep, todoOf } from '../nextStep';
@@ -129,6 +130,18 @@ export function BattleDetailPage() {
               ? t('onsite.withdrawn')
               : t('battle.cancelled')}
         </p>
+      )}
+
+      {battle.annulment?.state === 'annulled' && (
+        <div className="card notice">
+          <p style={{ margin: 0 }}>
+            {t('annul.annulled', { reason: battle.annulment.reason ?? '' })}
+          </p>
+          {battle.annulment.ratingsPending && <p className="hint">{t('annul.ratingsPending')}</p>}
+        </div>
+      )}
+      {battle.annulment?.state === 'pending' && (
+        <p className="card">{t('annul.pending', { reason: battle.annulment.reason })}</p>
       )}
 
       {step && (
@@ -260,8 +273,10 @@ export function BattleDetailPage() {
           myId={me.id}
           busy={action.isPending}
           onVote={(value) => run('vote', { value })}
+          onEscalate={() => run('escalate')}
         />
       )}
+      {!mine && <ReviewerCard battle={battle} />}
 
       {mine && battle.participants.length > 1 && (
         <Chat battleId={battle.id} myId={me.id} participants={battle.participants} />
@@ -343,7 +358,44 @@ export function BattleDetailPage() {
           )}
         </details>
       )}
+      {battle.status === 'decided' &&
+        !battle.annulment &&
+        !mine &&
+        hasRole(me, 'federation', 'admin') && <AnnulCard battleId={battle.id} />}
+      {battle.status !== 'open' && <ReportButton targetType="battle" targetId={battle.id} />}
     </>
+  );
+}
+
+/** Federation (and admins, with approval): annul a decided battle (concept section 11). */
+function AnnulCard({ battleId }: { battleId: string }) {
+  const queryClient = useQueryClient();
+  const annul = useMutation({
+    mutationFn: (reason: string) => api.annulBattle(battleId, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['battle', battleId] }),
+  });
+  return (
+    <details className="card more">
+      <summary>{t('annul.title')}</summary>
+      <p className="hint">{t('annul.hint')}</p>
+      <button
+        type="button"
+        className="danger"
+        disabled={annul.isPending}
+        onClick={() => {
+          const reason = window.prompt(t('annul.prompt'))?.trim();
+          if (reason) annul.mutate(reason);
+        }}
+      >
+        {t('annul.button')}
+      </button>
+      {annul.data && (
+        <p className="success">
+          {annul.data.status === 'annulled' ? t('annul.done') : t('annul.requested')}
+        </p>
+      )}
+      <ErrorText error={annul.error} />
+    </details>
   );
 }
 

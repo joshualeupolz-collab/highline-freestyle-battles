@@ -18,4 +18,4 @@ export const OPERATOR = {
 export const REPOSITORY_URL = 'https://github.com/joshualeupolz-collab/highline-freestyle-battles';
 
 /** Date shown on the privacy policy; change it whenever the policy changes. */
-export const PRIVACY_UPDATED = '2026-10-11';
+export const PRIVACY_UPDATED = '2026-10-12';

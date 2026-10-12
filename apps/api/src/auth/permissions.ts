@@ -35,6 +35,9 @@ export const can = {
     user.id !== targetUserId &&
     grantableRoles(user.roles).includes(role),
 
+  /** See and close reports (concept section 11). Not for reports that concern oneself. */
+  handleReports: (user: CurrentUser | null) => hasRole(user, 'federation', 'admin'),
+
   /** Read the audit log (concept section 2: the federation can view it). */
   viewAuditLog: (user: CurrentUser | null) => hasRole(user, 'federation', 'admin'),
 
@@ -49,7 +52,8 @@ export const can = {
  * - a video that counts in a battle, once the videos are unlocked: the participants, and other
  *   logged-in users unless it is "review only" (visibility `public` is treated like `logged_in`
  *   until there are public pages; reviewers of levels 2–3 follow in stage 2);
- * - the opponent, for a cut-off video attached to a request for an extra attempt.
+ * - the opponent, for a cut-off video attached to a request for an extra attempt;
+ * - the reviewers of levels 2–3 (pool, judge) while they review it, even "review only".
  * Attempts that do not count stay private.
  */
 export function canViewVideo(input: {
@@ -60,10 +64,12 @@ export function canViewVideo(input: {
   unlocked: boolean;
   visibility: VideoVisibility;
   sharedWithOpponent: boolean;
+  /** The viewer reviews this battle (pool or judge, `reviewerRole`). */
+  isReviewer?: boolean;
 }): boolean {
   if (input.viewerId === null) return false;
   if (input.viewerId === input.ownerId) return true;
   if (input.isParticipant && input.sharedWithOpponent) return true;
   if (!input.submitted || !input.unlocked) return false;
-  return input.isParticipant || input.visibility !== 'review_only';
+  return input.isParticipant || !!input.isReviewer || input.visibility !== 'review_only';
 }

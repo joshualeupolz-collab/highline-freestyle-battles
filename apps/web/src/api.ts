@@ -4,9 +4,13 @@
  */
 import type {
   BattleSettings,
+  CreateEstimate,
   CreateOnsiteBattle,
+  CreateReport,
   CreateVideo,
   CurrentUser,
+  ReportCategory,
+  ReportTarget,
   SpecialRole,
   UploadTarget,
 } from '@hfb/shared';
@@ -193,17 +197,34 @@ export interface Battle {
   deadlinePassed: boolean;
   decisionReason: string | null;
   cancelReason: string | null;
+  /** Annulled (with the reason), or a request to annul waiting for the federation. */
+  annulment:
+    | { state: 'annulled'; at: number | null; reason: string | null; ratingsPending: boolean }
+    | { state: 'pending'; at: number; reason: string }
+    | null;
   participants: Participant[];
   proposals: Proposal[];
   videos: BattleVideos;
-  /** Review level 1 while reviewing (and after a decision by review). */
+  /** Review while reviewing (and after a decision by review), concept section 7. */
   review: {
+    /** 1 = the two athletes, 2 = athlete pool, 3 = judge. */
     level: number;
+    levelSince: number | null;
     endsAt: number | null;
-    /** Who has voted. */
+    /** Who has voted (level 1). */
     voted: string[];
-    /** Votes seen from seat 0; others' votes only once everyone has voted. */
+    /** Level 1 votes seen from seat 0; others' votes only once everyone has voted. */
     votes: { userId: string; value: number }[];
+    /** A participant may hand the dispute to the pool now. */
+    canEscalate: boolean;
+    poolSize: number;
+    poolCount: number;
+    /** Pool reviews (values), for the judge only. */
+    poolVotes: number[] | null;
+    myPoolVote: number | null;
+    judged: boolean;
+    /** What the viewer does in this review: pool reviewer, judge, or nothing. */
+    reviewerRole: 'pool' | 'judge' | null;
   } | null;
   /** Rating before and after, for decided battles. */
   ratingChanges: { userId: string; before: number; after: number }[];
@@ -320,6 +341,55 @@ export interface AuditEntry {
   createdAt: number;
 }
 
+export interface MyReport {
+  id: string;
+  targetType: ReportTarget;
+  targetId: string;
+  category: ReportCategory;
+  text: string;
+  status: 'open' | 'closed';
+  createdAt: number;
+  closedAt: number | null;
+}
+
+export interface ReportEntry extends MyReport {
+  battleId: string | null;
+  involved: UserHit[];
+  reporter: UserHit | null;
+  closedBy: UserHit | null;
+  closeNote: string | null;
+  canHandle: boolean;
+}
+
+export interface FederationApproval {
+  id: string;
+  action: 'battle.annul';
+  targetType: string;
+  targetId: string;
+  reason: string;
+  createdAt: number;
+  requestedBy: UserHit;
+  canDecide: boolean;
+  canWithdraw: boolean;
+}
+
+export interface EstimateEntry {
+  id: string;
+  formatId: string;
+  kind: 'athlete' | 'federation' | 'admin';
+  value: number;
+  createdAt: number;
+  estimator?: UserHit;
+}
+
+export interface OpenReview {
+  battleId: string;
+  formatId: string;
+  level: number;
+  since: number | null;
+  participants: { userId: string; displayName: string }[];
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -374,6 +444,26 @@ export const api = {
     get<{ entries: AuditEntry[]; next: string | null }>(
       before ? `/audit?before=${encodeURIComponent(before)}` : '/audit',
     ),
+  createReport: (body: CreateReport) => post<{ id: string }>('/reports', body),
+  myReports: () => get<{ reports: MyReport[] }>('/reports/mine'),
+  reports: (status: 'open' | 'closed') =>
+    get<{ reports: ReportEntry[] }>(`/reports?status=${status}`),
+  openReportCount: () => get<{ count: number }>('/reports/open-count'),
+  closeReport: (id: string, note: string) => post(`/reports/${id}/close`, { note }),
+  annulBattle: (id: string, reason: string) =>
+    post<{ status: 'annulled' | 'pending_approval' }>(`/battles/${id}/annul`, { reason }),
+  federationApprovals: () => get<{ approvals: FederationApproval[] }>('/federation-approvals'),
+  decideApproval: (id: string, decision: 'approve' | 'reject', note?: string) =>
+    post(`/federation-approvals/${id}/decide`, { decision, note }),
+  withdrawApproval: (id: string) => post(`/federation-approvals/${id}/withdraw`),
+  estimates: (subjectId: string) =>
+    get<{ mine: EstimateEntry[]; count: number; all: EstimateEntry[] | null }>(
+      `/estimates?subjectId=${encodeURIComponent(subjectId)}`,
+    ),
+  createEstimate: (body: CreateEstimate) =>
+    post<{ id: string; replay: boolean }>('/estimates', body),
+  withdrawEstimate: (id: string) => post(`/estimates/${id}/withdraw`),
+  openReviews: () => get<{ reviews: OpenReview[] }>('/reviews/open'),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

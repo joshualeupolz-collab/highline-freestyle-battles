@@ -6,7 +6,17 @@
  * value later means a table rebuild; prefer adding it here before the first deployment.
  */
 
-export { FORMAT_PART_KINDS, FORMAT_STATUSES, ROLES, USER_STATUSES } from '@hfb/shared';
+export {
+  FEDERATION_APPROVAL_ACTIONS,
+  FEDERATION_APPROVAL_STATUSES,
+  FORMAT_PART_KINDS,
+  FORMAT_STATUSES,
+  REPORT_CATEGORIES,
+  REPORT_STATUSES,
+  REPORT_TARGETS,
+  ROLES,
+  USER_STATUSES,
+} from '@hfb/shared';
 
 export const COMPETITION_STATUSES = [
   'planned',

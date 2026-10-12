@@ -143,18 +143,19 @@ describe('when the review time is over', () => {
     expect(battle.participants.map((p) => p.score)).toEqual([0, 1]);
   });
 
-  it('ends the battle unrated without agreement', async () => {
+  it('hands disagreement to the pool and ends the battle unrated without votes', async () => {
     const id = await battleInReview({}, late);
     await vote(anna, id, 1);
     await vote(ben, id, -1);
     const silent = await battleInReview({}, late);
     const fresh = await battleInReview();
     expect(await resolveExpiredReviews(getDb(env.DB))).toBe(2);
-    for (const battleId of [id, silent]) {
-      const battle = (await get(anna, battleId)).body.battle;
-      expect(battle.status).toBe('cancelled');
-      expect(battle.cancelReason).toBe('no_agreement');
-    }
+    const disputed = (await get(anna, id)).body.battle as Battle & { review: { level: number } };
+    expect(disputed.status).toBe('reviewing');
+    expect(disputed.review?.level).toBe(2);
+    const battle = (await get(anna, silent)).body.battle;
+    expect(battle.status).toBe('cancelled');
+    expect(battle.cancelReason).toBe('no_agreement');
     expect((await get(anna, fresh)).body.battle.status).toBe('reviewing');
   });
 });

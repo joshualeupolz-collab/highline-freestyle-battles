@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { nextStep } from '../nextStep';
 import { LegalLinks } from '../pages/Legal';
 import { ErrorText } from './ErrorText';
+import { InstallHint } from './InstallHint';
 
 /** Small line icons for the tab bar (24×24, drawn with the text color). */
 const ICONS = {
@@ -39,13 +40,17 @@ export function Layout() {
     refetchInterval: 60_000,
   });
   const pending = usePendingCount(active && hasRole(user, 'athlete', 'federation', 'admin'));
+  const reports = useOpenReportCount(active && hasRole(user, 'federation', 'admin'));
+  const reviews = useOpenReviews();
   const { pathname } = useLocation();
   if (isLoading) return <main className="muted">{t('common.loading')}</main>;
   if (!user) return <Navigate to="/login" replace />;
 
-  const waiting = (battles.data?.battles ?? []).some(
-    (b) => b.unreadMessages > 0 || nextStep(b, b.todo, user.id)?.urgent,
-  );
+  const waiting =
+    reviews.length > 0 ||
+    (battles.data?.battles ?? []).some(
+      (b) => b.unreadMessages > 0 || nextStep(b, b.todo, user.id)?.urgent,
+    );
   return (
     <>
       <header className="header">
@@ -54,18 +59,24 @@ export function Layout() {
         </Link>
         <Link to="/profile" className="avatar" aria-label={t('nav.profile')}>
           {user.displayName.slice(0, 1).toUpperCase()}
-          {pending > 0 && (
+          {pending + reports > 0 && (
             <span
               className="avatar-badge"
               role="img"
-              aria-label={t('approvals.waiting', { n: pending })}
+              aria-label={[
+                pending > 0 && t('approvals.waiting', { n: pending }),
+                reports > 0 && t('reports.waiting', { n: reports }),
+              ]
+                .filter(Boolean)
+                .join(', ')}
             >
-              {pending}
+              {pending + reports}
             </span>
           )}
         </Link>
       </header>
       <main className="with-tabs">
+        <InstallHint />
         {/* The profile stays reachable, so someone who does not agree can delete the account. */}
         {user.termsVersion === TERMS_VERSION || pathname === '/profile' ? (
           <Outlet />
@@ -144,4 +155,29 @@ export function usePendingCount(enabled: boolean): number {
     refetchInterval: 5 * 60_000,
   });
   return enabled ? (pending.data?.users.length ?? 0) : 0;
+}
+
+/** How many reports are open (for the federation and admins). */
+export function useOpenReportCount(enabled: boolean): number {
+  const open = useQuery({
+    queryKey: ['openReportCount'],
+    queryFn: api.openReportCount,
+    enabled,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  return enabled ? (open.data?.count ?? 0) : 0;
+}
+
+/** Battles of others waiting for my review (pool or judge). */
+export function useOpenReviews() {
+  const { data: me } = useMe();
+  const query = useQuery({
+    queryKey: ['openReviews'],
+    queryFn: api.openReviews,
+    enabled: me?.status === 'active',
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  return query.data?.reviews ?? [];
 }

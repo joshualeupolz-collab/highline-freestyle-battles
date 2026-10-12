@@ -136,6 +136,7 @@ Notes:
 - Added after step 12 (additive): `battle_messages.event_json` (the chat documents proposals, answers, extra attempts, choices and votes).
 - Added in step 12 (additive): `battles.ended_at`, `users.deletion_token_hash`.
 - Added with the legal texts (additive, migration 0009): `users.terms_version`, `users.terms_accepted_at`.
+- Added in stage 2 (additive, migration 0010): `reports` (id, reporter_id, target_type battle|video|user, target_id, category, text, status open|closed, created_at, closed_by, closed_at, close_note); migration 0011: `federation_approvals` (id, action, target_type, target_id, reason, payload_json, requested_by, status pending|approved|rejected|withdrawn, created_at, decided_by, decided_at, decision_note).
 - Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
@@ -286,6 +287,74 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
   `TERMS_VERSION` (accounts from before, or after raising it), the app shows only a request to
   accept (`POST /auth/accept-terms`); the profile stays reachable so the person can delete the
   account instead. Raise `TERMS_VERSION` only for changes people must agree to.
+
+---
+
+## 4g. Roles, audit log, reports, annulment, estimates (stage 2, parts 2.1–2.4)
+
+- **Roles:** `grantableRoles` (`packages/shared/src/roles.ts`) is the one rule: admins hand out
+  judge, organizer, federation and admin; the federation hands out judge, organizer and
+  federation. Nobody changes their own roles; the athlete role comes with the approval. Roles are
+  read per request, so a change applies at once. `POST /api/users/:id/roles`, `…/roles/revoke`,
+  `GET /api/users/staff`.
+- **Audit log:** `GET /api/audit` for federation and admins, newest first, paged by id (`?before=`),
+  filter `?targetType=&targetId=`. Shown on the admin page.
+- **Reports** (`apps/api/src/routes/reports.ts`): approved users report a battle, a video or a
+  profile (category + text). One open report per person and target, at most 10 open per person.
+  Federation and admins list them (`GET /api/reports?status=open|closed`) and close them with a
+  note (audited). The conflict-of-interest rule: whoever is concerned (the reported person, the
+  participants of the battle, the owner of the video) cannot close it (`canHandle: false`). The
+  reporter sees only whether it was handled (`GET /api/reports/mine`). The badge on the profile
+  button counts open reports for federation and admins.
+- **Annulment** (`apps/api/src/routes/annulment.ts`, part 2.3): `POST /api/battles/:id/annul`
+  with a reason, only for decided battles and never by a participant. A federation member annuls
+  at once: status `annulled`, `annulled_by/at`, `annul_reason`, a `replay_request` and an audit
+  entry. The next replay drops the battle from every rating (it reads decided battles only); the
+  battle page says so until then. An admin without the federation role creates a
+  `federation_approvals` request instead (202), unless nobody holds the federation role yet; a
+  federation member who is neither the requester nor a participant approves (the annulment is
+  then carried out in the admin's name, `audit_log.federation_approval_by` = the approver) or
+  rejects it; the admin can withdraw it. `GET /api/federation-approvals` lists the waiting
+  requests (admin page). The table is generic so later sport-related admin actions can use it.
+- **Initial estimates** (`apps/api/src/routes/estimates.ts`, part 2.4, rating spec §6.1):
+  `POST /api/estimates` (subject, format, value 500–3000, `official`), only while the person has
+  fewer than `MIN_BATTLES` battles in the (rating) format, never for oneself. A new estimate
+  withdraws the estimator's previous one. `official` (federation → kind `federation`, admin →
+  `admin`) overrides the athletes' median and is audited; athletes' estimates are not (they are
+  not special permissions). The Worker applies estimates at a person's first battle; an estimate
+  given or withdrawn after that adds a `replay_request` (the engine applies it retroactively).
+  `GET /api/estimates?subjectId=` returns my own estimates and the count; federation and admins
+  also see all of them with the estimators, except for themselves. The profile shows where the
+  value would be in the current ranking.
+
+---
+
+## 4h. Review levels 2–3 (stage 2, parts 2.6–2.7)
+
+Rules in `apps/api/src/battles/review.ts` (pure), flow in `apps/api/src/services/review.ts`,
+routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
+`battles.review_level_since` (migration 0012) say where a battle is.
+
+- **Level 1 → 2:** when both athletes voted without agreement, either of them can hand the battle
+  to the pool at once (`POST /battles/:id/escalate`); otherwise the hourly job does it when the
+  level 1 review time (`REVIEW_DAYS`) is over. A single vote for one side still decides then;
+  no vote ends the battle unrated.
+- **Level 2 (pool):** `reviewerRole` decides who may review: an athlete who is not taking part,
+  has at least `poolMinBattles` battles in the battle's rating format and whose rating lies in
+  `poolWindow` around R_high (the higher participant rating): ±150 at first, up to +250 after
+  48 h, from −250 without upper limit after 7 days. One review per person, blind and final
+  (`POST /battles/:id/pool-vote`). With `poolSize` (3) reviews, `poolOutcome`: no contradiction →
+  decided, s = mean of the reviews ("can't decide" = 0.5); reviews for both sides or only "can't
+  decide" → level 3. A pool that is not full after `poolMaxDays` (14) goes to level 3 as well.
+- **Level 3 (judge):** any active judge who is not taking part decides with one vote −2/−1/+1/+2
+  (`POST /battles/:id/judge-decision`, optional note), audited as `review.judge_decision`. Judges
+  see the earlier votes (athletes and pool).
+- **Reviewers watch the videos:** `canViewVideo` lets the pool and the judge see "review only"
+  videos while they review.
+- **"To review":** `GET /reviews/open` lists the battles waiting for the viewer (pool or judge),
+  shown at the top of the start page with a dot on the Battles tab.
+- The window values are RuleSet parameters (`params.review`, defaults `REVIEW_DEFAULTS` in
+  `packages/shared/src/rulesets.ts`), so a new RuleSet version can change them.
 
 ---
 

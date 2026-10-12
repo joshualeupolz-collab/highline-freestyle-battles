@@ -71,6 +71,27 @@
       "when": 1791753850525,
       "tag": "0009_terms_acceptance",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791807346940,
+      "tag": "0010_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791807765266,
+      "tag": "0011_federation_approvals",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791812026136,
+      "tag": "0012_review_levels",
+      "breakpoints": true
     }
   ]
 }

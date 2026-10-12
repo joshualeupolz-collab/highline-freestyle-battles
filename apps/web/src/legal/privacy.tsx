@@ -103,6 +103,16 @@ export function PrivacyEn() {
         It is a sports ranking and has no legal or similarly significant effect on you.
       </p>
       <p>Legal basis: Art. 6(1)(b) GDPR.</p>
+      <p>
+        <strong>Reports and special roles.</strong> You can report a battle, a video or a profile.
+        We store the report (category, your text, who reported, when) and how it was handled. Only
+        the federation and the admins see reports; the person reported does not learn who reported
+        them from the app. Actions by people with special roles (judge, organizer, federation,
+        admin), e.g. approving accounts, handing out roles or closing reports, are recorded in an
+        audit log (who, what, when, reason) that the federation and the admins can read. Legal
+        basis: Art. 6(1)(f) GDPR – our legitimate interest in fair competition, safety and traceable
+        decisions.
+      </p>
 
       <h2>6. Videos</h2>
       <p>
@@ -349,6 +359,17 @@ export function PrivacyDe() {
         ähnlich erhebliche Wirkung.
       </p>
       <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO.</p>
+      <p>
+        <strong>Meldungen und Sonderrollen.</strong> Du kannst ein Battle, ein Video oder ein Profil
+        melden. Wir speichern die Meldung (Kategorie, deinen Text, wer gemeldet hat, wann) und wie
+        sie bearbeitet wurde. Nur die Föderation und die Admins sehen Meldungen; die gemeldete
+        Person erfährt über die App nicht, wer sie gemeldet hat. Handlungen von Personen mit
+        Sonderrollen (Judge, Organizer, Föderation, Admin), z. B. Freischaltungen, Rollenvergabe
+        oder das Schließen von Meldungen, werden in einem Audit-Log festgehalten (wer, was, wann,
+        Begründung), das die Föderation und die Admins lesen können. Rechtsgrundlage: Art. 6 Abs. 1
+        lit. f DSGVO – unser berechtigtes Interesse an fairem Wettkampf, Sicherheit und
+        nachvollziehbaren Entscheidungen.
+      </p>
 
       <h2>6. Videos</h2>
       <p>
