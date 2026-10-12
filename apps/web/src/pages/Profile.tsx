@@ -49,6 +49,8 @@ export function ProfilePage() {
         )}
         <Link to="/formats/propose">{t('new.proposeFormat')}</Link>
         {hasRole(me, 'federation', 'admin') && <Link to="/admin">{t('nav.admin')}</Link>}
+        {/* The installed app has no address bar, so testers reach the test page from here. */}
+        <Link to="/lab/video">{t('profile.videoTest')}</Link>
       </div>
       <div className="card">
         <dl>

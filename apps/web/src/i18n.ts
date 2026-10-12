@@ -276,6 +276,7 @@ const en = {
   'profile.passwordChanged': 'Password changed. Other devices were logged out.',
   'profile.logout': 'Log out',
   'profile.viewPublic': 'View my profile as others see it',
+  'profile.videoTest': 'Video test page (camera check for testers)',
   'profile.delete': 'Delete my account',
   'profile.deleteHint':
     'Your profile becomes "Deleted user"; your name, e-mail, password and chat messages are removed. Battle results and your opponents\' ratings stay. Running battles count as given up (a win for your opponent); open requests are cancelled. This cannot be undone.',
