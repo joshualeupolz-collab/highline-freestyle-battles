@@ -442,6 +442,23 @@ export interface CompetitionDetail {
   canConfirm: boolean;
 }
 
+export interface CombinedRanking {
+  official: boolean;
+  dropWorst: number;
+  formats: { id: string; name: string }[];
+  ranking: {
+    rank: number;
+    userId: string;
+    username: string;
+    displayName: string;
+    /** Mean of the kept z-values. */
+    value: number;
+    /** z per format in the order of `formats`; null = never played. */
+    z: (number | null)[];
+    formatsPlayed: number;
+  }[];
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -521,6 +538,12 @@ export const api = {
   createCompetition: (body: CreateCompetition) => post<{ id: string }>('/competitions', body),
   competitionAction: (id: string, action: string, body?: unknown) =>
     post(`/competitions/${id}/${action}`, body),
+  combinedRanking: (choice?: { formats: string[]; drop: number }) =>
+    get<CombinedRanking>(
+      choice
+        ? `/rankings/combined?formats=${choice.formats.map(encodeURIComponent).join(',')}&drop=${choice.drop}`
+        : '/rankings/combined',
+    ),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

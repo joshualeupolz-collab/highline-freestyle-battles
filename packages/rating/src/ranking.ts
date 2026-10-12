@@ -75,3 +75,89 @@ export function formatRanking(
             : 0,
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Combined ranking (rating specification section 8.2)
+// ---------------------------------------------------------------------------------------------
+
+type ComboParams = Pick<RuleSetParams, 'comboMissingZ' | 'comboMinPop' | 'comboFallbackSd'>;
+
+/**
+ * Mean and spread of R in one format: over the non-provisional people; with fewer than
+ * `comboMinPop` of them the spread is `comboFallbackSd` and the mean is over everyone.
+ */
+export function formatNormalization(
+  entries: readonly RankingEntry[],
+  params: ComboParams,
+): { mean: number; sd: number } {
+  const established = entries.filter((e) => !e.provisional).map((e) => e.rankingValue);
+  const mean = (values: number[]) => values.reduce((s, v) => s + v, 0) / (values.length || 1);
+  if (established.length < params.comboMinPop) {
+    return { mean: mean(entries.map((e) => e.rankingValue)), sd: params.comboFallbackSd };
+  }
+  const m = mean(established);
+  const variance = established.reduce((s, v) => s + (v - m) ** 2, 0) / established.length;
+  const sd = Math.sqrt(variance);
+  return { mean: m, sd: sd > 0 ? sd : params.comboFallbackSd };
+}
+
+/**
+ * Combined value of one person: the X worst z-values are dropped (at least one value stays),
+ * the rest is averaged. A missing format counts `missingZ`.
+ */
+export function combineZ(
+  zValues: readonly (number | null)[],
+  dropWorst: number,
+  missingZ: number,
+): number {
+  const values = zValues.map((z) => z ?? missingZ).sort((a, b) => b - a);
+  const kept = values.slice(0, Math.max(1, values.length - Math.max(0, dropWorst)));
+  return kept.reduce((s, v) => s + v, 0) / kept.length;
+}
+
+export interface CombinedEntry {
+  personId: string;
+  /** Mean of the kept z-values. */
+  value: number;
+  /** z per format in the order of `formatIds` (null = never played). */
+  z: (number | null)[];
+  /** Formats the person has a rating in. */
+  formatsPlayed: number;
+}
+
+/**
+ * Combined ranking over several formats, best first. `rankings` holds the format ranking of
+ * each format in `formatIds` (formatRanking). Only people with at least one real format appear.
+ */
+export function combinedRanking(
+  formatIds: readonly string[],
+  rankings: ReadonlyMap<string, readonly RankingEntry[]>,
+  dropWorst: number,
+  params: ComboParams,
+): CombinedEntry[] {
+  const byFormat = formatIds.map((id) => {
+    const entries = rankings.get(id) ?? [];
+    const { mean, sd } = formatNormalization(entries, params);
+    return new Map(entries.map((e) => [e.personId, (e.rankingValue - mean) / sd]));
+  });
+  const people = new Set(byFormat.flatMap((m) => [...m.keys()]));
+  return [...people]
+    .map((personId) => {
+      const z = byFormat.map((m) => m.get(personId) ?? null);
+      return {
+        personId,
+        z,
+        value: combineZ(z, dropWorst, params.comboMissingZ),
+        formatsPlayed: z.filter((v) => v !== null).length,
+      };
+    })
+    .sort((a, b) =>
+      b.value !== a.value
+        ? b.value - a.value
+        : a.personId < b.personId
+          ? -1
+          : a.personId > b.personId
+            ? 1
+            : 0,
+    );
+}

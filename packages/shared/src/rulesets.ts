@@ -24,6 +24,16 @@ export const ruleSetParamsSchema = z
     comboFallbackSd: z.number().positive(),
     overrateZ: z.number(),
     volatilityEpsilon: z.number().positive().max(0.01),
+    /**
+     * Official combined ranking (rating spec §8.2): all *relevant* formats (or `formatIds`),
+     * the `dropWorst` worst dropped. Missing = 1 (owner, 2026-10-12).
+     */
+    officialCombo: z
+      .object({
+        dropWorst: z.number().int().min(0).max(10),
+        formatIds: z.array(z.string().min(1).max(64)).max(20).optional(),
+      })
+      .optional(),
     /** Review levels 2–3 (concept 7.2–7.3); missing values use REVIEW_DEFAULTS. */
     review: z
       .object({
@@ -73,4 +83,13 @@ export type ReviewParams = { [K in keyof typeof REVIEW_DEFAULTS]: number };
 export function reviewParams(params: object): ReviewParams {
   const review = (params as { review?: Partial<ReviewParams> }).review;
   return { ...REVIEW_DEFAULTS, ...review };
+}
+
+/** The official combined ranking of a RuleSet's params (default: relevant formats, 1 dropped). */
+export function officialCombo(params: object): { dropWorst: number; formatIds?: string[] } {
+  return (
+    (params as { officialCombo?: { dropWorst: number; formatIds?: string[] } }).officialCombo ?? {
+      dropWorst: 1,
+    }
+  );
 }
