@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-12 (end of the sixth session: push fixes, notification settings, app icon number, filming by friends with the athlete code).
+Last updated: 2026-10-12 (end of the sixth session: push fixes, notification settings, app icon number, filming by friends with the athlete code, owner's feedback round).
 
 ---
 
@@ -20,8 +20,8 @@ prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3
 `claude/bold-planck-lrea7q`: PRs #18 (browser tests), #19 (stage 2 plan, roles, audit log),
 #20 (iPhone results), #21 (reports, annulment, estimates, review levels 2–3), #22 (on-site group
 battles), #23 (competitions), #24 (combined rankings), #25 (push notifications) merged.
-Session 6 = branch `claude/exciting-feynman-hd7dtr`: PR #26 (push fixes, settings, app icon
-number) merged; the athlete code follows in the next PR. **The owner allows Claude to merge its
+Session 6 = branch `claude/exciting-feynman-hd7dtr`: PRs #26 (push fixes, settings, app icon
+number), #27 (athlete code) merged; then the owner's feedback round (next PR). **The owner allows Claude to merge its
 own PRs once CI is green** (session 6); if the session's safety check blocks it, Claude says
 so and the owner merges. A new session starts a fresh branch from `main`.
 
@@ -80,11 +80,23 @@ green" applies again). Also: API test timeout raised to 20 s (CI runner was too 
 that register many people).
 
 **Filming by friends (2.10) done:** athlete code in the profile (share link), public page
-`/film` for the friend (online: pick battle + part; offline: description → athlete's inbox),
-inbox on the Battles page, later assignments confirmed by the opponent, "filmed by …" labels,
-video settings for friends' videos, privacy policy updated (EN/DE). Details:
-`docs/architecture.md` §4m. Tests: `apps/api/test/friendVideos.test.ts`, browser test
-`e2e/tests/film-for-friend.spec.ts`.
+`/film` for the friend, "filmed by …" labels, video settings for friends' videos, privacy
+policy updated (EN/DE). PR #27 merged. Details: `docs/architecture.md` §4m. Tests:
+`apps/api/test/friendVideos.test.ts`, browser test `e2e/tests/film-for-friend.spec.ts`.
+
+**Owner's feedback after testing (same session):** push works (also on the iPhone); on Android
+tapping a notification did not open the app → fixed (`push-sw.js` focuses first, then
+navigates, otherwise the app switches pages itself or a window is opened). The athlete chooses
+the code freely (migration 0017, `athlete_code_key`). Filming by friends is **online only**:
+offline description, inbox and confirmation removed again. Running battles are loaded in the
+background so one's own battles can be opened and recorded offline (checked in Chromium with
+the service worker: app opened offline → battle never opened before → record → upload after
+reconnecting).
+
+**Open (owner to decide): cheating with offline recordings.** Today an attempt recorded offline
+only reaches the server when the phone is online again; deleting the app (or its data) before
+that hides a bad attempt. Claude's proposal: *reserve attempts while online* – see open
+question 6.
 
 ### Not started yet
 
@@ -174,6 +186,16 @@ profile button for members waiting for approval, confirmation before approving.
    as a false positive in the GitGuardian dashboard.
 4. Google login is postponed: it needs a Google Cloud OAuth client created by the owner. Still wanted?
 5. Further open questions of the concept are listed in `docs/concept.md` §15.
+6. **Offline recording without cheating** (proposal, session 6): before going offline the app
+   *reserves* attempts for a battle while online ("Prepare for offline", or automatically when
+   a battle page is opened). Reserved attempts count as used at once; recording offline uses a
+   reserved attempt; when the phone is online again it hands back the ones it did not use.
+   Deleting the app loses the reservations – they stay used – so hiding a bad attempt gains
+   nothing. Without a reservation, recording needs a connection (Start is registered at once).
+   Remaining gap: the phone's clock (deadline) – reservations are only possible before the
+   deadline, and their attempts must have started before it. Effort: about one session
+   (attempt reservations table, release endpoint, phone-side store, UI). Waiting for the
+   owner's decision.
 
 ---
 

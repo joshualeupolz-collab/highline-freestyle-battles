@@ -159,15 +159,14 @@ async function processGuest(recording: StoredRecording) {
       round: guest.round,
       startedAt: recording.createdAt,
       recorderName: guest.recorderName,
-      description: guest.description,
     });
     await updateRecording(recording.id, (r) =>
       r.guest ? { ...r, guest: { ...r.guest, synced: true } } : r,
     );
-    for (const listener of serverListeners) listener(guest.battleId ?? '');
+    for (const listener of serverListeners) listener(guest.battleId);
   }
   if (recording.status === 'recording' || recording.upload?.state !== 'queued') return;
-  await upload(recording, guest.battleId ?? '', guest.code);
+  await upload(recording, guest.battleId, guest.code);
 }
 
 function baseType(mimeType: string): 'video/mp4' | 'video/webm' {

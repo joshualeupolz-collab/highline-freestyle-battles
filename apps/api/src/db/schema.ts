@@ -87,8 +87,10 @@ export const users = sqliteTable(
     approvedBy: text('approved_by'),
     approvedAt: integer('approved_at'),
     questionnaireJson: text('questionnaire_json'),
-    /** Code for filming by friends (stage 2). */
+    /** Code for filming by friends (stage 2), as the athlete chose it (any text). */
     athleteCode: text('athlete_code'),
+    /** The code as compared (`athleteCodeKey` in @hfb/shared): unique among all athletes. */
+    athleteCodeKey: text('athlete_code_key'),
     /** Failed logins in a row; reset on success. Used to slow down password guessing. */
     failedLoginCount: integer('failed_login_count').notNull().default(0),
     lastFailedLoginAt: integer('last_failed_login_at'),
@@ -109,6 +111,7 @@ export const users = sqliteTable(
     uniqueIndex('users_username_unique').on(lower(t.username)),
     uniqueIndex('users_email_unique').on(lower(t.email)),
     uniqueIndex('users_athlete_code_unique').on(t.athleteCode),
+    uniqueIndex('users_athlete_code_key_unique').on(t.athleteCodeKey),
     index('users_approved_by_idx').on(t.approvedBy),
     foreignKey({ columns: [t.approvedBy], foreignColumns: [t.id] }),
     oneOf('users_status_check', t.status, USER_STATUSES),
@@ -522,12 +525,15 @@ export const attempts = sqliteTable(
     opponentNameEntered: text('opponent_name_entered'),
     /** Filming by friends: the name the person filming gave (free text, optional). */
     recorderName: text('recorder_name'),
-    /** Offline filming by friends: what the friend wrote (opponent, format …) to assign it later. */
+    /**
+     * Unused: offline filming by friends with a description was dropped again (owner,
+     * 2026-10-12); the column stays (migrations are only added to).
+     */
     description: text('description'),
     /**
-     * Filming by friends: `direct` = the friend picked the battle before recording; `pending` =
-     * assigned later from the inbox, waits for the opponent's confirmation; `confirmed`.
-     * NULL = recorded by the athlete.
+     * Filming by friends: `direct` = the friend picked the battle before recording (the only
+     * way now; later assignments from an inbox were dropped again). NULL = recorded by the
+     * athlete. `assigned_at`/`confirmed_by` are unused for the same reason.
      */
     assignment: text('assignment'),
     assignedAt: integer('assigned_at'),

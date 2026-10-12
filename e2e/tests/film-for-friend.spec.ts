@@ -3,9 +3,7 @@ import { BASE_URL, createAthlete, phoneOf, recordAttempt } from '../helpers';
 
 const BEST_TRICK = '01a12842-5c02-7d6b-bce2-b6212ef6a4df';
 
-test('a friend films with the athlete code: online into the battle, offline via the inbox', async ({
-  browser,
-}) => {
+test('a friend films with the athlete code the athlete chose', async ({ browser }) => {
   const anna = await createAthlete('anna');
   const ben = await createAthlete('ben');
   const annaPhone = await phoneOf(browser, anna);
@@ -22,15 +20,18 @@ test('a friend films with the athlete code: online into the battle, offline via 
     true,
   );
 
-  // Anna shares her code; the friend has no account.
+  // Anna chooses her own code; the friend has no account.
   await annaPhone.goto('/profile');
-  const code = (await annaPhone.locator('.athlete-code').textContent())?.trim() ?? '';
-  expect(code).toMatch(/^\w{4}-\w{4}$/);
+  await annaPhone.getByRole('button', { name: 'Change code' }).click();
+  const code = `Flips ${anna.displayName}`;
+  await annaPhone.getByLabel('Your code').fill(code);
+  await annaPhone.getByRole('button', { name: 'Save code' }).click();
+  await expect(annaPhone.locator('.athlete-code')).toHaveText(code);
   const friend = await (await browser.newContext()).newPage();
   friend.on('dialog', (d) => void d.accept());
 
   // Online: the friend picks the battle and records.
-  await friend.goto(`/film?code=${code}`);
+  await friend.goto(`/film?code=${encodeURIComponent(code.toLowerCase())}`);
   await friend.getByLabel('Your name').fill('Max');
   await friend.getByRole('button', { name: 'Continue' }).click();
   await expect(friend.getByText(`Running battles of ${anna.displayName}`)).toBeVisible();
@@ -45,33 +46,11 @@ test('a friend films with the athlete code: online into the battle, offline via 
   await expect(annaPhone.getByText('filmed by Max')).toBeVisible();
   await expect(annaPhone.getByText('Uploaded', { exact: true })).toBeVisible();
 
-  // Offline at the line: the friend describes the battle and records.
-  await friend.context().setOffline(true);
-  await friend.getByRole('button', { name: 'Continue' }).click();
-  await friend.getByLabel('Which battle?').fill(`Best trick against ${ben.displayName}`);
-  await recordAttempt(friend);
-  await expect(friend.getByText('Waiting for a connection to upload')).toBeVisible();
-  await friend.context().setOffline(false);
-  await expect(friend.getByRole('heading', { name: 'Recordings on this phone' })).toHaveCount(0, {
-    timeout: 30_000,
-  });
+  await expect(annaPhone.getByRole('button', { name: 'This one counts' })).toBeVisible();
 
-  // The video waits in Anna's inbox; she assigns it.
-  await annaPhone.goto('/');
-  await expect(annaPhone.getByRole('heading', { name: 'Videos from friends' })).toBeVisible();
-  await annaPhone
-    .getByRole('button', { name: new RegExp(`Best Trick · against ${ben.displayName}`) })
-    .click();
-  await expect(annaPhone.getByRole('heading', { name: 'Videos from friends' })).toHaveCount(0);
-
-  // Ben confirms that it belongs to the battle.
+  // Ben sees who filmed it, but not the code.
   await benPhone.goto(`/battles/${battleId}`);
-  await expect(benPhone.getByText(`Best trick against ${ben.displayName}`)).toBeVisible();
-  await benPhone.getByRole('button', { name: 'Yes, belongs here' }).click();
-  await expect(benPhone.getByRole('button', { name: 'Yes, belongs here' })).toHaveCount(0);
-
-  // Now Anna can choose it.
-  await annaPhone.goto(`/battles/${battleId}`);
-  await expect(annaPhone.getByText('waits for the opponent’s confirmation')).toHaveCount(0);
-  await expect(annaPhone.getByRole('button', { name: 'This one counts' })).toHaveCount(2);
+  await expect(benPhone.getByRole('heading', { name: 'Filmed by friends' })).toBeVisible();
+  await expect(benPhone.getByText('filmed by Max')).toBeVisible();
+  await expect(benPhone.getByText(code)).toHaveCount(0);
 });

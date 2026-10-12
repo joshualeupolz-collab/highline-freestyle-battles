@@ -32,7 +32,6 @@ import {
 } from '../battles/rules';
 import { type Database, getDb, runBatch } from '../db/client';
 import {
-  attempts,
   battleMessages,
   battleParticipants,
   battleProposals,
@@ -437,7 +436,7 @@ battleRoutes.get('/mine', async (c) => {
         .from(ratingHistory)
         .where(and(inArray(ratingHistory.battleId, ids), eq(ratingHistory.userId, user.id)))
     : [];
-  const [mySubs, votes, proposalsForMe, versions, assignmentsForMe] = rows.length
+  const [mySubs, votes, proposalsForMe, versions] = rows.length
     ? await Promise.all([
         db
           .select({ battleId: submissions.battleId, n: sql<number>`count(*)` })
@@ -468,19 +467,8 @@ battleRoutes.get('/mine', async (c) => {
           })
           .from(formatVersions)
           .where(inArray(formatVersions.formatId, [...new Set(rows.map((b) => b.formatId))])),
-        // Videos friends filmed for my opponents, assigned later: I confirm they belong here.
-        db
-          .select({ battleId: attempts.battleId })
-          .from(attempts)
-          .where(
-            and(
-              inArray(attempts.battleId, ids),
-              eq(attempts.assignment, 'pending'),
-              ne(attempts.userId, user.id),
-            ),
-          ),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], []];
   const partsOf = (b: (typeof rows)[number]) => {
     const v = versions.find((x) => x.formatId === b.formatId && x.version === b.formatVersion);
     return v ? (JSON.parse(v.partsJson) as unknown[]).length : 1;
@@ -499,7 +487,6 @@ battleRoutes.get('/mine', async (c) => {
         iVoted: votes.some((v) => v.battleId === b.id && v.voterId === user.id),
         votes: votes.filter((v) => v.battleId === b.id).length,
         proposalForMe: proposalsForMe.some((p) => p.battleId === b.id),
-        assignmentForMe: assignmentsForMe.some((a) => a.battleId === b.id),
         reviewLevel: b.reviewLevel,
       },
       id: b.id,

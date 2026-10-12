@@ -31,16 +31,32 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url ?? '/';
+  const url = new URL(event.notification.data?.url ?? '/', self.location.origin).href;
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const open = windows.find((w) => 'focus' in w);
       if (open) {
-        await open.navigate(url);
-        return open.focus();
+        // Focus first: Android allows it only right after the tap. `navigate` fails on pages the
+        // service worker does not control, so it must not stop the app from coming to the front;
+        // then the app itself switches to the page (main.tsx listens for this message).
+        let focused = null;
+        try {
+          focused = (await open.focus()) ?? open;
+        } catch {
+          // Could not bring it to the front: open a new window below.
+        }
+        if (focused) {
+          try {
+            await focused.navigate(url);
+          } catch {
+            focused.postMessage({ type: 'open', url });
+          }
+          return;
+        }
       }
-      return self.clients.openWindow(url);
+      // App closed (or the window could not be used): open it at the page of the notification.
+      await self.clients.openWindow(url);
     })(),
   );
 });

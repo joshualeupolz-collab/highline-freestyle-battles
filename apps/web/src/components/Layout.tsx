@@ -10,7 +10,6 @@ import { nextStep } from '../nextStep';
 import { LegalLinks } from '../pages/Legal';
 import { resyncPush } from '../push';
 import { ErrorText } from './ErrorText';
-import { useInbox } from './Inbox';
 import { InstallHint } from './InstallHint';
 
 /** Small line icons for the tab bar (24×24, drawn with the text color). */
@@ -46,14 +45,11 @@ export function Layout() {
   const pending = usePendingCount(active && hasRole(user, 'athlete', 'federation', 'admin'));
   const reports = useOpenReportCount(active && hasRole(user, 'federation', 'admin'));
   const reviews = useOpenReviews();
-  const inbox = useInbox();
   const { pathname } = useLocation();
-  // The number on the app icon: battles that wait for me or have new messages, reviews, and
-  // videos friends filmed for me that wait in the inbox.
+  // The number on the app icon: battles that wait for me or have new messages, and reviews.
   const waitingCount =
     user && battles.data
       ? reviews.length +
-        inbox.length +
         battles.data.battles.filter(
           (b) => b.unreadMessages > 0 || nextStep(b, b.todo, user.id)?.urgent,
         ).length
@@ -64,6 +60,23 @@ export function Layout() {
   useEffect(() => {
     if (active) resyncPush().catch(() => {});
   }, [active]);
+  // Running battles are loaded once in the background, so they can be opened (and recorded for)
+  // without a connection later, even if they were not opened before (offline copies, api.ts).
+  const queryClient = useQueryClient();
+  const runningIds = (battles.data?.battles ?? [])
+    .filter((b) => b.status === 'active')
+    .slice(0, 10)
+    .map((b) => b.id)
+    .join(',');
+  useEffect(() => {
+    if (!runningIds || navigator.onLine === false) return;
+    for (const id of runningIds.split(','))
+      void queryClient.prefetchQuery({
+        queryKey: ['battle', id],
+        queryFn: () => api.battle(id),
+        staleTime: 10 * 60_000,
+      });
+  }, [runningIds, queryClient]);
   if (isLoading) return <main className="muted">{t('common.loading')}</main>;
   if (!user) return <Navigate to="/login" replace />;
 

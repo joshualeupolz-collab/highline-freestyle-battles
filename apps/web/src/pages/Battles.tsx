@@ -4,7 +4,6 @@ import { api, type BattleSummary } from '../api';
 import { useMe } from '../auth';
 import { formatColor, StatusBadge, useFormatName } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
-import { Inbox } from '../components/Inbox';
 import { useOpenReviews } from '../components/Layout';
 import { formatShort, type MessageKey, t } from '../i18n';
 import { nextStep } from '../nextStep';
@@ -44,7 +43,6 @@ export function BattlesPage() {
     <>
       <h1>{t('battles.title')}</h1>
       <OpenReviews />
-      <Inbox />
       <ErrorText error={battles.error} />
       {list.length === 0 && <p className="muted">{t('battles.empty')}</p>}
       {groups

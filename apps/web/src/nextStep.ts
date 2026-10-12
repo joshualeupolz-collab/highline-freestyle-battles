@@ -11,8 +11,6 @@ export interface Todo {
   /** Level 1 votes so far (both voted without agreement = 2 while still in review). */
   votes: number;
   proposalForMe: boolean;
-  /** A video a friend filmed for my opponent was assigned later and waits for my confirmation. */
-  assignmentForMe?: boolean;
   /** 1 = the two athletes, 2 = pool, 3 = judge. */
   reviewLevel: number;
 }
@@ -54,7 +52,6 @@ export function nextStep(battle: Basics, todo: Todo, myId: string): NextStep | n
       if (!mine) return null;
       if (battle.deadlinePassed) return step('next.deadlinePassed', true);
       if (todo.proposalForMe) return step('next.answerProposal', true);
-      if (todo.assignmentForMe) return step('next.confirmVideo', true);
       return todo.submittedAll ? step('next.waitingVideos', false) : step('next.record', true);
     case 'reviewing':
       if (!mine) return null;
@@ -76,9 +73,6 @@ export function todoOf(battle: Battle, myId: string, partsCount: number): Todo {
     votes: battle.review?.voted.length ?? 0,
     proposalForMe: battle.proposals.some(
       (p) => p.proposedBy !== myId && !p.acceptedBy.includes(myId),
-    ),
-    assignmentForMe: (battle.videos.byFriends ?? []).some(
-      (a) => a.friend.assignment === 'pending' && a.userId !== myId,
     ),
     reviewLevel: battle.review?.level ?? 1,
   };

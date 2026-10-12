@@ -129,17 +129,6 @@ export function BattleVideos({
     }
   };
 
-  // Filming by friends: confirm or reject videos assigned to this battle later.
-  const decide = async (attemptId: string, action: 'confirm' | 'reject') => {
-    setError(null);
-    try {
-      const res = await api.decideAssignment(battle.id, attemptId, action);
-      queryClient.setQueryData(['battle', battle.id], res);
-    } catch (e) {
-      setError(e);
-    }
-  };
-
   const prepare = local.find((r) => r.id === prepareId);
 
   return (
@@ -173,7 +162,6 @@ export function BattleVideos({
                 canChoose={battle.status === 'active'}
                 onPrepare={() => setPrepareId(row.id)}
                 onChoose={choose}
-                onWrongBattle={() => decide(row.id, 'reject')}
               />
             ))}
             {active && (
@@ -194,7 +182,7 @@ export function BattleVideos({
         );
       })}
 
-      <FilmedByFriends battle={battle} myId={myId} onDecide={decide} />
+      <FilmedByFriends battle={battle} />
       {recordPart !== null && (
         <RecordScreen
           battleId={battle.id}
@@ -235,17 +223,14 @@ function AttemptLine({
   canChoose,
   onPrepare,
   onChoose,
-  onWrongBattle,
 }: {
   row: AttemptRow;
   number: number;
   canChoose: boolean;
   onPrepare: () => void;
   onChoose: (videoId: string) => void;
-  onWrongBattle: () => void;
 }) {
   const friend = row.server?.friend ?? null;
-  const pending = friend?.assignment === 'pending';
   const [watch, setWatch] = useState(false);
   const video = row.server?.video;
   const uploaded = video && (video.status === 'uploaded' || video.status === 'ready');
@@ -274,7 +259,6 @@ function AttemptLine({
             ` · ${friend.name ? t('film.filmedBy', { name: friend.name }) : t('film.filmedByFriend')}`}
         </span>
         <div>{state}</div>
-        {pending && <div className="hint">{t('film.waitsForConfirmation')}</div>}
       </div>
       <div className="actions">
         {local && local.status !== 'recording' && local.upload?.state !== 'queued' && (
@@ -287,14 +271,9 @@ function AttemptLine({
             {watch ? t('videos.hide') : t('videos.watch')}
           </button>
         )}
-        {uploaded && canChoose && !video.counts && !pending && (
+        {uploaded && canChoose && !video.counts && (
           <button type="button" onClick={() => onChoose(video.id)}>
             {t('videos.choose')}
-          </button>
-        )}
-        {pending && canChoose && (
-          <button type="button" className="secondary" onClick={onWrongBattle}>
-            {t('film.wrongBattle')}
           </button>
         )}
       </div>
@@ -353,19 +332,8 @@ export function VideoSettings({
   );
 }
 
-/**
- * Attempts friends filmed for the other side (concept section 6): who filmed and when. Videos
- * assigned later wait for my confirmation that they belong to this battle.
- */
-function FilmedByFriends({
-  battle,
-  myId,
-  onDecide,
-}: {
-  battle: Battle;
-  myId: string;
-  onDecide: (attemptId: string, action: 'confirm' | 'reject') => void;
-}) {
+/** Attempts friends filmed for the other side (concept section 6): who filmed and when. */
+function FilmedByFriends({ battle }: { battle: Battle }) {
   const items = battle.videos.byFriends ?? [];
   if (items.length === 0) return null;
   const nameOf = (id: string) =>
@@ -383,21 +351,7 @@ function FilmedByFriends({
                 ? t('film.filmedBy', { name: a.friend.name })
                 : t('film.filmedByFriend')}
             </span>
-            {a.friend.description && <div>“{a.friend.description}”</div>}
-            {a.friend.assignment === 'pending' && (
-              <div className="hint">{t('film.confirmQuestion')}</div>
-            )}
           </div>
-          {a.friend.assignment === 'pending' && a.userId !== myId && battle.status === 'active' && (
-            <div className="actions">
-              <button type="button" onClick={() => onDecide(a.id, 'confirm')}>
-                {t('film.confirm')}
-              </button>
-              <button type="button" className="secondary" onClick={() => onDecide(a.id, 'reject')}>
-                {t('film.reject')}
-              </button>
-            </div>
-          )}
         </div>
       ))}
     </div>

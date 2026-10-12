@@ -1,15 +1,11 @@
 /**
- * Filming for a friend with their athlete code (concept section 6). No account needed, but the
- * app must have been opened online once (it then works offline).
- *
- * Online: enter the code, pick one of the athlete's running battles and a part, record.
- * Offline: enter the code and a short description (opponent, format …), record; the video goes
- * to the athlete's inbox. Once online, this phone offers the battles that were running at the
- * recording time, so the right one can be chosen here (or later by the athlete).
+ * Filming for a friend with their athlete code (concept section 6). No account needed; online
+ * only (owner, 2026-10-12): enter the code, pick one of the athlete's running battles and a
+ * part, record. The upload waits on the phone if the connection drops after recording.
  */
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { ApiError, api, type GuestBattle } from '../api';
+import { api, type GuestBattle } from '../api';
 import { partText } from '../battleHelpers';
 import { PrepareUpload, RecordScreen } from '../components/BattleVideos';
 import { ErrorText } from '../components/ErrorText';
@@ -27,17 +23,6 @@ import { kickUploads, onProgress, uploadProgress } from '../video/uploadQueue';
 const CODE_KEY = 'hfb-guest-code';
 const NAME_KEY = 'hfb-guest-name';
 const QUALITY_KEY = 'hfb-quality';
-/** Attempts recorded offline on this phone, to assign them once online (see the file comment). */
-const UNASSIGNED_KEY = 'hfb-guest-unassigned';
-
-interface Unassigned {
-  id: string;
-  code: string;
-  athleteName: string;
-  description: string;
-  recordedAt: number;
-}
-
 function read<T>(key: string, fallback: T): T {
   try {
     const value = localStorage.getItem(key);
@@ -65,8 +50,6 @@ export function FilmForFriendPage() {
   const [athlete, setAthlete] = useState<{ displayName: string; battles: GuestBattle[] } | null>(
     null,
   );
-  const [offline, setOffline] = useState(false);
-  const [description, setDescription] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [target, setTarget] = useState<Target | null>(null);
@@ -85,12 +68,9 @@ export function FilmForFriendPage() {
     try {
       const res = await api.guestLookup(code);
       setAthlete({ displayName: res.athlete.displayName, battles: res.battles });
-      setOffline(false);
     } catch (e) {
       setAthlete(null);
-      // No connection at the line: record anyway and describe the battle.
-      if (e instanceof ApiError && e.status === 0) setOffline(true);
-      else setError(e);
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -121,9 +101,8 @@ export function FilmForFriendPage() {
           {t('film.code')}
           <input
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="K7M2-QX9P"
-            autoCapitalize="characters"
+            onChange={(e) => setCode(e.target.value)}
+            autoCapitalize="none"
             autoComplete="off"
             required
           />
@@ -132,7 +111,7 @@ export function FilmForFriendPage() {
           {t('film.yourName')}
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
         </label>
-        <button type="submit" disabled={busy || code.trim().length < 8}>
+        <button type="submit" disabled={busy || !code.trim()}>
           {t('film.continue')}
         </button>
         <ErrorText error={error} />
@@ -173,52 +152,14 @@ export function FilmForFriendPage() {
               })}
             </div>
           ))}
-          <p className="muted">
-            <button type="button" className="link" onClick={() => setOffline(true)}>
-              {t('film.notListed')}
-            </button>
-          </p>
-        </section>
-      )}
-
-      {offline && (
-        <section className="card">
-          <h2 style={{ marginTop: 0 }}>{t('film.offlineTitle')}</h2>
-          <p className="hint">{t('film.offlineHint')}</p>
-          <label>
-            {t('film.description')}
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              maxLength={300}
-              rows={2}
-              placeholder={t('film.descriptionPlaceholder')}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={!description.trim() || code.trim().length < 8 || !isRecordingSupported()}
-            onClick={() =>
-              setTarget({
-                ...base,
-                battleId: null,
-                partIndex: 0,
-                description: description.trim(),
-                attemptsLeft: null,
-              })
-            }
-          >
-            {t('videos.record')}
-          </button>
         </section>
       )}
 
       <GuestRecordings recordings={recordings} onPrepare={setPrepareId} />
-      <UnassignedList />
 
       {target && (
         <RecordScreen
-          battleId={target.battleId ?? ''}
+          battleId={target.battleId}
           partIndex={target.partIndex}
           guest={{
             code: target.code,
@@ -227,7 +168,6 @@ export function FilmForFriendPage() {
             partIndex: target.partIndex,
             round: target.round,
             recorderName: target.recorderName,
-            description: target.description,
           }}
           quality={quality}
           onQuality={(q) => {
@@ -236,17 +176,6 @@ export function FilmForFriendPage() {
           }}
           attemptsLeft={target.attemptsLeft}
           onDone={(recordingId) => {
-            if (recordingId && target.battleId === null)
-              write(UNASSIGNED_KEY, [
-                ...read<Unassigned[]>(UNASSIGNED_KEY, []),
-                {
-                  id: recordingId,
-                  code: target.code,
-                  athleteName: target.athleteName,
-                  description: target.description ?? '',
-                  recordedAt: Date.now(),
-                },
-              ]);
             setTarget(null);
             if (recordingId) setPrepareId(recordingId);
             if (athlete) void lookup(); // attempts left changed
@@ -317,7 +246,6 @@ function GuestRecordings({
             <div>
               <strong>{r.guest?.athleteName || r.guest?.code}</strong>{' '}
               <span className="muted">{formatDate(r.createdAt)}</span>
-              {r.guest?.description && <div>“{r.guest.description}”</div>}
               <div>{state}</div>
             </div>
             {r.status !== 'recording' && r.upload?.state !== 'queued' && (
@@ -328,90 +256,6 @@ function GuestRecordings({
           </div>
         );
       })}
-    </section>
-  );
-}
-
-/**
- * Videos recorded offline: once online, show the battles that were running at the recording
- * time and let the friend pick the right one (the opponent confirms it).
- */
-function UnassignedList() {
-  const [items, setItems] = useState<Unassigned[]>(() => read(UNASSIGNED_KEY, []));
-  const [options, setOptions] = useState<Record<string, GuestBattle[]>>({});
-  const [error, setError] = useState<unknown>(null);
-  useEffect(
-    () =>
-      onRecordingsChanged(() => {
-        setItems(read(UNASSIGNED_KEY, []));
-      }),
-    [],
-  );
-  const forget = (id: string) => {
-    const rest = read<Unassigned[]>(UNASSIGNED_KEY, []).filter((i) => i.id !== id);
-    write(UNASSIGNED_KEY, rest);
-    setItems(rest);
-  };
-  if (items.length === 0) return null;
-
-  const load = async (item: Unassigned) => {
-    setError(null);
-    try {
-      const res = await api.guestLookup(item.code, item.recordedAt);
-      setOptions((o) => ({ ...o, [item.id]: res.battles }));
-    } catch (e) {
-      setError(e);
-    }
-  };
-  const assign = async (item: Unassigned, battleId: string, partIndex: number) => {
-    setError(null);
-    try {
-      await api.guestAssign(item.id, item.code, battleId, partIndex);
-      forget(item.id);
-    } catch (e) {
-      // Assigned by the athlete in the meantime: nothing left to do here.
-      if (e instanceof ApiError && e.code === 'already_assigned') forget(item.id);
-      else setError(e);
-    }
-  };
-
-  return (
-    <section>
-      <h2>{t('film.assignTitle')}</h2>
-      <p className="hint">{t('film.assignHint')}</p>
-      <ErrorText error={error} />
-      {items.map((item) => (
-        <div key={item.id} className="card">
-          <strong>{item.athleteName || item.code}</strong>{' '}
-          <span className="muted">{formatDate(item.recordedAt)}</span>
-          <div>“{item.description}”</div>
-          {options[item.id] === undefined ? (
-            <div className="actions">
-              <button type="button" className="secondary" onClick={() => load(item)}>
-                {t('film.findBattle')}
-              </button>
-              <button type="button" className="link" onClick={() => forget(item.id)}>
-                {t('film.leaveToAthlete')}
-              </button>
-            </div>
-          ) : (options[item.id] ?? []).length === 0 ? (
-            <p className="muted">{t('film.noBattlesThen')}</p>
-          ) : (
-            (options[item.id] ?? []).map((b) =>
-              b.parts.map((part, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a format never change
-                <div key={`${b.id}:${i}`} className="actions">
-                  <button type="button" onClick={() => assign(item, b.id, i)}>
-                    {b.formatName}
-                    {b.parts.length > 1 && ` (${partText(part)})`} ·{' '}
-                    {t('film.against', { names: b.opponents.join(', ') })}
-                  </button>
-                </div>
-              )),
-            )
-          )}
-        </div>
-      ))}
     </section>
   );
 }

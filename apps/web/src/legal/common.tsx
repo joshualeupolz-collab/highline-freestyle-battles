@@ -24,6 +24,6 @@ export function OperatorEmail() {
   return OPERATOR.email.includes('@') ? (
     <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>
   ) : (
-    <>{OPERATOR.email}</>
+    OPERATOR.email
   );
 }
