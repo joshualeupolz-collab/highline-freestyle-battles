@@ -11,6 +11,7 @@ import { competitionRoutes } from './routes/competitions';
 import { estimateRoutes } from './routes/estimates';
 import { formatRoutes } from './routes/formats';
 import { groupRoutes } from './routes/groups';
+import { athleteCodeRoutes, guestRoutes } from './routes/guest';
 import { onsiteRoutes } from './routes/onsite';
 import { notificationRoutes, pushRoutes } from './routes/push';
 import { rankingRoutes } from './routes/rankings';
@@ -52,6 +53,8 @@ export function createApp() {
   app.route('/push', pushRoutes);
   app.route('/notifications', notificationRoutes);
   app.route('/reviews', reviewRoutes);
+  app.route('/guest', guestRoutes);
+  app.route('/athlete-code', athleteCodeRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

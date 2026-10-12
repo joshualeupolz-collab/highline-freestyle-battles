@@ -1,6 +1,7 @@
 /**
- * Upload queue for battle recordings (concept section 6: "upload happens automatically once there
- * is a connection and the app is open"; iPhones cannot upload in the background).
+ * Upload queue for battle recordings and recordings made for a friend with their athlete code
+ * (concept section 6: "upload happens automatically once there is a connection and the app is
+ * open"; iPhones cannot upload in the background).
  *
  * For every battle recording in IndexedDB:
  * 1. the attempt is registered with the server (right after Start, or later when back online);
@@ -87,7 +88,8 @@ export function startUploadQueue(): void {
 /** Battle recordings still marked "recording" at start-up were cut off by a crash. */
 async function markInterruptedBattleRecordings() {
   for (const r of await listRecordings()) {
-    if (r.battle && r.status === 'recording') await saveRecording({ ...r, status: 'interrupted' });
+    if ((r.battle || r.guest) && r.status === 'recording')
+      await saveRecording({ ...r, status: 'interrupted' });
   }
 }
 
@@ -100,7 +102,7 @@ function isRefusal(error: unknown): error is ApiError {
 
 async function runOnce() {
   for (const recording of await listRecordings()) {
-    if (!recording.battle || recording.upload?.state === 'failed') continue;
+    if ((!recording.battle && !recording.guest) || recording.upload?.state === 'failed') continue;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     try {
       await process(recording);
@@ -125,6 +127,7 @@ async function runOnce() {
 }
 
 async function process(recording: StoredRecording) {
+  if (recording.guest) return processGuest(recording);
   const battle = recording.battle;
   if (!battle) return;
   if (!battle.synced) {
@@ -143,11 +146,36 @@ async function process(recording: StoredRecording) {
   await upload(recording, battle.battleId);
 }
 
+/** Filmed for a friend: registered and uploaded with the athlete's code instead of a login. */
+async function processGuest(recording: StoredRecording) {
+  const guest = recording.guest;
+  if (!guest) return;
+  if (!guest.synced) {
+    await api.guestAttempt({
+      code: guest.code,
+      id: recording.id,
+      battleId: guest.battleId,
+      partIndex: guest.partIndex,
+      round: guest.round,
+      startedAt: recording.createdAt,
+      recorderName: guest.recorderName,
+      description: guest.description,
+    });
+    await updateRecording(recording.id, (r) =>
+      r.guest ? { ...r, guest: { ...r.guest, synced: true } } : r,
+    );
+    for (const listener of serverListeners) listener(guest.battleId ?? '');
+  }
+  if (recording.status === 'recording' || recording.upload?.state !== 'queued') return;
+  await upload(recording, guest.battleId ?? '', guest.code);
+}
+
 function baseType(mimeType: string): 'video/mp4' | 'video/webm' {
   return mimeType.startsWith('video/webm') ? 'video/webm' : 'video/mp4';
 }
 
-async function upload(recording: StoredRecording, battleId: string) {
+/** Sends the video; with `guestCode` through the friend endpoints (no login). */
+async function upload(recording: StoredRecording, battleId: string, guestCode?: string) {
   const settings = recording.upload;
   if (!settings) return;
   const original = await loadRecordingBytes(recording.id);
@@ -171,7 +199,7 @@ async function upload(recording: StoredRecording, battleId: string) {
   }
   if (bytes.length > MAX_VIDEO_BYTES) throw new ApiError(413, 'video_too_large');
 
-  const { video, upload: target } = await api.createVideo({
+  const announce = {
     attemptId: recording.id,
     contentType,
     sizeBytes: bytes.length,
@@ -182,15 +210,19 @@ async function upload(recording: StoredRecording, battleId: string) {
     visibility: settings.visibility,
     retention: settings.keep ? 'keep' : 'delete_after_battle',
     endReason: recording.endReason ?? 'stopped',
-  });
+  } as const;
+  const { video, upload: target } = guestCode
+    ? await api.guestVideo({ ...announce, code: guestCode })
+    : await api.createVideo(announce);
   setProgress(recording.id, 0);
   await send(target, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: contentType }), (p) =>
     setProgress(recording.id, p),
   );
-  await api.completeVideo(video.id);
+  if (guestCode) await api.guestCompleteVideo(video.id, guestCode);
+  else await api.completeVideo(video.id);
   setProgress(recording.id, undefined);
 
-  if (settings.askExtraAttempt) {
+  if (settings.askExtraAttempt && !guestCode) {
     try {
       await api.battleAction(battleId, 'proposals', {
         kind: 'extra_attempt',

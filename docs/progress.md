@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-12 (sixth session, part 1: push fixes, notification settings, app icon number).
+Last updated: 2026-10-12 (end of the sixth session: push fixes, notification settings, app icon number, filming by friends with the athlete code).
 
 ---
 
@@ -19,10 +19,11 @@ prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3
 `claude/gallant-ritchie-r1n4tv`: legal texts. Session 5 = branch
 `claude/bold-planck-lrea7q`: PRs #18 (browser tests), #19 (stage 2 plan, roles, audit log),
 #20 (iPhone results), #21 (reports, annulment, estimates, review levels 2–3), #22 (on-site group
-battles), #23 (competitions), #24 (combined rankings) merged; PR #25 (push notifications) waiting
-for the owner's merge. **The owner merges**; Claude's own merges are blocked by the session's
-safety check (Claude opens the PR, watches CI and says when it is green). A new session starts a
-fresh branch from `main`.
+battles), #23 (competitions), #24 (combined rankings), #25 (push notifications) merged.
+Session 6 = branch `claude/exciting-feynman-hd7dtr`: PR #26 (push fixes, settings, app icon
+number) merged; the athlete code follows in the next PR. **The owner allows Claude to merge its
+own PRs once CI is green** (session 6); if the session's safety check blocks it, Claude says
+so and the owner merges. A new session starts a fresh branch from `main`.
 
 **Tests:** 22 video cutting tests (`apps/web/test`), 148 API tests, 44 rating tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
@@ -55,8 +56,8 @@ Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 
 ### Done (development stage 2, session 5)
 
-Everything of `docs/stage-2-plan.md` except 2.10 (athlete code) and 2.12 (over-rating warning,
-needs data): roles + audit log, reports, annulment with federation approval, initial estimates,
+Everything of `docs/stage-2-plan.md` except 2.12 (over-rating warning, needs data; 2.10
+athlete code followed in session 6): roles + audit log, reports, annulment with federation approval, initial estimates,
 review levels 2–3 (pool + judge), on-site group battles, competitions with weight 1–5, combined
 rankings, push notifications. Details: `docs/architecture.md` §4g–§4l.
 
@@ -74,6 +75,16 @@ shows what the push service answered. Also new: **notification settings** per ki
 only with notifications allowed). Details: `docs/architecture.md` §4l.
 **Owner to test:** Profile → Notifications → "Send a test". "Sent" but nothing appears = the
 phone blocks it (Android settings → Apps → the app / Chrome → Notifications; battery saving).
+PR #26 (push) merged by Claude with the owner's permission ("Claude may merge once CI is
+green" applies again). Also: API test timeout raised to 20 s (CI runner was too slow for tests
+that register many people).
+
+**Filming by friends (2.10) done:** athlete code in the profile (share link), public page
+`/film` for the friend (online: pick battle + part; offline: description → athlete's inbox),
+inbox on the Battles page, later assignments confirmed by the opponent, "filmed by …" labels,
+video settings for friends' videos, privacy policy updated (EN/DE). Details:
+`docs/architecture.md` §4m. Tests: `apps/api/test/friendVideos.test.ts`, browser test
+`e2e/tests/film-for-friend.spec.ts`.
 
 ### Not started yet
 
@@ -171,12 +182,11 @@ profile button for members waiting for approval, confirmation before approving.
 1. **More UI feedback** from the owner (announced for the next session).
 2. **Legal texts:** done except the operator data (open question 00). Keep the privacy policy in
    line with new features (push, public video pages, Telegram archive, Google login, e-mails).
-3. **Stage 2, rest:** 2.10 **filming by friends with the athlete code** (rules decided, plan §3.7 /
-   concept §6: online the friend picks one of the athlete's running battles; offline a
-   free-text description, assigned later, the opponent confirms). Schema is prepared
-   (`users.athlete_code`, `attempts.recorded_by/code_used/opponent_name_entered`,
-   `videos.battle_id` NULL = inbox). 2.12 over-rating warning later (needs ≥ 10 battles per
-   estimated person). Online group battles later.
+3. **Stage 2, rest:** 2.12 over-rating warning later (needs ≥ 10 battles per estimated
+   person). Online group battles later. **Owner to confirm** the athlete-code defaults
+   (architecture §4m: friends' videos start as *review only*; unassigned inbox videos deleted
+   after 30 days; the opponent does not see the code) and test it with a friend's phone.
+   **Owner to test push** with Profile → Notifications → "Send a test" and report the message.
 4. **Owner to confirm** the five review defaults (plan §3.2: ≥ 5 battles to review, anonymous and
    final, 14 days until the judge, judge sees earlier votes, voluntary) and test push on phones
    (Profile → Notifications; iPhone only in the installed app).

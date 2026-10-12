@@ -9,6 +9,7 @@ import { BattleDetailPage } from './pages/BattleDetail';
 import { BattlesPage } from './pages/Battles';
 import { CompetitionPage, CompetitionsPage } from './pages/Competitions';
 import { DeletionRequestPage } from './pages/DeletionRequest';
+import { FilmForFriendPage } from './pages/FilmForFriend';
 import { LegalPage } from './pages/Legal';
 import { LoginPage } from './pages/Login';
 import { NewBattlePage } from './pages/NewBattle';
@@ -54,6 +55,8 @@ const router = createBrowserRouter([
   { path: '/imprint', element: <LegalPage doc="imprint" /> },
   // Video prototype for testers, no login needed (docs/video-prototype.md).
   { path: '/lab/video', element: <VideoLabPage /> },
+  // Filming for a friend with their athlete code: no login needed (concept section 6).
+  { path: '/film', element: <FilmForFriendPage /> },
   {
     element: <Layout />,
     children: [

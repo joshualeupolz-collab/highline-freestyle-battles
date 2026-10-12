@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { getDb } from './db/client';
 import type { Env } from './env';
 import { resolveAbandonedDeadlines } from './services/battles';
+import { markOldInboxVideos } from './services/friendVideos';
 import { deleteOldNotifications } from './services/notify';
 import { notifyReviewers, resolveExpiredReviews } from './services/review';
 import {
@@ -32,6 +33,7 @@ export default {
     // Videos no longer needed after a battle: mark them, then remove their files.
     ctx.waitUntil(
       markUnneededVideos(db)
+        .then(() => markOldInboxVideos(db))
         .then(() => deleteFilesOfDeletedVideos(db, videoStore(env)))
         .then((n) => console.log(`removed ${n} files of deleted videos`)),
     );
