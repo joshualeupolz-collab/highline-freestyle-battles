@@ -107,7 +107,7 @@ A person can hold several roles (e.g. athlete + judge).
 - **Filming by friends:** every athlete has a **fixed athlete code** they can change themselves. The person filming opens the app (no account needed, but the app must have been opened online once), enters code + opponent name and films. The opponent name tolerates typos.
   - The video goes to the athlete's **inbox** and is assigned to the matching battle on upload.
   - The opponent sees the code/name used and the recording time.
-  - Open: abuse through assigning videos to the "best" battle afterwards when several are open (see section 15).
+  - Assignment (decided 2026-10-12): online, the person filming gets the athlete's running battles after entering the code and picks one before recording. Offline, they enter the code and a free-text description (opponent, format …); once online, the battles that were running at the recording time are offered and the right one is chosen. The opponent sees the description and must confirm that the video belongs to the battle; the athlete can confirm too or report a wrong assignment.
 - **Visibility** is chosen per video at upload (see section 12).
 
 ---
@@ -125,11 +125,11 @@ A person can hold several roles (e.g. athlete + judge).
 - Eligible reviewers are athletes with a similar or slightly higher rating in the format, preferably slightly higher. Participants are excluded.
 - Open reviews appear in a "To review" list when the app opens.
 - 3 reviews are collected, also on the 5-point scale.
-- If a battle stays open too long, the allowed rating range is gradually widened up and down.
-- All agree → decided. Otherwise → level 3.
+- If a battle stays open too long, the allowed rating range is widened, mainly upwards (decided 2026-10-12): with R_high = the higher participant rating, R_high − 150 … R_high + 150 at the start, R_high − 150 … R_high + 250 after 48 h, R_high − 250 … no upper limit after 7 days. The values are RuleSet parameters.
+- All agree → decided (decided 2026-10-12): the reviews must not contradict each other. At least one review sees a side ahead and none sees the other side ahead ("can't decide" does not count against). As soon as reviews favour different sides → level 3; a 2:1 majority is not enough. s = mean of the three reviews.
 
 ### 7.3 Level 3 – judges
-- Certified judges make the final decision.
+- Certified judges make the final decision. For now one judge decides (decided 2026-10-12); later three judges with a 2:1 majority.
 
 ### 7.4 Detailed mode (later stage)
 - Score sheet per video: tricks with suggested points from the trick list (base trick + variation ± execution) plus subjective categories (combo/order, variety, style).
@@ -148,8 +148,9 @@ A person can hold several roles (e.g. athlete + judge).
 
 - **On-site battle:** only the result is entered (optionally with margin and video). It counts once **both confirm**. Weight selectable as for online battles.
   - Implemented in step 11 (defaults, to be confirmed by the owner): one side enters format, opponent, date (up to 60 days back), weight 1–3, scoring and the result on the 5-point scale without a draw. The other side accepts, rejects or enters a different result; either side can say "did not take place". Not confirmed within 14 days, it expires. Video and group battles on site follow later.
-- **Group battle (n people):** split into pairs; each pair counts 1/(n−1) (rating specification section 5.1).
+- **Group battle (n people):** split into pairs; each pair counts 1/(n−1) (rating specification section 5.1). On site only for now, online group battles later (decided 2026-10-12). The result counts when all athletes confirm it, or one official person (judge, organizer or federation, not taking part) confirms it for everyone.
 - **Official competition:** the organizer creates it and enters results, either individual or group battles (possibly with points) or only final placements. Individual results take precedence over final placements. Confirmation by the federation or a judge (rating specification section 5.2).
+- **Weight 4–5** only in official competitions, not in online battles (decided 2026-10-12). The organizer/judge sets the level of the competition (3, 4 or 5) beforehand.
 - **Live streaming** of on-site battles: future idea (section 14).
 
 ---
@@ -244,8 +245,8 @@ Current progress and next steps: [`docs/progress.md`](progress.md).
 - Review level 2 (pool, "To review") and level 3 (judges)
 - Roles judge, organizer, federation; audit log, reporting, annulment
 - Group battles, official competitions, weight 4–5 with approval
-- Combined rankings (official + free), initial ratings by athletes, over-rating warning
-- Push notifications
+- Combined rankings (official + free; official = all relevant formats minus the worst one, decided 2026-10-12, rating specification §8.2), initial ratings by athletes, over-rating warning
+- Push notifications (opponent accepted, videos unlocked, review needed, chat message; not for new challenges – decided 2026-10-12)
 
 **Stage 3 – Database and community**
 - Trick list import, trick tagging, quality rating, detailed mode
@@ -263,12 +264,10 @@ Current progress and next steps: [`docs/progress.md`](progress.md).
 
 ## 15. Open questions
 
-1. Level 2: what applies on a 2:1 split in the pool – majority or escalation to judges? How long until the rating range is widened?
-2. Athlete code offline: how do we prevent videos from being assigned to the "best" battle afterwards (fix the assignment before recording, timestamps, visibility to the opponent)?
 3. Archiving: after how many weeks to Telegram?
-4. Video prototype: test recording quality, trimming and splitting on real iPhones and Android phones (test page `/lab/video` exists, see [`docs/video-prototype.md`](video-prototype.md)).
+4. Video prototype: recording and trimming are tested on Android and iPhones (`docs/video-prototype.md` §3); splitting into clips is still to be tested (stage 3).
 5. Exchange format for trick list / scoring formula with the other developer.
-6. Type and scope of federation penalties.
+6. Type and scope of federation penalties – not needed for now (owner, 2026-10-12). Suggestion for later: warning, suspension for N days (account status `suspended` exists), annulment of the battles concerned; no rating deductions (ratings stay reproducible from results).
 
 ---
 
