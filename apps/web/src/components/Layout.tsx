@@ -1,11 +1,14 @@
 import { TERMS_VERSION } from '@hfb/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router';
 import { api } from '../api';
 import { hasRole, useMe } from '../auth';
+import { setBadge } from '../badge';
 import { t } from '../i18n';
 import { nextStep } from '../nextStep';
 import { LegalLinks } from '../pages/Legal';
+import { resyncPush } from '../push';
 import { ErrorText } from './ErrorText';
 import { InstallHint } from './InstallHint';
 
@@ -43,14 +46,24 @@ export function Layout() {
   const reports = useOpenReportCount(active && hasRole(user, 'federation', 'admin'));
   const reviews = useOpenReviews();
   const { pathname } = useLocation();
+  // The number on the app icon: battles that wait for me or have new messages, and reviews.
+  const waitingCount =
+    user && battles.data
+      ? reviews.length +
+        battles.data.battles.filter(
+          (b) => b.unreadMessages > 0 || nextStep(b, b.todo, user.id)?.urgent,
+        ).length
+      : null;
+  useEffect(() => {
+    if (waitingCount !== null) void setBadge(waitingCount);
+  }, [waitingCount]);
+  useEffect(() => {
+    if (active) resyncPush().catch(() => {});
+  }, [active]);
   if (isLoading) return <main className="muted">{t('common.loading')}</main>;
   if (!user) return <Navigate to="/login" replace />;
 
-  const waiting =
-    reviews.length > 0 ||
-    (battles.data?.battles ?? []).some(
-      (b) => b.unreadMessages > 0 || nextStep(b, b.todo, user.id)?.urgent,
-    );
+  const waiting = (waitingCount ?? 0) > 0;
   return (
     <>
       <header className="header">

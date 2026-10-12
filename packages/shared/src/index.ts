@@ -5,6 +5,7 @@ export * from './deadline';
 export * from './estimates';
 export * from './formats';
 export * from './ids';
+export * from './notifications';
 export * from './reports';
 export * from './roles';
 export * from './rulesets';

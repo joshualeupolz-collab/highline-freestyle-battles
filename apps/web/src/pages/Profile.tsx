@@ -1,9 +1,10 @@
-import { PASSWORD_MIN } from '@hfb/shared';
-import { useMutation } from '@tanstack/react-query';
+import { NOTIFICATION_KINDS, type NotificationKind, PASSWORD_MIN } from '@hfb/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api } from '../api';
 import { hasRole, useMe, useSetMe } from '../auth';
+import { setBadge } from '../badge';
 import { ErrorText } from '../components/ErrorText';
 import { useOpenReportCount, usePendingCount } from '../components/Layout';
 import { type MessageKey, t } from '../i18n';
@@ -13,6 +14,7 @@ import {
   enablePush,
   isPushSupported,
   needsInstallForPush,
+  testPush,
 } from '../push';
 import { LegalLinks } from './Legal';
 
@@ -31,6 +33,7 @@ export function ProfilePage() {
   const logout = useMutation({
     mutationFn: async () => {
       await disablePush();
+      await setBadge(0);
       return api.logout();
     },
     onSettled: () => setMe(null),
@@ -41,6 +44,7 @@ export function ProfilePage() {
   const remove = useMutation({
     mutationFn: api.deleteAccount,
     onSuccess: (res) => {
+      void setBadge(0);
       setMe(null);
       navigate('/deletion-request', { state: { token: res.deletionToken } });
     },
@@ -161,14 +165,15 @@ export function ProfilePage() {
   );
 }
 
-/** Turn push notifications on or off for this device. */
+/** Turn push notifications on or off for this device, choose what for, and test them. */
 function PushCard() {
   const [on, setOn] = useState<boolean | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     currentSubscription()
-      .then((sub) => setOn(!!sub))
+      .then((sub) => setOn(!!sub && Notification.permission === 'granted'))
       .catch(() => setOn(false));
   }, []);
   if (!isPushSupported())
@@ -183,6 +188,7 @@ function PushCard() {
   const toggle = async () => {
     setBusy(true);
     setProblem(null);
+    setTestResult(null);
     try {
       if (on) {
         await disablePush();
@@ -198,21 +204,85 @@ function PushCard() {
       setBusy(false);
     }
   };
+  const test = async () => {
+    setBusy(true);
+    setTestResult(null);
+    try {
+      const res = await testPush();
+      if (res.outcome === 'sent') setTestResult(t('push.testSent'));
+      else if (res.outcome === 'denied') setTestResult(t('push.denied'));
+      else if (res.outcome === 'gone') {
+        setOn(false);
+        setTestResult(t('push.testGone'));
+      } else
+        setTestResult(
+          t('push.testFailed', {
+            detail: 'status' in res ? `${res.status} ${res.detail ?? ''}`.trim() : '',
+          }),
+        );
+    } catch (e) {
+      setTestResult(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="card">
       <strong>{t('push.title')}</strong>
       <p className="hint">{on ? t('push.on') : t('push.hint')}</p>
       {needsInstallForPush() && !on && <p className="hint">{t('push.installFirst')}</p>}
       {problem && <p className="error">{problem}</p>}
-      <button
-        type="button"
-        className={on ? 'secondary' : ''}
-        disabled={busy || on === null}
-        onClick={toggle}
-      >
-        {on ? t('push.disable') : t('push.enable')}
-      </button>
+      <div className="inline">
+        <button
+          type="button"
+          className={on ? 'secondary' : ''}
+          disabled={busy || on === null}
+          onClick={toggle}
+        >
+          {on ? t('push.disable') : t('push.enable')}
+        </button>
+        {on && (
+          <button type="button" className="secondary" disabled={busy} onClick={test}>
+            {t('push.test')}
+          </button>
+        )}
+      </div>
+      {testResult && <p className="hint">{testResult}</p>}
+      <NotificationKinds />
     </div>
+  );
+}
+
+/** Which events notify me (for all my devices). */
+function NotificationKinds() {
+  const queryClient = useQueryClient();
+  const settings = useQuery({ queryKey: ['pushSettings'], queryFn: api.pushSettings });
+  const save = useMutation({
+    mutationFn: api.savePushSettings,
+    onSuccess: (res) => queryClient.setQueryData(['pushSettings'], res),
+  });
+  if (!settings.data) return null;
+  const off = save.isPending && save.variables ? save.variables.off : settings.data.off;
+  const flip = (kind: NotificationKind) =>
+    save.mutate({
+      off: off.includes(kind) ? off.filter((k) => k !== kind) : [...off, kind],
+    });
+  return (
+    <fieldset className="field" style={{ marginTop: '0.8rem' }}>
+      <legend>{t('push.kinds')}</legend>
+      {NOTIFICATION_KINDS.map((kind) => (
+        <label key={kind} className="check">
+          <input
+            type="checkbox"
+            checked={!off.includes(kind)}
+            disabled={save.isPending}
+            onChange={() => flip(kind)}
+          />
+          {t(`push.kind.${kind}` as MessageKey)}
+        </label>
+      ))}
+      <ErrorText error={save.error} />
+    </fieldset>
   );
 }
 

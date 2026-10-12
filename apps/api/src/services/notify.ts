@@ -1,9 +1,11 @@
 /**
  * Notifications (concept §14 stage 2, owner 2026-10-12): opponent accepted, videos unlocked,
- * review needed, chat message – not new challenges. Each is a row in `notifications`; if the
+ * review needed, chat message – not new challenges. Each kind can be turned off in the profile
+ * (`users.notify_off_json`). Each is a row in `notifications`; if the
  * person allowed push on a device, an empty push wakes the app, which fetches the rows
  * (GET /api/notifications/pending) and shows them.
  */
+import type { NotificationKind as SettableKind } from '@hfb/shared';
 import { and, eq, gt, inArray, isNull, lt } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { type Database, getDb } from '../db/client';
@@ -12,7 +14,8 @@ import type { AppEnv, Env } from '../env';
 import { newId } from '../lib/ids';
 import { sendPush, type VapidKeys } from './push';
 
-export type NotificationKind = 'accepted' | 'unlocked' | 'review' | 'chat';
+/** The kinds a person can turn off, plus the test from the profile. */
+export type NotificationKind = SettableKind | 'test';
 
 /** At most one chat notification per battle and person in this time (no flood of pushes). */
 const CHAT_QUIET_MS = 15 * 60_000;
@@ -22,10 +25,12 @@ export const NOTIFICATION_KEEP_DAYS = 30;
 export function vapidKeys(env: Env): VapidKeys | null {
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
   return {
-    publicKey: env.VAPID_PUBLIC_KEY,
-    privateKey: env.VAPID_PRIVATE_KEY,
+    // Copied secrets sometimes carry spaces, line breaks or base64 padding.
+    publicKey: env.VAPID_PUBLIC_KEY.trim().replace(/=+$/, ''),
+    privateKey: env.VAPID_PRIVATE_KEY.trim().replace(/=+$/, ''),
     subject:
-      env.VAPID_SUBJECT || 'https://highline-freestyle-battles.highlinefreestyle.workers.dev',
+      env.VAPID_SUBJECT?.trim() ||
+      'https://highline-freestyle-battles.highlinefreestyle.workers.dev',
   };
 }
 
@@ -57,6 +62,16 @@ export async function notify(
   now = Date.now(),
 ) {
   let userIds = [...new Set(input.userIds)].filter((id) => id !== input.actorId);
+  if (userIds.length > 0) {
+    const settings = await ctx.db
+      .select({ id: users.id, off: users.notifyOffJson })
+      .from(users)
+      .where(inArray(users.id, userIds));
+    const muted = new Set(
+      settings.filter((u) => turnedOff(u.off).includes(input.kind)).map((u) => u.id),
+    );
+    userIds = userIds.filter((id) => !muted.has(id));
+  }
   if (input.kind === 'chat' && userIds.length > 0) {
     const recent = await ctx.db
       .select({ userId: notifications.userId })
@@ -90,13 +105,24 @@ export async function notify(
   else await sending;
 }
 
+/** The kinds stored as turned off (unknown or broken values count as on). */
+export function turnedOff(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const list = JSON.parse(json);
+    return Array.isArray(list) ? list.filter((k) => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 async function pushTo(db: Database, userIds: string[], keys: VapidKeys) {
   const subs = await db
     .select()
     .from(pushSubscriptions)
     .where(inArray(pushSubscriptions.userId, userIds));
   const results = await Promise.all(subs.map((s) => sendPush(s.endpoint, keys)));
-  const gone = subs.filter((_, i) => results[i] === 'gone').map((s) => s.id);
+  const gone = subs.filter((_, i) => results[i]?.outcome === 'gone').map((s) => s.id);
   if (gone.length) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, gone));
 }
 
@@ -108,6 +134,7 @@ const TEXTS: Record<NotificationKind, { title: string; body: string }> = {
   },
   review: { title: 'Review needed', body: 'A {format} battle waits for your review.' },
   chat: { title: 'New message', body: '{actor} wrote in your {format} battle.' },
+  test: { title: 'Test notification', body: 'Notifications work on this device.' },
 };
 
 /**

@@ -70,12 +70,14 @@ describe('web push', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 201 }))
       .mockResolvedValueOnce(new Response(null, { status: 410 }));
-    expect(await sendPush('https://push.example.org/a', keys)).toBe('sent');
-    expect(await sendPush('https://push.example.org/b', keys)).toBe('gone');
+    expect((await sendPush('https://push.example.org/a', keys)).outcome).toBe('sent');
+    expect((await sendPush('https://push.example.org/b', keys)).outcome).toBe('gone');
     const init = fetchSpy.mock.calls[0]?.[1] as RequestInit;
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toMatch(/^vapid t=[\w-]+\.[\w-]+\.[\w-]+, k=/);
     expect(headers['Content-Length']).toBe('0');
+    // Android holds back pushes of normal urgency while the phone sleeps.
+    expect(headers.Urgency).toBe('high');
   });
 });
 
@@ -107,6 +109,63 @@ describe('notifications', () => {
       await call(`/api/battles/${battle.id}/messages`, { session: ben.session, body: { body } });
     const chat = await pending(anna);
     expect(chat.notifications.map((n) => n.body)).toEqual(['ben wrote in your Best Trick battle.']);
+  });
+
+  it('kinds turned off in the profile are not notified', async () => {
+    const admin = await registerAdmin();
+    const anna = await registerAthlete('anna', admin.session);
+    const ben = await registerAthlete('ben', admin.session);
+    expect(await json(call('/api/push/settings', { session: anna.session }))).toEqual({ off: [] });
+    const put = await call('/api/push/settings', {
+      method: 'PUT',
+      session: anna.session,
+      body: { off: ['chat', 'chat'] },
+    });
+    expect(await json(put)).toEqual({ off: ['chat'] });
+    const bad = await call('/api/push/settings', {
+      method: 'PUT',
+      session: anna.session,
+      body: { off: ['everything'] },
+    });
+    expect(bad.status).toBe(400);
+
+    const { battle } = await json<{ battle: { id: string } }>(
+      call('/api/battles', { session: anna.session, body: { formatId: BEST_TRICK } }),
+    );
+    await call(`/api/battles/${battle.id}/accept`, { method: 'POST', session: ben.session });
+    await call(`/api/battles/${battle.id}/messages`, {
+      session: ben.session,
+      body: { body: 'Hi' },
+    });
+    expect((await pending(anna)).notifications.map((n) => n.kind)).toEqual(['accepted']);
+  });
+
+  it('a test push reports what the push service answered', async () => {
+    const admin = await registerAdmin();
+    const { publicKey, privateKey } = await vapidPair();
+    const saved = { ...env };
+    Object.assign(env, { VAPID_PUBLIC_KEY: `${publicKey}\n`, VAPID_PRIVATE_KEY: privateKey });
+    try {
+      const endpoint = 'https://push.example.org/device';
+      const notMine = await call('/api/push/test', { session: admin.session, body: { endpoint } });
+      expect(notMine.status).toBe(404);
+      await call('/api/push/subscribe', { session: admin.session, body: { endpoint } });
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response('invalid JWT provided', { status: 403 }),
+      );
+      const res = await call('/api/push/test', { session: admin.session, body: { endpoint } });
+      expect(await json(res)).toEqual({
+        outcome: 'failed',
+        status: 403,
+        detail: 'invalid JWT provided',
+      });
+      expect((await pending(admin)).notifications.map((n) => n.title)).toEqual([
+        'Test notification',
+      ]);
+    } finally {
+      for (const k of ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'] as const)
+        if (!(k in saved)) delete (env as unknown as Record<string, unknown>)[k];
+    }
   });
 
   it('push needs the VAPID keys; without them the app learns that', async () => {

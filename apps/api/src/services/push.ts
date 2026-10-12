@@ -68,27 +68,37 @@ export async function vapidToken(endpoint: string, keys: VapidKeys, now = Date.n
   return `${unsigned}.${base64url(signature)}`;
 }
 
+export interface PushResult {
+  /** `gone`: the push service says the subscription no longer exists (404/410) – delete it. */
+  outcome: 'sent' | 'gone' | 'failed';
+  /** HTTP status of the push service (0 = no answer). */
+  status: number;
+  /** The push service's error text, shortened (for the test button and the Worker logs). */
+  detail?: string;
+}
+
 /**
- * Sends one empty push. Returns `gone` when the push service says the subscription no longer
- * exists (404/410) – it should be deleted then.
+ * Sends one empty push. `Urgency: high` lets Android deliver it at once even while the phone
+ * sleeps (with `normal`, Google may hold it back until the phone wakes up).
  */
-export async function sendPush(
-  endpoint: string,
-  keys: VapidKeys,
-): Promise<'sent' | 'gone' | 'failed'> {
+export async function sendPush(endpoint: string, keys: VapidKeys): Promise<PushResult> {
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         Authorization: `vapid t=${await vapidToken(endpoint, keys)}, k=${keys.publicKey}`,
         TTL: String(24 * 3600),
-        Urgency: 'normal',
+        Urgency: 'high',
         'Content-Length': '0',
       },
     });
-    if (res.status === 404 || res.status === 410) return 'gone';
-    return res.ok ? 'sent' : 'failed';
-  } catch {
-    return 'failed';
+    if (res.ok) return { outcome: 'sent', status: res.status };
+    const detail = (await res.text().catch(() => '')).slice(0, 200);
+    console.warn(`push to ${new URL(endpoint).host} failed: ${res.status} ${detail}`);
+    const gone = res.status === 404 || res.status === 410;
+    return { outcome: gone ? 'gone' : 'failed', status: res.status, detail };
+  } catch (err) {
+    console.warn(`push to ${endpoint.slice(0, 40)} failed: ${err}`);
+    return { outcome: 'failed', status: 0, detail: String(err).slice(0, 200) };
   }
 }
