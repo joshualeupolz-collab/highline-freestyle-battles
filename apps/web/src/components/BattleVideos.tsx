@@ -18,6 +18,7 @@ import {
 } from '../video/recorder';
 import {
   deleteRecording,
+  type GuestAttempt,
   listRecordings,
   loadRecordingBytes,
   onRecordingsChanged,
@@ -128,6 +129,17 @@ export function BattleVideos({
     }
   };
 
+  // Filming by friends: confirm or reject videos assigned to this battle later.
+  const decide = async (attemptId: string, action: 'confirm' | 'reject') => {
+    setError(null);
+    try {
+      const res = await api.decideAssignment(battle.id, attemptId, action);
+      queryClient.setQueryData(['battle', battle.id], res);
+    } catch (e) {
+      setError(e);
+    }
+  };
+
   const prepare = local.find((r) => r.id === prepareId);
 
   return (
@@ -161,6 +173,7 @@ export function BattleVideos({
                 canChoose={battle.status === 'active'}
                 onPrepare={() => setPrepareId(row.id)}
                 onChoose={choose}
+                onWrongBattle={() => decide(row.id, 'reject')}
               />
             ))}
             {active && (
@@ -181,6 +194,7 @@ export function BattleVideos({
         );
       })}
 
+      <FilmedByFriends battle={battle} myId={myId} onDecide={decide} />
       {recordPart !== null && (
         <RecordScreen
           battleId={battle.id}
@@ -221,13 +235,17 @@ function AttemptLine({
   canChoose,
   onPrepare,
   onChoose,
+  onWrongBattle,
 }: {
   row: AttemptRow;
   number: number;
   canChoose: boolean;
   onPrepare: () => void;
   onChoose: (videoId: string) => void;
+  onWrongBattle: () => void;
 }) {
+  const friend = row.server?.friend ?? null;
+  const pending = friend?.assignment === 'pending';
   const [watch, setWatch] = useState(false);
   const video = row.server?.video;
   const uploaded = video && (video.status === 'uploaded' || video.status === 'ready');
@@ -252,8 +270,11 @@ function AttemptLine({
         <span className="muted">
           {formatDate(row.startedAt)}
           {cutOff && ` · ${t('videos.cutOff')}`}
+          {friend &&
+            ` · ${friend.name ? t('film.filmedBy', { name: friend.name }) : t('film.filmedByFriend')}`}
         </span>
         <div>{state}</div>
+        {pending && <div className="hint">{t('film.waitsForConfirmation')}</div>}
       </div>
       <div className="actions">
         {local && local.status !== 'recording' && local.upload?.state !== 'queued' && (
@@ -266,13 +287,119 @@ function AttemptLine({
             {watch ? t('videos.hide') : t('videos.watch')}
           </button>
         )}
-        {uploaded && canChoose && !video.counts && (
+        {uploaded && canChoose && !video.counts && !pending && (
           <button type="button" onClick={() => onChoose(video.id)}>
             {t('videos.choose')}
           </button>
         )}
+        {pending && canChoose && (
+          <button type="button" className="secondary" onClick={onWrongBattle}>
+            {t('film.wrongBattle')}
+          </button>
+        )}
       </div>
       {watch && video && <VideoPlayer id={video.id} />}
+      {friend && uploaded && <VideoSettings video={video} />}
+    </div>
+  );
+}
+
+/**
+ * A friend filmed it, so the friend could not choose who may watch it: the athlete does it here
+ * (default: for the review only, deleted after the battle).
+ */
+export function VideoSettings({
+  video,
+}: {
+  video: { id: string; visibility: string; retention: string };
+}) {
+  const [visibility, setVisibility] = useState(video.visibility);
+  const [keep, setKeep] = useState(video.retention === 'keep');
+  const [error, setError] = useState<unknown>(null);
+  const save = async (v: string, k: boolean) => {
+    setVisibility(v);
+    setKeep(k);
+    setError(null);
+    try {
+      await api.videoSettings(video.id, {
+        visibility: v,
+        retention: k ? 'keep' : 'delete_after_battle',
+      });
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <div className="inline">
+      <select
+        aria-label={t('videos.visibility')}
+        value={visibility}
+        onChange={(e) => save(e.target.value, keep)}
+      >
+        <option value="public">{t('videos.visibility.public')}</option>
+        <option value="logged_in">{t('videos.visibility.logged_in')}</option>
+        <option value="review_only">{t('videos.visibility.review_only')}</option>
+      </select>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={keep}
+          onChange={(e) => save(visibility, e.target.checked)}
+        />
+        {t('videos.keep')}
+      </label>
+      <ErrorText error={error} />
+    </div>
+  );
+}
+
+/**
+ * Attempts friends filmed for the other side (concept section 6): who filmed and when. Videos
+ * assigned later wait for my confirmation that they belong to this battle.
+ */
+function FilmedByFriends({
+  battle,
+  myId,
+  onDecide,
+}: {
+  battle: Battle;
+  myId: string;
+  onDecide: (attemptId: string, action: 'confirm' | 'reject') => void;
+}) {
+  const items = battle.videos.byFriends ?? [];
+  if (items.length === 0) return null;
+  const nameOf = (id: string) =>
+    battle.participants.find((p) => p.userId === id)?.displayName ?? '';
+  return (
+    <div className="card">
+      <h3 style={{ marginTop: 0 }}>{t('film.byFriendsTitle')}</h3>
+      {items.map((a) => (
+        <div key={a.id} className="attempt">
+          <div>
+            <strong>{nameOf(a.userId)}</strong>{' '}
+            <span className="muted">
+              {formatDate(a.startedAt)} ·{' '}
+              {a.friend.name
+                ? t('film.filmedBy', { name: a.friend.name })
+                : t('film.filmedByFriend')}
+            </span>
+            {a.friend.description && <div>“{a.friend.description}”</div>}
+            {a.friend.assignment === 'pending' && (
+              <div className="hint">{t('film.confirmQuestion')}</div>
+            )}
+          </div>
+          {a.friend.assignment === 'pending' && a.userId !== myId && battle.status === 'active' && (
+            <div className="actions">
+              <button type="button" onClick={() => onDecide(a.id, 'confirm')}>
+                {t('film.confirm')}
+              </button>
+              <button type="button" className="secondary" onClick={() => onDecide(a.id, 'reject')}>
+                {t('film.reject')}
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -284,10 +411,14 @@ export function VideoPlayer({ id }: { id: string }) {
   );
 }
 
-/** Full-screen camera for one attempt. Pressing the record button uses up the attempt. */
-function RecordScreen({
+/**
+ * Full-screen camera for one attempt. Pressing the record button uses up the attempt. With
+ * `guest`, the attempt is filmed for a friend with their athlete code (pages/FilmForFriend.tsx).
+ */
+export function RecordScreen({
   battleId,
   partIndex,
+  guest,
   quality,
   onQuality,
   attemptsLeft: left,
@@ -295,6 +426,7 @@ function RecordScreen({
 }: {
   battleId: string;
   partIndex: number;
+  guest?: Omit<GuestAttempt, 'synced'>;
   quality: Quality;
   onQuality: (q: Quality) => void;
   attemptsLeft: number | null;
@@ -370,7 +502,9 @@ function RecordScreen({
           keyFrameIntervalMs: 1000,
           timesliceMs: 1000,
           attempt: 0,
-          battle: { attemptId: newId(), battleId, partIndex, round: ROUND },
+          ...(guest
+            ? { guest: { attemptId: newId(), ...guest } }
+            : { battle: { attemptId: newId(), battleId, partIndex, round: ROUND } }),
         },
         () => {},
         // Leaving the app ended the attempt.
@@ -456,8 +590,11 @@ function RecordScreen({
   );
 }
 
-/** Watch the recording, mark the cut and the visibility, then hand it to the upload queue. */
-function PrepareUpload({
+/**
+ * Watch the recording, mark the cut and the visibility, then hand it to the upload queue.
+ * Filmed for a friend, the athlete decides about visibility and keeping later.
+ */
+export function PrepareUpload({
   recording,
   opponentName,
   onClose,
@@ -466,6 +603,7 @@ function PrepareUpload({
   opponentName: string;
   onClose: () => void;
 }) {
+  const forFriend = !!recording.guest;
   const player = useRef<HTMLVideoElement>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
@@ -476,7 +614,9 @@ function PrepareUpload({
   );
   const [keep, setKeep] = useState(recording.upload?.keep ?? false);
   const cutOff = (recording.endReason ?? 'stopped') !== 'stopped';
-  const [askExtra, setAskExtra] = useState(recording.upload?.askExtraAttempt ?? cutOff);
+  const [askExtra, setAskExtra] = useState(
+    recording.upload?.askExtraAttempt ?? (cutOff && !forFriend),
+  );
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -561,22 +701,28 @@ function PrepareUpload({
           </button>
         )}
       </div>
-      <label>
-        {t('videos.visibility')}
-        <select
-          value={visibility}
-          onChange={(e) => setVisibility(e.target.value as VideoVisibility)}
-        >
-          <option value="public">{t('videos.visibility.public')}</option>
-          <option value="logged_in">{t('videos.visibility.logged_in')}</option>
-          <option value="review_only">{t('videos.visibility.review_only')}</option>
-        </select>
-      </label>
-      <label className="check">
-        <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
-        {t('videos.keep')}
-      </label>
-      {cutOff && (
+      {forFriend ? (
+        <p className="hint">{t('film.visibilityHint')}</p>
+      ) : (
+        <>
+          <label>
+            {t('videos.visibility')}
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as VideoVisibility)}
+            >
+              <option value="public">{t('videos.visibility.public')}</option>
+              <option value="logged_in">{t('videos.visibility.logged_in')}</option>
+              <option value="review_only">{t('videos.visibility.review_only')}</option>
+            </select>
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+            {t('videos.keep')}
+          </label>
+        </>
+      )}
+      {cutOff && !forFriend && (
         <label className="check">
           <input
             type="checkbox"

@@ -144,7 +144,17 @@ export function PrivacyEn() {
       <p>
         Attempts that do not count are visible only to you. Attempts that do not count (unless you
         keep them) and review-only videos are deleted 7 days after the battle ended. If you want to
-        change the visibility of a video or have it deleted, write to us.
+        change the visibility of a video or have it deleted, write to us (for videos filmed by
+        friends you can change it yourself).
+      </p>
+      <p>
+        <strong>Filming by friends.</strong> Every athlete has an athlete code. Whoever knows it can
+        film attempts for that athlete in the app without an account; they see the athlete's display
+        name and running battles. Such videos belong to the athlete and are visible for the review
+        only until the athlete changes that. We store the name the person filming gives (optional)
+        and, for videos recorded without a battle, their short description; the athletes of the
+        battle see both. Videos that are never assigned to a battle are deleted 30 days after the
+        recording unless the athlete keeps them. You can renew your code at any time.
       </p>
       <p>
         Please only film other people if they agree (see the terms of use). Legal basis: Art.
@@ -411,7 +421,18 @@ export function PrivacyDe() {
       <p>
         Versuche, die nicht zählen, siehst nur du. Nicht zählende Versuche (außer du behältst sie)
         und Videos „nur Review“ werden 7 Tage nach Ende des Battles gelöscht. Wenn du die
-        Sichtbarkeit eines Videos ändern oder es löschen lassen möchtest, schreib uns.
+        Sichtbarkeit eines Videos ändern oder es löschen lassen möchtest, schreib uns (bei Videos,
+        die Freunde gefilmt haben, kannst du sie selbst ändern).
+      </p>
+      <p>
+        <strong>Filmen durch Freunde.</strong> Jede Athletin und jeder Athlet hat einen
+        Athleten-Code. Wer ihn kennt, kann in der App ohne Konto Versuche für diese Person filmen
+        und sieht dabei deren Anzeigenamen und laufende Battles. Solche Videos gehören der Athletin
+        bzw. dem Athleten und sind nur für das Review sichtbar, bis sie bzw. er das ändert. Wir
+        speichern den Namen, den die filmende Person angibt (freiwillig), und bei Videos ohne
+        gewähltes Battle ihre kurze Beschreibung; die Beteiligten des Battles sehen beides. Videos,
+        die nie einem Battle zugeordnet werden, werden 30 Tage nach der Aufnahme gelöscht, außer die
+        Athletin bzw. der Athlet behält sie. Du kannst deinen Code jederzeit erneuern.
       </p>
       <p>
         Bitte filme andere Personen nur mit deren Einverständnis (siehe Nutzungsbedingungen).

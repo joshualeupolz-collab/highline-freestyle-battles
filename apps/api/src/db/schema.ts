@@ -520,6 +520,18 @@ export const attempts = sqliteTable(
     recordedBy: text('recorded_by').references(() => users.id),
     codeUsed: text('code_used'),
     opponentNameEntered: text('opponent_name_entered'),
+    /** Filming by friends: the name the person filming gave (free text, optional). */
+    recorderName: text('recorder_name'),
+    /** Offline filming by friends: what the friend wrote (opponent, format …) to assign it later. */
+    description: text('description'),
+    /**
+     * Filming by friends: `direct` = the friend picked the battle before recording; `pending` =
+     * assigned later from the inbox, waits for the opponent's confirmation; `confirmed`.
+     * NULL = recorded by the athlete.
+     */
+    assignment: text('assignment'),
+    assignedAt: integer('assigned_at'),
+    confirmedBy: text('confirmed_by').references(() => users.id),
   },
   (t) => [index('attempts_slot_idx').on(t.battleId, t.userId, t.partIndex, t.round)],
 );

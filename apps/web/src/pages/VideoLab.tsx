@@ -96,7 +96,7 @@ export function VideoLabPage() {
   const preview = useRef<HTMLVideoElement>(null);
 
   const refresh = useCallback(async () => {
-    setRecordings((await listRecordings()).filter((r) => !r.battle));
+    setRecordings((await listRecordings()).filter((r) => !r.battle && !r.guest));
     setStorage(await storageInfo());
   }, []);
 

@@ -447,6 +447,38 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
   notifications allowed) and on computers. Android has no Badging API: its launcher shows a
   dot/number for the app's notifications, so there the number needs notifications on.
 
+## 4m. Filming by friends with the athlete code (stage 2, part 2.10)
+
+- **Code:** `users.athlete_code`, 8 characters from 31 unambiguous ones (no 0/O/1/I/L), shown
+  as `K7M2-QX9P`; created on first use (`GET /api/athlete-code`), renewable
+  (`POST /api/athlete-code/renew`). Profile → "Your athlete code" (share link
+  `/film?code=…`). Rules: `packages/shared/src/athleteCode.ts`.
+- **Friend's page `/film`** (public, no login; works offline once the app was opened):
+  `POST /api/guest/lookup` → the athlete's running battles with attempts left. Online the
+  friend picks battle + part and records (`POST /api/guest/attempts` with `battleId`: same
+  checks as the athlete's own attempts, `assignment = 'direct'`). Offline (or "not listed") the
+  friend writes a description; the attempt goes to the athlete's **inbox** (`battle_id` NULL).
+  Uploads: `POST /api/guest/videos`, `PUT /api/guest/videos/:id/upload` (code in the
+  `X-Athlete-Code` header, only without R2 keys), `POST /api/guest/videos/:id/complete`. The
+  code is checked against the attempt's `code_used`, so uploads keep working after a renewal.
+  Phone side: `StoredRecording.guest`, `uploadQueue.ts` (`processGuest`).
+- **Assignment** (migration 0016: `attempts.recorder_name/description/assignment/assigned_at/
+  confirmed_by`): the friend (`/film`, once online: battles running at the recording time via
+  `lookup` with `at`) or the athlete (Battles page → "Videos from friends",
+  `GET /api/videos/inbox`, `POST /api/videos/inbox/:attemptId/assign`) assigns it →
+  `pending`; it counts towards the attempt limit at once. The opponent confirms or rejects it
+  (`POST /api/battles/:id/assignments/:attemptId`); the athlete can take it back ("Wrong
+  battle"). Rejected → back to the inbox. A pending video cannot be chosen
+  (`assignment_unconfirmed`). The opponent's next step shows it (`todo.assignmentForMe`).
+- **Shown:** the athlete's own attempt list says "filmed by …"; the opponent sees a "Filmed by
+  friends" card with name, time and description – **not the code** (it would let the opponent
+  use up the athlete's attempts).
+- **Defaults (owner to confirm):** friends' videos are uploaded as *review only*, not kept; the
+  athlete changes that per video (`POST /api/videos/:id/settings`, owner only). Inbox videos
+  nobody assigns are deleted after 30 days (hourly job, `markOldInboxVideos`) unless kept.
+  Whoever knows the code can use up the athlete's attempts – that is why the code can be
+  renewed at any time ("moderately secure", concept section 6).
+
 ---
 
 ## 5. Implementation order (stage 1)

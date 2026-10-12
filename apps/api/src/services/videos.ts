@@ -52,6 +52,10 @@ export async function battleVideosView(
         partIndex: attempts.partIndex,
         round: attempts.round,
         startedAt: attempts.startedAtClient,
+        codeUsed: attempts.codeUsed,
+        recorderName: attempts.recorderName,
+        description: attempts.description,
+        assignment: attempts.assignment,
       })
       .from(attempts)
       .where(eq(attempts.battleId, battle.id))
@@ -141,9 +145,23 @@ export async function battleVideosView(
             partIndex: a.partIndex,
             round: a.round,
             startedAt: a.startedAt,
+            ...friendView(a),
             video: video && video.status !== 'deleted' ? videoView(video) : null,
           };
         })
+    : [];
+  // Attempts friends filmed for the others (concept section 6): who filmed and when, and for
+  // later assignments the description to confirm. The code itself is not shown.
+  const byFriends = isParticipant
+    ? attemptRows
+        .filter((a) => a.userId !== viewerId && a.codeUsed !== null)
+        .map((a) => ({
+          id: a.id,
+          userId: a.userId,
+          partIndex: a.partIndex,
+          startedAt: a.startedAt,
+          ...friendView(a),
+        }))
     : [];
   // Cut-off videos the opponent attached to an extra-attempt request.
   const sharedWithMe = isParticipant
@@ -153,7 +171,26 @@ export async function battleVideosView(
         .map((v) => ({ id: v.id, ownerId: v.ownerId, partIndex: v.partIndex, round: v.round }))
     : [];
 
-  return { unlocked, slots: [...slots.values()], mine, sharedWithMe };
+  return { unlocked, slots: [...slots.values()], mine, sharedWithMe, byFriends };
+}
+
+/** Filming by friends: null for the athlete's own recordings. */
+function friendView(a: {
+  codeUsed: string | null;
+  recorderName: string | null;
+  description: string | null;
+  assignment: string | null;
+}) {
+  return a.codeUsed === null
+    ? { friend: null }
+    : {
+        friend: {
+          name: a.recorderName,
+          description: a.description,
+          /** direct | pending (waits for the opponent's confirmation) | confirmed */
+          assignment: a.assignment ?? 'direct',
+        },
+      };
 }
 
 /**

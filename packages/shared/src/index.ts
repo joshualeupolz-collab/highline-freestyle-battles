@@ -1,3 +1,4 @@
+export * from './athleteCode';
 export * from './auth';
 export * from './battles';
 export * from './competitions';

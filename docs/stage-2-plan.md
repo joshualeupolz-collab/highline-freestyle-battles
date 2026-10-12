@@ -22,7 +22,7 @@ Parts that need no answer from the owner come first, so work can go on in the me
 | 2.7 | **Review level 3** (judges) | 2.6 | done (architecture §4h) |
 | 2.8 | **Group battles** (n people online/on site, pairs weighted 1/(n−1)) | – | done: on site (architecture §4i); online later |
 | 2.9 | **Official competitions** (organizer, results or placements, confirmation) | 2.1, 2.8 | done (architecture §4j) |
-| 2.10 | **Filming by friends** (athlete code, inbox) | – | decided (§3.7) |
+| 2.10 | **Filming by friends** (athlete code, inbox) | – | done (architecture §4m) |
 | 2.11 | **Combined rankings** (official + free) | – | done (architecture §4k) |
 | 2.12 | **Over-rating warning** (rating spec §6.2) | 2.4 | later: needs ≥ 10 battles per estimated person |
 | 2.13 | **Push notifications** (Web Push) | – | done (architecture §4l) |
@@ -116,5 +116,5 @@ These follow the concept; where it was silent, Claude picked the simplest fair o
 
 ## 4. Order after the decisions
 
-~~2.2 reports → 2.3 annulment → 2.4 initial estimates → 2.6/2.7 review levels 2–3~~ (done) → ~~2.8 on-site group battles~~ (done) → ~~2.9 competitions (with weight 4–5)~~ (done) → ~~2.11 combined rankings~~ (done) → 2.10 athlete code →
+~~2.2 reports → 2.3 annulment → 2.4 initial estimates → 2.6/2.7 review levels 2–3~~ (done) → ~~2.8 on-site group battles~~ (done) → ~~2.9 competitions (with weight 4–5)~~ (done) → ~~2.11 combined rankings~~ (done) → ~~2.10 athlete code~~ (done) →
 ~~2.13 push notifications~~ (done).

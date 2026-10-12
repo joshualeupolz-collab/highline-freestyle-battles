@@ -31,8 +31,26 @@ export interface StoredRecording {
   diagnostics: Record<string, unknown>;
   /** Set for battle recordings; the recording id is then the attempt id. Missing on the test page. */
   battle?: BattleAttempt;
-  /** Upload state of a battle recording (see uploadQueue.ts). */
+  /** Set when filming for a friend with their athlete code (no account needed). */
+  guest?: GuestAttempt;
+  /** Upload state of a battle or guest recording (see uploadQueue.ts). */
   upload?: UploadState;
+}
+
+/** Filming for a friend: the attempt belongs to the athlete whose code was entered. */
+export interface GuestAttempt {
+  code: string;
+  /** The athlete's name, as shown when the code was entered (empty if entered offline). */
+  athleteName: string;
+  /** null = recorded offline: goes to the athlete's inbox and is assigned later. */
+  battleId: string | null;
+  partIndex: number;
+  round: number;
+  recorderName?: string;
+  /** Offline: opponent, format … so the right battle can be found later. */
+  description?: string;
+  /** The server knows about the attempt. */
+  synced: boolean;
 }
 
 export interface BattleAttempt {
@@ -196,7 +214,7 @@ export async function deleteChunks(recordingId: string): Promise<void> {
 export async function markInterruptedRecordings(): Promise<number> {
   let count = 0;
   for (const r of await listRecordings()) {
-    if (r.status !== 'recording' || r.battle) continue;
+    if (r.status !== 'recording' || r.battle || r.guest) continue;
     await saveRecording({ ...r, status: 'interrupted' });
     count++;
   }

@@ -833,3 +833,12 @@ button.link.report-link {
 .placement-list li {
   padding: 0.2rem 0;
 }
+
+/* Athlete code in the profile: large and easy to read out. */
+.athlete-code {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-family: ui-monospace, monospace;
+  margin: 0.4rem 0;
+}

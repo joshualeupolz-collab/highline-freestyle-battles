@@ -10,6 +10,7 @@ import { nextStep } from '../nextStep';
 import { LegalLinks } from '../pages/Legal';
 import { resyncPush } from '../push';
 import { ErrorText } from './ErrorText';
+import { useInbox } from './Inbox';
 import { InstallHint } from './InstallHint';
 
 /** Small line icons for the tab bar (24×24, drawn with the text color). */
@@ -45,11 +46,14 @@ export function Layout() {
   const pending = usePendingCount(active && hasRole(user, 'athlete', 'federation', 'admin'));
   const reports = useOpenReportCount(active && hasRole(user, 'federation', 'admin'));
   const reviews = useOpenReviews();
+  const inbox = useInbox();
   const { pathname } = useLocation();
-  // The number on the app icon: battles that wait for me or have new messages, and reviews.
+  // The number on the app icon: battles that wait for me or have new messages, reviews, and
+  // videos friends filmed for me that wait in the inbox.
   const waitingCount =
     user && battles.data
       ? reviews.length +
+        inbox.length +
         battles.data.battles.filter(
           (b) => b.unreadMessages > 0 || nextStep(b, b.todo, user.id)?.urgent,
         ).length

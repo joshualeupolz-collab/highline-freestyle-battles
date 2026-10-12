@@ -10,6 +10,7 @@ import {
   addChunk,
   type BattleAttempt,
   type EndReason,
+  type GuestAttempt,
   type StoredRecording,
   saveRecording,
   updateRecording,
@@ -70,6 +71,8 @@ export interface RecordOptions {
   attempt: number;
   /** For a battle: the attempt (its id becomes the recording id) and where it belongs. */
   battle?: { attemptId: string } & Omit<BattleAttempt, 'synced'>;
+  /** Filming for a friend: the attempt (its id becomes the recording id) and whose it is. */
+  guest?: { attemptId: string } & Omit<GuestAttempt, 'synced'>;
 }
 
 export interface RecordProgress {
@@ -105,7 +108,7 @@ export async function startRecording(
     recorderOptions.videoKeyFrameIntervalDuration = options.keyFrameIntervalMs;
   const recorder = new MediaRecorder(stream, recorderOptions);
 
-  const id = options.battle?.attemptId ?? crypto.randomUUID();
+  const id = options.battle?.attemptId ?? options.guest?.attemptId ?? crypto.randomUUID();
   const t0 = performance.now();
   const chunkTimes: number[] = [];
   const events: string[] = [];
@@ -129,6 +132,11 @@ export async function startRecording(
         synced: false,
       },
       upload: { state: 'waiting', visibility: 'public', keep: false },
+    }),
+    ...(options.guest && {
+      guest: (({ attemptId: _, ...g }) => ({ ...g, synced: false }))(options.guest),
+      // Someone else's video: only for the review unless the athlete changes it.
+      upload: { state: 'waiting', visibility: 'review_only', keep: false },
     }),
   };
   const diagnostics = () => {

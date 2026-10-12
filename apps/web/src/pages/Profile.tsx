@@ -85,6 +85,7 @@ export function ProfilePage() {
           <dd>{me.roles.join(', ') || '–'}</dd>
         </dl>
       </div>
+      <AthleteCodeCard />
       <PushCard />
       <details className="card more">
         <summary>{t('profile.changePassword')}</summary>
@@ -162,6 +163,59 @@ export function ProfilePage() {
       </details>
       <LegalLinks />
     </>
+  );
+}
+
+/**
+ * My athlete code (concept section 6): friends enter it to film my attempts without an account.
+ * A new code stops the old one from working for new recordings.
+ */
+function AthleteCodeCard() {
+  const queryClient = useQueryClient();
+  const code = useQuery({ queryKey: ['athleteCode'], queryFn: api.athleteCode });
+  const renew = useMutation({
+    mutationFn: api.renewAthleteCode,
+    onSuccess: (res) => queryClient.setQueryData(['athleteCode'], res),
+  });
+  const [copied, setCopied] = useState(false);
+  const value = code.data?.code;
+  const link = value ? `${location.origin}/film?code=${value}` : '';
+  const share = async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: t('film.title'), url: link });
+      else {
+        await navigator.clipboard.writeText(link);
+        setCopied(true);
+      }
+    } catch {
+      // Sharing cancelled.
+    }
+  };
+  return (
+    <div className="card">
+      <strong>{t('code.title')}</strong>
+      <p className="hint">{t('code.hint')}</p>
+      {value && <p className="athlete-code">{value}</p>}
+      <ErrorText error={code.error ?? renew.error} />
+      <div className="inline">
+        <button type="button" className="secondary" disabled={!value} onClick={share}>
+          {copied ? t('code.copied') : t('code.share')}
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={!value || renew.isPending}
+          onClick={() => {
+            if (window.confirm(t('code.renewConfirm'))) renew.mutate();
+          }}
+        >
+          {t('code.renew')}
+        </button>
+      </div>
+      <p className="muted">
+        <Link to="/film">{t('code.filmForFriend')}</Link>
+      </p>
+    </div>
   );
 }
 
