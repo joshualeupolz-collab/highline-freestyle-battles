@@ -18,6 +18,7 @@ import {
 import { and, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
+  attemptReservations,
   attempts,
   battleParticipants,
   battles,
@@ -31,13 +32,11 @@ import type { Env } from '../env';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { originalKey, videoStore } from '../storage/videoStore';
+import { CLOCK_TOLERANCE_MS } from './attempts';
 import { requiredSubmissionsPerPerson } from './battles';
 
 type BattleRow = typeof battles.$inferSelect;
 type AttemptRow = typeof attempts.$inferSelect;
-
-/** The phone's clock may be a little ahead of ours. */
-export const CLOCK_TOLERANCE_MS = 5 * 60_000;
 
 /** A random code like `K7M2-QX9P` (until the athlete chooses their own). */
 function randomCode(): string {
@@ -126,7 +125,7 @@ export async function runningBattles(db: Database, athleteId: string, now: numbe
     .limit(30);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.battle.id);
-  const [people, used] = await Promise.all([
+  const [people, used, reserved] = await Promise.all([
     db
       .select({
         battleId: battleParticipants.battleId,
@@ -145,7 +144,14 @@ export async function runningBattles(db: Database, athleteId: string, now: numbe
           inArray(attempts.battleId, ids),
           eq(attempts.userId, athleteId),
           eq(attempts.provisional, false),
+          isNull(attempts.reservationId),
         ),
+      ),
+    db
+      .select()
+      .from(attemptReservations)
+      .where(
+        and(inArray(attemptReservations.battleId, ids), eq(attemptReservations.userId, athleteId)),
       ),
   ]);
   return rows.map(({ battle, formatName, partsJson }) => {
@@ -154,6 +160,12 @@ export async function runningBattles(db: Database, athleteId: string, now: numbe
     for (const a of used.filter((u) => u.battleId === battle.id)) {
       const key = slotKey(a.partIndex, a.round);
       usedBySlot.set(key, (usedBySlot.get(key) ?? 0) + 1);
+    }
+    // Reserved units (offline recording) are used up too.
+    const ofBattle = reserved.filter((r) => r.battleId === battle.id);
+    for (const r of ofBattle) {
+      const key = slotKey(r.partIndex, r.round);
+      usedBySlot.set(key, (usedBySlot.get(key) ?? 0) + r.count);
     }
     const me = people.find((p) => p.battleId === battle.id && p.userId === athleteId);
     return {
@@ -164,6 +176,11 @@ export async function runningBattles(db: Database, athleteId: string, now: numbe
         .filter((p) => p.battleId === battle.id && p.userId !== athleteId)
         .map((p) => p.displayName),
       deadlineAt: battle.deadlineAt,
+      attemptsPerVideo: battle.attemptsPerVideo,
+      /** Open reservations of other devices: shown before taking them over. */
+      reservations: ofBattle
+        .filter((r) => r.closedAt === null)
+        .map((r) => ({ partIndex: r.partIndex, count: r.count, createdAt: r.createdAt })),
       attemptsLeft: parts.map((_, i) =>
         attemptsLeft(battle.attemptsPerVideo, me?.extraAttempts ?? 0, usedBySlot, slotKey(i, 1)),
       ),

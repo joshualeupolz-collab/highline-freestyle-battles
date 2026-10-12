@@ -16,6 +16,7 @@ import {
   proposalResponseSchema,
   reviewVoteSchema,
   sendMessageRequestSchema,
+  UPLOAD_GRACE_DAYS,
 } from '@hfb/shared';
 import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
@@ -52,7 +53,7 @@ import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
-import { settleUserAttempts } from '../services/attempts';
+import { lostReservations, mayStillDeliver, settleUserAttempts } from '../services/attempts';
 import { eventStatement } from '../services/battleEvents';
 import {
   cancelPendingProposalsStatement,
@@ -147,9 +148,21 @@ export async function battleResponse(
       ),
     displayParams(db),
   ]);
+  // Reservations never reported back (lost devices), shown next to extra-attempt requests.
+  const lost =
+    battle.status === 'active' && battle.mode === 'online'
+      ? await lostReservations(
+          db,
+          participants.map((p) => p.userId),
+        )
+      : new Map<string, number>();
   const withRatings = participants.map((p) => {
     const state = states.find((s) => s.userId === p.userId);
-    return { ...p, rating: state ? ratingView(state, params, now) : null };
+    return {
+      ...p,
+      rating: state ? ratingView(state, params, now) : null,
+      lostReservations: lost.get(p.userId) ?? 0,
+    };
   });
   return {
     battle: {
@@ -169,6 +182,9 @@ export async function battleResponse(
       playedAt: battle.playedAt,
       deadlineAt: battle.deadlineAt,
       deadlinePassed: battle.status === 'active' && isDeadlinePassed(battle, now),
+      /** Uploading and choosing stay possible until then (owner, 2026-10-12). */
+      graceUntil:
+        battle.deadlineAt === null ? null : battle.deadlineAt + UPLOAD_GRACE_DAYS * 86_400_000,
       decidedAt: battle.decidedAt,
       decisionReason: battle.decisionReason,
       cancelReason: battle.cancelReason,
@@ -918,6 +934,14 @@ battleRoutes.post('/:id/deadline-decision', async (c) => {
   if (missing.length === 0) apiError(409, 'everyone_delivered');
   if (delivered.length > 0 && !delivered.includes(user.id))
     apiError(403, 'only_the_delivering_side_decides');
+  // Grace period (owner, 2026-10-12): for UPLOAD_GRACE_DAYS after the deadline the others may
+  // still upload attempts started in time and choose, e.g. after days without a connection.
+  if (
+    battle.deadlineAt !== null &&
+    now < battle.deadlineAt + UPLOAD_GRACE_DAYS * 86_400_000 &&
+    (await mayStillDeliver(db, battle.id, missing))
+  )
+    apiError(409, 'others_may_still_deliver');
   if (choice === 'claim_win' && delivered.length === 0) apiError(409, 'nobody_delivered');
 
   const statements =

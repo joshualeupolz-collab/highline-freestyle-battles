@@ -8,6 +8,7 @@ import { deliveryStatus } from '../battles/rules';
 import type { Database } from '../db/client';
 import { attempts, battleProposals, battles, submissions, videoFiles, videos } from '../db/schema';
 import type { VideoStore } from '../storage/videoStore';
+import { battleReservations } from './attempts';
 import { cancelPendingProposalsStatement, requiredSubmissionsPerPerson } from './battles';
 import { reviewerRole } from './review';
 
@@ -44,7 +45,7 @@ export async function battleVideosView(
   viewerId: string | null,
   isReviewer = false,
 ) {
-  const [attemptRows, videoRows, submissionRows, shared] = await Promise.all([
+  const [attemptRows, videoRows, submissionRows, shared, reservationRows] = await Promise.all([
     db
       .select({
         id: attempts.id,
@@ -55,6 +56,7 @@ export async function battleVideosView(
         codeUsed: attempts.codeUsed,
         recorderName: attempts.recorderName,
         provisional: attempts.provisional,
+        reservationId: attempts.reservationId,
       })
       .from(attempts)
       .where(eq(attempts.battleId, battle.id))
@@ -62,6 +64,7 @@ export async function battleVideosView(
     db.select().from(videos).where(eq(videos.battleId, battle.id)),
     db.select().from(submissions).where(eq(submissions.battleId, battle.id)),
     sharedVideoIds(db, battle.id),
+    battleReservations(db, battle.id),
   ]);
   const unlocked = isUnlocked(battle.status);
   const isParticipant = viewerId !== null && participantIds.includes(viewerId);
@@ -149,6 +152,7 @@ export async function battleVideosView(
             round: a.round,
             startedAt: a.startedAt,
             provisional: a.provisional,
+            reservationId: a.reservationId,
             ...friendView(a),
             video: video && video.status !== 'deleted' ? videoView(video) : null,
           };
@@ -175,7 +179,28 @@ export async function battleVideosView(
         .map((v) => ({ id: v.id, ownerId: v.ownerId, partIndex: v.partIndex, round: v.round }))
     : [];
 
-  return { unlocked, slots: [...slots.values()], mine, sharedWithMe, byFriends };
+  // Reservations for offline recording (concept section 6): everyone in the battle sees who
+  // reserved how many and since when; only the athlete sees the full device code.
+  const reservations = isParticipant
+    ? reservationRows.map((r) => ({
+        id: r.id,
+        userId: r.userId,
+        partIndex: r.partIndex,
+        round: r.round,
+        count: r.count,
+        requested: r.requested,
+        used: attemptRows.filter((a) => a.reservationId === r.id).length,
+        takeover: r.takeover,
+        createdAt: r.createdAt,
+        reportedAt: r.reportedAt,
+        closedAt: r.closedAt,
+        friend: r.codeUsed === null ? null : { name: r.recorderName },
+        deviceCode: r.userId === viewerId ? r.deviceCode : null,
+        deviceLabel: r.deviceCode.slice(0, 4),
+      }))
+    : [];
+
+  return { unlocked, slots: [...slots.values()], mine, sharedWithMe, byFriends, reservations };
 }
 
 /** Filming by friends: null for the athlete's own recordings. */

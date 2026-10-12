@@ -129,6 +129,7 @@ export async function startRecording(
         battleId: options.battle.battleId,
         partIndex: options.battle.partIndex,
         round: options.battle.round,
+        ...(options.battle.reservationId && { reservationId: options.battle.reservationId }),
         synced: false,
       },
       upload: { state: 'waiting', visibility: 'public', keep: false },

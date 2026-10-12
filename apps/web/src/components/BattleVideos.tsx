@@ -5,9 +5,23 @@
 import { attemptsLeft, newId, slotKey, type VideoVisibility } from '@hfb/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Battle, type Format, type BattleVideos as Videos, videoFileUrl } from '../api';
+import {
+  ApiError,
+  api,
+  type Battle,
+  type Format,
+  type BattleVideos as Videos,
+  videoFileUrl,
+} from '../api';
 import { partText } from '../battleHelpers';
 import { errorText, formatDate, t } from '../i18n';
+import {
+  countRecording,
+  localReservations,
+  removeLocalReservation,
+  reservationFor,
+  updateLocalReservation,
+} from '../video/device';
 import { QUALITIES, QUALITY_PRESETS, type Quality } from '../video/quality';
 import {
   type ActiveRecording,
@@ -30,6 +44,7 @@ import { trimVideo } from '../video/trim';
 import { kickUploads, onProgress, onServerChanged, uploadProgress } from '../video/uploadQueue';
 import { useCameraZoom } from '../video/zoom';
 import { ErrorText } from './ErrorText';
+import { MyReservations, OpponentReservations, PrepareOffline } from './OfflineReservations';
 import { ReportButton } from './ReportButton';
 
 const ROUND = 1; // multi-round formats come in stage 3
@@ -114,13 +129,64 @@ export function BattleVideos({
     }
     return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt);
   };
-  // Provisional attempts (beyond the allowance) do not use it up; recordings the server does
-  // not know yet probably will.
+  const reservations = battle.videos.reservations ?? [];
+  const myReservations = reservations.filter((r) => r.userId === myId);
+  const limited = battle.settings.attemptsPerVideo !== null;
+  // This device's reservation for a part (also known offline, see device.ts).
+  const onDevice = (i: number) => reservationFor(battle.id, i);
+  // Units of this device's reservation not used yet (recordings under it, here or on the server).
+  const deviceUnitsLeft = (i: number) => {
+    const r = onDevice(i);
+    if (!r) return 0;
+    const ids = new Set(
+      battle.videos.mine.filter((a) => a.reservationId === r.id).map((a) => a.id),
+    );
+    for (const l of local) if (l.battle?.reservationId === r.id) ids.add(l.id);
+    return Math.max(0, r.count - Math.max(ids.size, r.recorded ?? 0));
+  };
+  // Reserved units use up the allowance; so do valid attempts outside reservations. Provisional
+  // attempts do not; recordings the server does not know yet probably will.
   const used = new Map<string, number>();
-  for (let i = 0; i < format.parts.length; i++)
-    used.set(slotKey(i, ROUND), rows(i).filter((r) => !r.server?.provisional).length);
+  for (let i = 0; i < format.parts.length; i++) {
+    const reserved = myReservations
+      .filter((r) => r.partIndex === i)
+      .reduce((sum, r) => sum + r.count, 0);
+    const outside = rows(i).filter(
+      (r) => !r.server?.provisional && !r.server?.reservationId && !r.local?.battle?.reservationId,
+    ).length;
+    used.set(slotKey(i, ROUND), reserved + outside);
+  }
   const left = (i: number) =>
     attemptsLeft(battle.settings.attemptsPerVideo, me?.extraAttempts ?? 0, used, slotKey(i, ROUND));
+  // What the camera shows: free attempts plus the ones reserved on this device.
+  const leftHere = (i: number) => {
+    const n = left(i);
+    return n === null ? null : n + deviceUnitsLeft(i);
+  };
+
+  // Keep this device's list in step with the server: drop reservations it closed; once the
+  // battle no longer runs, report the open ones (the server then closes them).
+  useEffect(() => {
+    for (const r of localReservations()) {
+      if (r.battleId !== battle.id || r.guest) continue;
+      const server = reservations.find((s) => s.id === r.id);
+      if (server?.closedAt != null) removeLocalReservation(r.id);
+      else if (battle.status !== 'active' && !r.needsReport) {
+        updateLocalReservation(r.id, { needsReport: true });
+        kickUploads();
+      }
+    }
+  }, [battle.id, battle.status, reservations]);
+
+  const beginRecording = (i: number) => {
+    setError(null);
+    // Without a reservation, recording needs a connection: Start is registered at once.
+    if (limited && !navigator.onLine && !onDevice(i)) {
+      setError(new ApiError(0, 'offline_needs_reservation'));
+      return;
+    }
+    setRecordPart(i);
+  };
 
   const choose = async (videoId: string) => {
     setError(null);
@@ -192,17 +258,26 @@ export function BattleVideos({
                 <button
                   type="button"
                   disabled={!isRecordingSupported()}
-                  onClick={() => setRecordPart(i)}
+                  onClick={() => beginRecording(i)}
                 >
                   {t('videos.record')}
                 </button>
                 <LeftText left={n} />
+                {deviceUnitsLeft(i) > 0 && (
+                  <span className="muted">
+                    {t('offline.reservedHere', { n: deviceUnitsLeft(i) })}
+                  </span>
+                )}
               </div>
             )}
           </div>
         );
       })}
 
+      <MyReservations battle={battle} myId={myId} format={format} />
+      {active && limited && (
+        <PrepareOffline battle={battle} format={format} myId={myId} left={left} />
+      )}
       <FilmedByFriends battle={battle} />
       {recordPart !== null && (
         <RecordScreen
@@ -217,7 +292,9 @@ export function BattleVideos({
               // Not remembered in private mode.
             }
           }}
-          attemptsLeft={left(recordPart)}
+          attemptsLeft={leftHere(recordPart)}
+          reservationId={onDevice(recordPart)?.id}
+          needsConnection={limited}
           onDone={(recordingId) => {
             setRecordPart(null);
             if (recordingId) setPrepareId(recordingId);
@@ -416,6 +493,8 @@ export function RecordScreen({
   quality,
   onQuality,
   attemptsLeft: left,
+  reservationId,
+  needsConnection = false,
   onDone,
 }: {
   battleId: string;
@@ -424,6 +503,10 @@ export function RecordScreen({
   quality: Quality;
   onQuality: (q: Quality) => void;
   attemptsLeft: number | null;
+  /** This device's reservation for the part: recordings use it (offline recording). */
+  reservationId?: string | undefined;
+  /** Without a reservation, Start must be registered at once (no offline recording). */
+  needsConnection?: boolean;
   onDone: (recordingId: string | null) => void;
 }) {
   const preview = useRef<HTMLVideoElement>(null);
@@ -485,6 +568,11 @@ export function RecordScreen({
   async function start() {
     if (!stream) return;
     setError(null);
+    const offline = !navigator.onLine;
+    if (offline && needsConnection && !reservationId) {
+      setError(t('error.offline_needs_reservation'));
+      return;
+    }
     try {
       await requestPersistentStorage();
       const recording = await startRecording(
@@ -497,14 +585,16 @@ export function RecordScreen({
           timesliceMs: 1000,
           attempt: 0,
           ...(guest
-            ? { guest: { attemptId: newId(), ...guest } }
-            : { battle: { attemptId: newId(), battleId, partIndex, round: ROUND } }),
+            ? { guest: { attemptId: newId(), ...guest, reservationId } }
+            : { battle: { attemptId: newId(), battleId, partIndex, round: ROUND, reservationId } }),
         },
         () => {},
         // Leaving the app ended the attempt.
         (stopped) => finish(stopped.id),
       );
       setActive(recording);
+      // Recorded offline under a reservation: report back once online (uploadQueue.ts).
+      if (reservationId) countRecording(reservationId, offline);
       kickUploads(); // registers the attempt right away if there is a connection
     } catch (e) {
       setError(t('lab.recordError', { error: String(e) }));
@@ -797,10 +887,13 @@ export function OpponentProgress({ battle, myId }: { battle: Battle; myId: strin
         const uploaded = slots.reduce((sum, s) => sum + s.uploaded, 0);
         const chosen = slots.filter((s) => s.submittedAt !== null).length;
         return (
-          <p key={p.userId} className="muted" style={{ margin: 0 }}>
-            {t('videos.opponentProgress', { name: p.displayName, attempts, uploaded, chosen })}
-            {provisional > 0 && ` ${t('videos.opponentProvisional', { n: provisional })}`}
-          </p>
+          <div key={p.userId}>
+            <p className="muted" style={{ margin: 0 }}>
+              {t('videos.opponentProgress', { name: p.displayName, attempts, uploaded, chosen })}
+              {provisional > 0 && ` ${t('videos.opponentProvisional', { n: provisional })}`}
+            </p>
+            <OpponentReservations battle={battle} userId={p.userId} />
+          </div>
         );
       })}
     </>

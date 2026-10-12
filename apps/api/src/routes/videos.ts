@@ -6,6 +6,8 @@
  * 2. The phone announces the video (`POST /videos`) and gets an upload target: a signed R2 URL,
  *    or `PUT /videos/:id/upload` through the Worker (see storage/videoStore.ts).
  * 3. After sending the bytes, `POST /videos/:id/complete` checks the stored file.
+ *    Offline recording needs attempts reserved while online (`POST /battles/:id/reservations`);
+ *    the device reports back (`.../reservations/:rid/report`) once online again.
  * 4. The athlete chooses the attempt that counts per part (`POST /battles/:id/submissions`).
  *    Once everyone has chosen, the videos unlock and the battle moves on to the review.
  */
@@ -13,6 +15,8 @@ import {
   createVideoSchema,
   MAX_VIDEO_BYTES,
   registerAttemptSchema,
+  reportReservationSchema,
+  reserveAttemptsSchema,
   submitVideoSchema,
   videoSettingsSchema,
 } from '@hfb/shared';
@@ -31,7 +35,12 @@ import {
 import type { AppEnv, Env } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
-import { settleUserAttempts } from '../services/attempts';
+import {
+  insertAttempt,
+  ownReservation,
+  reportReservation,
+  reserveAttempts,
+} from '../services/attempts';
 import { eventStatement } from '../services/battleEvents';
 import { announceVideo, checkAttemptAllowed } from '../services/friendVideos';
 import { notify, requestNotifyContext } from '../services/notify';
@@ -68,19 +77,59 @@ battleVideoRoutes.post('/:id/attempts', async (c) => {
   }
 
   await checkAttemptAllowed(db, battle, input, now);
-
-  await db.insert(attempts).values({
-    id: input.id,
-    battleId: battle.id,
-    userId: user.id,
-    partIndex: input.partIndex,
-    round: input.round,
-    startedAtClient: input.startedAt,
-    syncedAt: now,
-    provisional: true,
-  });
-  await settleUserAttempts(db, battle, user.id);
+  await insertAttempt(
+    db,
+    battle,
+    user.id,
+    input,
+    { deviceCode: input.deviceCode ?? null, codeUsed: null, recorderName: null, recordedBy: null },
+    now,
+  );
   return c.json(await battleResponse(db, battle.id, user.id, now), 201);
+});
+
+/**
+ * "Prepare for offline recording" (concept section 6): reserve attempts per part on this device.
+ * Reserved attempts count as used at once; the device must report back once online.
+ */
+battleVideoRoutes.post('/:id/reservations', async (c) => {
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const input = await parseJson(c, reserveAttemptsSchema);
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+  const { battle, participants } = await loadBattle(db, c.req.param('id'));
+  requireParticipant(participants, user.id);
+  for (const part of input.parts)
+    await checkAttemptAllowed(db, battle, { ...part, startedAt: now }, now);
+  await reserveAttempts(
+    db,
+    battle,
+    user.id,
+    input,
+    { deviceCode: input.deviceCode, codeUsed: null, recorderName: null, recordedBy: null },
+    now,
+  );
+  return c.json(await battleResponse(db, battle.id, user.id, now), 201);
+});
+
+/** Back online: the device's attempts are registered; optionally hand back the unused ones. */
+battleVideoRoutes.post('/:id/reservations/:reservationId/report', async (c) => {
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const input = await parseJson(c, reportReservationSchema);
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+  const { battle } = await loadBattle(db, c.req.param('id'));
+  const reservation = await ownReservation(
+    db,
+    battle.id,
+    c.req.param('reservationId'),
+    user.id,
+    input.deviceCode,
+  );
+  await reportReservation(db, battle, reservation, input.handBack, now);
+  return c.json(await battleResponse(db, battle.id, user.id, now));
 });
 
 /**

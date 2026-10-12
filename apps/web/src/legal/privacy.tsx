@@ -156,6 +156,15 @@ export function PrivacyEn() {
         at any time.
       </p>
       <p>
+        <strong>Recording offline.</strong> To keep the attempt limit fair, the app stores a random
+        device code on every phone or browser (deleting the app or its data creates a new one).
+        Every attempt and every reservation of attempts for recording offline is stored with this
+        code and its time. The athletes of the battle see reservations (number, time, the first four
+        characters of the device code) in the battle and its chat. How many reservations an athlete
+        never reported back is shown to their opponents and to the federation and admins. Legal
+        basis: Art. 6(1)(b) GDPR, and Art. 6(1)(f) GDPR (fair competition).
+      </p>
+      <p>
         Please only film other people if they agree (see the terms of use). Legal basis: Art.
         6(1)(b) GDPR.
       </p>
@@ -430,6 +439,16 @@ export function PrivacyDe() {
         Solche Videos gehören der Athletin bzw. dem Athleten und sind öffentlich (siehe oben), bis
         sie bzw. er das ändert. Wir speichern den Namen, den die filmende Person angibt
         (freiwillig); die Beteiligten des Battles sehen ihn. Du kannst deinen Code jederzeit ändern.
+      </p>
+      <p>
+        <strong>Offline aufnehmen.</strong> Damit das Versuchslimit fair bleibt, speichert die App
+        auf jedem Handy bzw. in jedem Browser einen zufälligen Gerätecode (wird die App oder werden
+        ihre Daten gelöscht, entsteht ein neuer). Jeder Versuch und jede Reservierung von Versuchen
+        für Offline-Aufnahmen wird mit diesem Code und der Uhrzeit gespeichert. Die Beteiligten des
+        Battles sehen Reservierungen (Anzahl, Zeit, die ersten vier Zeichen des Gerätecodes) im
+        Battle und im Chat. Wie viele Reservierungen jemand nie zurückgemeldet hat, sehen die
+        jeweiligen Gegner sowie Verband und Admins. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO und
+        Art. 6 Abs. 1 lit. f DSGVO (fairer Wettkampf).
       </p>
       <p>
         Bitte filme andere Personen nur mit deren Einverständnis (siehe Nutzungsbedingungen).

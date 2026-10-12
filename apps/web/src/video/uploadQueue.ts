@@ -13,6 +13,12 @@
 import { MAX_VIDEO_BYTES } from '@hfb/shared';
 import { ApiError, api } from '../api';
 import {
+  deviceCode,
+  localReservations,
+  removeLocalReservation,
+  updateLocalReservation,
+} from './device';
+import {
   deleteRecording,
   listRecordings,
   loadRecordingBytes,
@@ -124,6 +130,43 @@ async function runOnce() {
       }));
     }
   }
+  await reportReservations();
+}
+
+/**
+ * Back online: report reservations whose recordings are all registered (concept section 6).
+ * Once the deadline passed, the server hands the unused attempts back and the reservation is
+ * done on this device.
+ */
+async function reportReservations() {
+  const unsynced = new Set(
+    (await listRecordings())
+      .filter((r) => r.upload?.state !== 'failed')
+      .filter((r) => (r.battle && !r.battle.synced) || (r.guest && !r.guest.synced))
+      .map((r) => r.battle?.reservationId ?? r.guest?.reservationId),
+  );
+  const now = Date.now();
+  for (const reservation of localReservations()) {
+    const deadlinePassed = reservation.deadlineAt !== null && reservation.deadlineAt <= now;
+    if (!(reservation.needsReport || deadlinePassed) || unsynced.has(reservation.id)) continue;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    try {
+      const body = { deviceCode: deviceCode(), handBack: deadlinePassed };
+      const closed = reservation.guest
+        ? (await api.guestReport(reservation.id, { ...body, code: reservation.guest.code }))
+            .reservation.closedAt !== null
+        : (
+            await api.reportReservation(reservation.battleId, reservation.id, body)
+          ).battle.videos.reservations.find((r) => r.id === reservation.id)?.closedAt != null;
+      if (closed) removeLocalReservation(reservation.id);
+      else updateLocalReservation(reservation.id, { needsReport: false });
+      for (const listener of serverListeners) listener(reservation.battleId);
+    } catch (error) {
+      if (!isRefusal(error)) return; // no connection: try again later
+      // Unknown to the server (or no longer ours): nothing left to report.
+      removeLocalReservation(reservation.id);
+    }
+  }
 }
 
 async function process(recording: StoredRecording) {
@@ -136,6 +179,8 @@ async function process(recording: StoredRecording) {
       partIndex: battle.partIndex,
       round: battle.round,
       startedAt: recording.createdAt,
+      deviceCode: deviceCode(),
+      ...(battle.reservationId ? { reservationId: battle.reservationId } : {}),
     });
     await updateRecording(recording.id, (r) =>
       r.battle ? { ...r, battle: { ...r.battle, synced: true } } : r,
@@ -159,6 +204,8 @@ async function processGuest(recording: StoredRecording) {
       round: guest.round,
       startedAt: recording.createdAt,
       recorderName: guest.recorderName,
+      deviceCode: deviceCode(),
+      ...(guest.reservationId ? { reservationId: guest.reservationId } : {}),
     });
     await updateRecording(recording.id, (r) =>
       r.guest ? { ...r, guest: { ...r.guest, synced: true } } : r,

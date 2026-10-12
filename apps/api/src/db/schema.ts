@@ -543,8 +543,55 @@ export const attempts = sqliteTable(
      * extra attempts are granted (concept section 6). Set by `settleAttempts` in @hfb/shared.
      */
     provisional: integer('provisional', { mode: 'boolean' }).notNull().default(false),
+    /** The installation or browser that recorded it (random, stored on the device). */
+    deviceCode: text('device_code'),
+    /** Inside the units of this reservation for offline recording (always valid). */
+    reservationId: text('reservation_id'),
   },
   (t) => [index('attempts_slot_idx').on(t.battleId, t.userId, t.partIndex, t.round)],
+);
+
+/**
+ * Attempts reserved while online for recording offline (concept section 6, decided 2026-10-12):
+ * one row per device, battle, athlete and part. `count` reserved units use up the allowance at
+ * once; attempts recorded under the reservation fill them (`attempts.reservation_id`). Reporting
+ * back with `closed_at` hands the unused units back (`count` = attempts recorded). A reservation
+ * still open when the battle ended was never reported (lost device): counted per athlete.
+ */
+export const attemptReservations = sqliteTable(
+  'attempt_reservations',
+  {
+    id: text('id').primaryKey(),
+    battleId: text('battle_id')
+      .notNull()
+      .references(() => battles.id),
+    /** The athlete whose attempts are reserved. */
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    partIndex: integer('part_index').notNull(),
+    round: integer('round').notNull().default(1),
+    /** Units that use up the allowance; 0 when nothing was free (a take-over: provisional). */
+    count: integer('count').notNull(),
+    /** How many attempts the device asked for. */
+    requested: integer('requested').notNull(),
+    deviceCode: text('device_code').notNull(),
+    /** Other open reservations existed and nothing was free: attempts stay provisional. */
+    takeover: integer('takeover', { mode: 'boolean' }).notNull().default(false),
+    /** Filming by friends: the code's key and the name given (NULL = the athlete's own device). */
+    codeUsed: text('code_used'),
+    recorderName: text('recorder_name'),
+    createdAt: integer('created_at').notNull(),
+    /** The device reported its attempts (last time). */
+    reportedAt: integer('reported_at'),
+    /** Handed back: unused units are free again. */
+    closedAt: integer('closed_at'),
+  },
+  (t) => [
+    index('attempt_reservations_battle_idx').on(t.battleId, t.userId),
+    index('attempt_reservations_user_idx').on(t.userId, t.closedAt),
+    check('attempt_reservations_count_check', sql`${t.count} >= 0 AND ${t.requested} >= 0`),
+  ],
 );
 
 export const videos = sqliteTable(

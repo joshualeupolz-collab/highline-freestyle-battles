@@ -1,7 +1,9 @@
 /**
- * Filming for a friend with their athlete code (concept section 6). No account needed; online
- * only (owner, 2026-10-12): enter the code, pick one of the athlete's running battles and a
- * part, record. The upload waits on the phone if the connection drops after recording.
+ * Filming for a friend with their athlete code (concept section 6). No account needed: enter the
+ * code, pick one of the athlete's running battles and a part, record (owner, 2026-10-12). The
+ * upload waits on the phone if the connection drops after recording. Filming offline needs
+ * attempts reserved on this phone beforehand ("Prepare for offline filming"); the prepared
+ * battles are kept on the phone and shown even without a connection.
  */
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -9,7 +11,17 @@ import { api, type GuestBattle } from '../api';
 import { partText } from '../battleHelpers';
 import { LeftText, PrepareUpload, RecordScreen } from '../components/BattleVideos';
 import { ErrorText } from '../components/ErrorText';
+import { ReserveForm, useOnline } from '../components/OfflineReservations';
 import { errorText, formatDate, t } from '../i18n';
+import {
+  addLocalReservations,
+  deviceCode,
+  type LocalReservation,
+  localReservations,
+  onReservationsChanged,
+  removeLocalReservation,
+  reservationFor,
+} from '../video/device';
 import { QUALITIES, type Quality } from '../video/quality';
 import { isRecordingSupported } from '../video/recorder';
 import {
@@ -40,7 +52,10 @@ function write(key: string, value: unknown) {
   }
 }
 
-type Target = Omit<GuestAttempt, 'synced'> & { attemptsLeft: number | null };
+type Target = Omit<GuestAttempt, 'synced'> & {
+  attemptsLeft: number | null;
+  limited: boolean;
+};
 
 export function FilmForFriendPage() {
   // A shared link carries the code (Profile → athlete code → share).
@@ -54,6 +69,8 @@ export function FilmForFriendPage() {
   const [busy, setBusy] = useState(false);
   const [target, setTarget] = useState<Target | null>(null);
   const [prepareId, setPrepareId] = useState<string | null>(null);
+  const [reserveFor, setReserveFor] = useState<string | null>(null);
+  const prepared = useGuestReservations();
   const [quality, setQuality] = useState<Quality>(() => {
     const q = read<string>(QUALITY_KEY, 'normal');
     return QUALITIES.find((x) => x === q) ?? 'normal';
@@ -130,6 +147,7 @@ export function FilmForFriendPage() {
               </span>
               {b.parts.map((part, i) => {
                 const left = b.attemptsLeft[i] ?? null;
+                const reservation = reservationFor(b.id, i, code);
                 return (
                   // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a format never change
                   <div key={i} className="actions">
@@ -137,7 +155,14 @@ export function FilmForFriendPage() {
                       type="button"
                       disabled={!isRecordingSupported()}
                       onClick={() =>
-                        setTarget({ ...base, battleId: b.id, partIndex: i, attemptsLeft: left })
+                        setTarget({
+                          ...base,
+                          battleId: b.id,
+                          partIndex: i,
+                          attemptsLeft: left,
+                          limited: b.attemptsPerVideo !== null,
+                          ...(reservation && { reservationId: reservation.id }),
+                        })
                       }
                     >
                       {b.parts.length > 1
@@ -148,10 +173,77 @@ export function FilmForFriendPage() {
                   </div>
                 );
               })}
+              {b.attemptsPerVideo !== null &&
+                (reserveFor === b.id ? (
+                  <ReserveForm
+                    partTexts={b.parts.map(
+                      (p, i) => `${t('videos.part', { n: i + 1 })}: ${partText(p)}`,
+                    )}
+                    left={b.attemptsLeft.map((n) => n ?? 0)}
+                    othersOpen={b.reservations}
+                    onCancel={() => setReserveFor(null)}
+                    onReserve={async (parts) => {
+                      const res = await api.guestReserve({
+                        code,
+                        battleId: b.id,
+                        deviceCode: deviceCode(),
+                        parts,
+                        ...(base.recorderName && { recorderName: base.recorderName }),
+                      });
+                      addLocalReservations(
+                        res.reservations.map((r) => ({
+                          id: r.id,
+                          battleId: b.id,
+                          partIndex: r.partIndex,
+                          round: r.round,
+                          count: r.count,
+                          takeover: r.takeover,
+                          createdAt: r.createdAt,
+                          deadlineAt: b.deadlineAt,
+                          needsReport: false,
+                          guest: {
+                            code,
+                            athleteName: athlete.displayName,
+                            ...(base.recorderName && { recorderName: base.recorderName }),
+                            formatName: b.formatName,
+                            opponents: b.opponents,
+                            partTexts: b.parts.map((p) => partText(p)),
+                          },
+                        })),
+                      );
+                      setReserveFor(null);
+                      void lookup();
+                    }}
+                  />
+                ) : (
+                  <div className="actions">
+                    <button type="button" className="secondary" onClick={() => setReserveFor(b.id)}>
+                      {t('offline.prepareFilm')}
+                    </button>
+                  </div>
+                ))}
             </div>
           ))}
         </section>
       )}
+
+      <PreparedBattles
+        reservations={prepared}
+        onRecord={(r, unitsLeft) =>
+          r.guest &&
+          setTarget({
+            code: r.guest.code,
+            athleteName: r.guest.athleteName,
+            battleId: r.battleId,
+            partIndex: r.partIndex,
+            round: r.round,
+            reservationId: r.id,
+            attemptsLeft: unitsLeft,
+            limited: true,
+            ...(r.guest.recorderName && { recorderName: r.guest.recorderName }),
+          })
+        }
+      />
 
       <GuestRecordings recordings={recordings} onPrepare={setPrepareId} />
 
@@ -167,6 +259,8 @@ export function FilmForFriendPage() {
             round: target.round,
             recorderName: target.recorderName,
           }}
+          reservationId={target.reservationId}
+          needsConnection={target.limited}
           quality={quality}
           onQuality={(q) => {
             setQuality(q);
@@ -254,6 +348,77 @@ function GuestRecordings({
           </div>
         );
       })}
+    </section>
+  );
+}
+
+/** The reservations made on this phone with an athlete code, kept up to date. */
+function useGuestReservations() {
+  const [list, setList] = useState(() => localReservations().filter((r) => r.guest));
+  useEffect(
+    () => onReservationsChanged(() => setList(localReservations().filter((r) => r.guest))),
+    [],
+  );
+  return list;
+}
+
+/**
+ * Battles prepared for filming offline on this phone: recording works without a connection.
+ * Back online, the upload queue reports and the deadline hands the rest back.
+ */
+function PreparedBattles({
+  reservations,
+  onRecord,
+}: {
+  reservations: LocalReservation[];
+  onRecord: (r: LocalReservation, unitsLeft: number) => void;
+}) {
+  const [error, setError] = useState<unknown>(null);
+  const online = useOnline();
+  if (reservations.length === 0) return null;
+  const handBack = async (r: LocalReservation) => {
+    if (!r.guest) return;
+    setError(null);
+    try {
+      await api.guestReport(r.id, { code: r.guest.code, deviceCode: deviceCode(), handBack: true });
+      removeLocalReservation(r.id);
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <section>
+      <h2>{t('offline.filmTitle')}</h2>
+      <p className="hint">{t('offline.filmHint')}</p>
+      {reservations.map((r) => {
+        const g = r.guest;
+        if (!g) return null;
+        const unitsLeft = Math.max(0, r.count - (r.recorded ?? 0));
+        return (
+          <div key={r.id} className="card">
+            <strong>{g.athleteName}</strong>{' '}
+            <span className="muted">
+              {g.formatName} · {t('film.against', { names: g.opponents.join(', ') })}
+              {r.deadlineAt !== null && ` · ${formatDate(r.deadlineAt)}`}
+            </span>
+            {g.partTexts.length > 1 && <div>{g.partTexts[r.partIndex]}</div>}
+            <div className="actions">
+              <button
+                type="button"
+                disabled={!isRecordingSupported()}
+                onClick={() => onRecord(r, unitsLeft)}
+              >
+                {t('videos.record')}
+              </button>
+              <LeftText left={unitsLeft} />
+              <button type="button" className="link" disabled={!online} onClick={() => handBack(r)}>
+                {t('offline.handBack')}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <ErrorText error={error} />
     </section>
   );
 }

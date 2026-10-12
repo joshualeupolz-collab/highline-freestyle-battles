@@ -30,7 +30,12 @@ test('online battle: record, upload (one phone offline), choose, unlock, vote', 
   await recordAttempt(annaPhone);
   await expect(annaPhone.getByText('Uploaded', { exact: true })).toBeVisible({ timeout: 30_000 });
 
-  // Ben records without a connection: the video waits on the phone …
+  // Ben prepares for offline recording (reserves the attempts while online) …
+  await benPhone.reload();
+  await benPhone.getByRole('button', { name: 'Prepare for offline recording' }).click();
+  await benPhone.getByRole('button', { name: 'Reserve', exact: true }).click();
+  await expect(benPhone.getByText('3 attempt(s) reserved')).toBeVisible();
+  // … and records without a connection: the video waits on the phone …
   await benPhone.context().setOffline(true);
   await recordAttempt(benPhone);
   await expect(benPhone.getByText('Waiting for a connection to upload')).toBeVisible();

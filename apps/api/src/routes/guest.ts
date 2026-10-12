@@ -14,22 +14,23 @@ import {
   guestAttemptSchema,
   guestCodeSchema,
   guestLookupSchema,
+  guestReportSchema,
+  guestReserveSchema,
   guestVideoSchema,
 } from '@hfb/shared';
 import { eq } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
 import { requireUser } from '../auth/middleware';
 import { type Database, getDb } from '../db/client';
-import { attempts, battleParticipants, battles, videos } from '../db/schema';
+import { attemptReservations, attempts, battleParticipants, battles, videos } from '../db/schema';
 import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
-import { settleUserAttempts } from '../services/attempts';
+import { insertAttempt, reportReservation, reserveAttempts } from '../services/attempts';
 import {
   announceVideo,
   athleteByCode,
   athleteCode,
-  CLOCK_TOLERANCE_MS,
   checkAttemptAllowed,
   chooseAthleteCode,
   runningBattles,
@@ -70,34 +71,98 @@ guestRoutes.post('/attempts', async (c) => {
       apiError(409, 'attempt_id_taken');
     return c.json({ ok: true, battleId: existing.battleId });
   }
-  if (input.startedAt > now + CLOCK_TOLERANCE_MS) apiError(400, 'start_in_the_future');
+  const { battle } = await athleteBattle(db, input.battleId, athlete.id);
+  await checkAttemptAllowed(db, battle, input, now);
+  await insertAttempt(
+    db,
+    battle,
+    athlete.id,
+    input,
+    {
+      deviceCode: input.deviceCode ?? null,
+      codeUsed: input.code,
+      recorderName: input.recorderName || null,
+      recordedBy: c.get('user')?.id ?? null,
+    },
+    now,
+  );
+  return c.json({ ok: true, battleId: input.battleId }, 201);
+});
 
-  const battle = await db.select().from(battles).where(eq(battles.id, input.battleId)).get();
+/** One of the athlete's battles, or a 404. */
+async function athleteBattle(db: Database, battleId: string, athleteId: string) {
+  const battle = await db.select().from(battles).where(eq(battles.id, battleId)).get();
   if (!battle) apiError(404, 'not_found');
   const participants = await db
     .select({ userId: battleParticipants.userId })
     .from(battleParticipants)
     .where(eq(battleParticipants.battleId, battle.id));
-  if (!participants.some((p) => p.userId === athlete.id)) apiError(404, 'not_found');
-  await checkAttemptAllowed(db, battle, input, now);
+  if (!participants.some((p) => p.userId === athleteId)) apiError(404, 'not_found');
+  return { battle };
+}
 
-  await db.insert(attempts).values({
-    id: input.id,
-    battleId: input.battleId,
-    userId: athlete.id,
-    partIndex: input.partIndex,
-    round: input.round,
-    startedAtClient: input.startedAt,
-    syncedAt: now,
-    recordedBy: c.get('user')?.id ?? null,
-    codeUsed: input.code,
-    recorderName: input.recorderName || null,
-    assignment: 'direct',
-    provisional: true,
-  });
-  await settleUserAttempts(db, battle, athlete.id);
-  return c.json({ ok: true, battleId: input.battleId }, 201);
+/**
+ * The friend prepares for filming offline (concept section 6): reserves attempts on their
+ * device, like the athlete can. Returns the reservations (count 0 = nothing was free).
+ */
+guestRoutes.post('/reservations', async (c) => {
+  const input = await parseJson(c, guestReserveSchema);
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+  const athlete = await athleteByCode(db, input.code);
+  const { battle } = await athleteBattle(db, input.battleId, athlete.id);
+  for (const part of input.parts)
+    await checkAttemptAllowed(db, battle, { ...part, startedAt: now }, now);
+  const rows = await reserveAttempts(
+    db,
+    battle,
+    athlete.id,
+    input,
+    {
+      deviceCode: input.deviceCode,
+      codeUsed: input.code,
+      recorderName: input.recorderName || null,
+      recordedBy: c.get('user')?.id ?? null,
+    },
+    now,
+  );
+  return c.json({ reservations: rows.map(reservationView) }, 201);
 });
+
+/** Back online: report the friend's attempts and optionally hand back the unused ones. */
+guestRoutes.post('/reservations/:id/report', async (c) => {
+  const input = await parseJson(c, guestReportSchema);
+  const db = getDb(c.env.DB);
+  const reservation = await db
+    .select()
+    .from(attemptReservations)
+    .where(eq(attemptReservations.id, c.req.param('id')))
+    .get();
+  if (
+    !reservation ||
+    reservation.codeUsed !== input.code ||
+    reservation.deviceCode !== input.deviceCode
+  )
+    apiError(404, 'not_found');
+  const battle = await db.select().from(battles).where(eq(battles.id, reservation.battleId)).get();
+  if (!battle) apiError(404, 'not_found');
+  const updated = await reportReservation(db, battle, reservation, input.handBack, Date.now());
+  return c.json({ reservation: reservationView(updated) });
+});
+
+function reservationView(r: typeof attemptReservations.$inferSelect) {
+  return {
+    id: r.id,
+    battleId: r.battleId,
+    partIndex: r.partIndex,
+    round: r.round,
+    count: r.count,
+    requested: r.requested,
+    takeover: r.takeover,
+    createdAt: r.createdAt,
+    closedAt: r.closedAt,
+  };
+}
 
 /** An attempt this code started (the code it was started with, even if renewed since). */
 async function codeAttempt(db: Database, attemptId: string, code: string) {

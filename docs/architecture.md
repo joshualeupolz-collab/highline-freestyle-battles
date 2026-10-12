@@ -490,6 +490,35 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
   the app opens online (`Layout.tsx`, up to 10), so they can be opened and recorded for without
   a connection even if they were not opened before (offline copies in `api.ts`).
 
+## 4n. Offline recording with reserved attempts (session 7)
+
+Rules: `docs/concept.md` section 6. Code: `apps/api/src/services/attempts.ts`,
+`apps/web/src/video/device.ts`, `components/OfflineReservations.tsx`.
+
+- **Device code:** random, in `localStorage` (`hfb-device`); sent with every attempt
+  (`attempts.device_code`) and reservation. Deleting the app's data gives a new one.
+- **Reservations** (`attempt_reservations`, migration 0019): one row per device, battle,
+  athlete and part. `count` units use up the allowance at once (at most what is free; 0 = a
+  take-over or nothing free). `POST /battles/:id/reservations`, friends:
+  `POST /guest/reservations` (with the athlete code). Attempts sent with `reservationId` of the
+  same device fill its units (`attempts.reservation_id`, always valid); beyond them they are
+  settled like any attempt (`settleAttempts`).
+- **Report:** `POST .../reservations/:rid/report` (`/guest/reservations/:id/report`).
+  `handBack` (or deadline passed / battle not running) closes it: `count` = attempts recorded,
+  then `settleUserAttempts` lets provisional attempts move up. The first report and the closing
+  go into the chat (`reserved`, `reservation_reported`).
+- **Phone:** the reservations of this device are also kept in `localStorage`
+  (`hfb-reservations`, with battle info for `/film`), so recording works offline. Without a
+  reservation, Start is refused offline (`offline_needs_reservation`). The upload queue registers
+  the recordings and then reports reservations that recorded offline; after the deadline it hands
+  them back. The battle page drops reservations the server closed.
+- **Never reported:** open reservations of battles that no longer run, counted per athlete
+  (`lostReservations`): in the battle response per participant (shown next to the opponent's
+  progress and extra-attempt requests) and on the profile for the federation and admins.
+- **Grace period:** `graceUntil` = deadline + `UPLOAD_GRACE_DAYS` (7). During it,
+  `deadline-decision` refuses with `others_may_still_deliver` while the missing side holds open
+  reservations or valid attempts (`mayStillDeliver`). The hourly job still decides after 7 days.
+
 ---
 
 ## 5. Implementation order (stage 1)

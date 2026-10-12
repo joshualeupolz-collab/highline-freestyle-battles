@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-12 (end of the sixth session: push fixes, notification settings, app icon number, filming by friends with the athlete code, feedback round, offline reservations decided).
+Last updated: 2026-10-12 (end of the seventh session: the three recording features – sharing any attempt with an extra-attempt request, provisional attempts, offline reservations – and the 7-day grace period).
 
 ---
 
@@ -22,11 +22,13 @@ prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3
 battles), #23 (competitions), #24 (combined rankings), #25 (push notifications) merged.
 Session 6 = branch `claude/exciting-feynman-hd7dtr`: PRs #26 (push fixes, settings, app icon
 number), #27 (athlete code), #28 (feedback round), #29 (friends' videos public) merged; the
-recording rules for the next session were decided and written down (docs-only PR). **The owner allows Claude to merge its
+recording rules for the next session were decided and written down (docs-only PR).
+Session 7 = branch `claude/hopeful-fermat-3qyweu` (worked alone while the owner slept): PRs #31
+(share any attempt), #32 (provisional attempts) and the offline-reservations PR. **The owner allows Claude to merge its
 own PRs once CI is green** (session 6); if the session's safety check blocks it, Claude says
 so and the owner merges. A new session starts a fresh branch from `main`.
 
-**Tests:** 22 video cutting tests (`apps/web/test`), 148 API tests, 44 rating tests
+**Tests:** 22 video cutting tests (`apps/web/test`), 166 API tests, 44 rating tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
@@ -99,6 +101,31 @@ only reaches the server when the phone is online again; deleting the app (or its
 that hides a bad attempt. Claude's proposal: *reserve attempts while online* – see open
 question 6.
 
+### Session 7 (branch `claude/hopeful-fermat-3qyweu`, owner asleep, decisions to confirm)
+
+Built the three decided recording features (`docs/concept.md` section 6):
+a. **Any uploaded attempt** can be sent with a request for an extra attempt ("Ask for an extra
+   attempt" next to it; the server only accepts uploaded videos). PR #31.
+b. **Provisional attempts:** the limit never blocks recording; attempts beyond the allowance are
+   provisional and cannot be chosen; granted extra attempts make the earliest ones valid
+   (migration 0018, `settleAttempts`). PR #32.
+c. **Offline reservations** with a device code, take-over, reporting back, hand-back, chat
+   entries, "never reported" counter (opponent + federation/admin profile), on the battle page
+   and on `/film` for friends (migration 0019, architecture §4n). Recording offline without a
+   reservation is refused.
+Plus the owner's answer from the start of the session: **7-day grace period** after the
+deadline to upload and choose; the delivering side can only decide early when the other side
+has nothing left that could count. Privacy policy (EN/DE) mentions the device code.
+Tests: 166 API tests, 11 browser tests (new: `offline-reservation.spec.ts`, offline part in
+`film-for-friend.spec.ts`; `video-battle.spec.ts` now reserves before recording offline).
+**Owner to confirm** the details Claude decided (concept section 6, bullet "Details decided by
+Claude while building"): reservations per part, default all free; reservations stay until
+"Hand back unused" or the deadline (coming online only reports); "never reported" = open when
+the battle stopped running; no push for reservations. Also: taking back an extra attempt turns
+the latest valid, not chosen attempt provisional again.
+**Owner to test on phones:** battle → "Prepare for offline recording" → flight mode → record →
+back online → "Hand back unused"; a second phone taking over; a friend preparing on `/film`.
+
 ### Not started yet
 
 All stage 1 features exist. iPhone tests of step 7 passed on two iPhones (Safari and Brave: H.264 MP4,
@@ -165,6 +192,8 @@ profile button for members waiting for approval, confirmation before approving.
 | Step 9 (owner): on disagreement both may change their vote; no draw in stage 1; after 7 days a single vote for one side decides, otherwise unrated | Level 2 (pool) does not exist yet; whoever takes part is not punished |
 | Session 6 (owner): push uses `Urgency: high`; per-kind notification settings; app icon number via the Badging API | Notifications arrived late on Android; the owner wanted to choose and to see a number on the icon |
 | Session 6 (owner): athlete code chosen freely, secret (the opponent never sees it); filming by friends online only; friends' videos public by default | Offline filming with description/inbox had too many open problems |
+| Session 7 (owner): 7 days after the deadline to upload and choose; the delivering side waits while the other side may still deliver | Days without a connection must not cost the battle |
+| Session 7 (Claude, to confirm): reservations per part, kept until handed back or the deadline, "never reported" = open when the battle stopped running | Flaky connections at the line must not release reserved attempts |
 | Session 6 (owner): offline recording only with actively reserved attempts (device code, take-over, provisional attempts, never-reported reservations counted per athlete); any uploaded attempt can be shared with an extra-attempt request; recording beyond the limit is provisional | A web app cannot report anything when it is deleted; reserving while online makes hiding a bad attempt pointless |
 
 ---
@@ -190,38 +219,16 @@ profile button for members waiting for approval, confirmation before approving.
    as a false positive in the GitGuardian dashboard.
 4. Google login is postponed: it needs a Google Cloud OAuth client created by the owner. Still wanted?
 5. Further open questions of the concept are listed in `docs/concept.md` §15.
-6. ~~Offline recording without cheating~~ – **decided** with the owner at the end of session 6
-   (attempt reservations with device codes, taking over, provisional attempts). Rules:
-   `docs/concept.md` section 6; to be built next (section 4, step 1). The owner also asked
-   whether the app can report anything when it is closed or uninstalled: not reliably
-   (`sendBeacon` needs a connection, uninstalling fires no event, Background Sync is
-   Chrome-only and deleted with the app) – hence the reservations.
+6. ~~Offline recording without cheating~~ – decided in session 6, **built in session 7**. Please
+   confirm Claude's detail decisions (section 1, "Session 7").
 
 ---
 
 ## 4. Next steps
 
-1. **Next session (owner's request): build the three decided recording features**, all in
-   `docs/concept.md` section 6 (bullets marked "decided 2026-10-12, not built yet"):
-   a. *Share any uploaded attempt with a request for an extra attempt* (today only offered for
-      cut-off recordings at upload; the `extra_attempt` proposal already carries `videoId`,
-      `sharedVideoIds` in `services/videos.ts` already lets the opponent watch it) – small.
-   b. *Provisional attempts beyond the limit*: never block recording; attempts in start order,
-      the first N (agreed + granted extras, `attemptsLeft` in `packages/shared/src/videos.ts`)
-      count, the rest are provisional and cannot be chosen until extras are granted. Touches
-      `checkAttemptAllowed` (`services/friendVideos.ts`), submissions, `battleVideosView`, the
-      attempt list UI.
-   c. *Offline reservations*: device code (random, IndexedDB/localStorage, also on `/film`
-      without login), active "Prepare for offline recording" with a warning, reservations
-      table (device, battle, athlete, count, created, reported/used/handed back), take-over by
-      another device or a friend (warning with the reservation time; provisional until the
-      original device reports), resolution order (original device first, never more than the
-      allowance), report + hand-back when online, chat entries for every step, counter of
-      never-reported reservations per athlete (shown to the opponent next to requests and to
-      federation/admins), deadline = start time before the deadline. Recording offline without
-      a reservation is no longer possible (the queue registers Start at once when online).
-      Browser tests with two phones going offline (`context.setOffline`).
-   Suggested order a → b → c (c builds on b's "provisional"). Probably 1–2 sessions.
+1. **Owner:** test the offline reservations on real phones (section 1, "Session 7") and confirm
+   the detail decisions. Ideas if wanted: a push notification to the opponent when attempts are
+   reserved; showing the grace period end on the battle page more prominently.
 2. **More UI feedback** from the owner.
 2. **Legal texts:** done except the operator data (open question 00). Keep the privacy policy in
    line with new features (push, public video pages, Telegram archive, Google login, e-mails).

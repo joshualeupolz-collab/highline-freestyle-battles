@@ -41,16 +41,37 @@ test('a friend films with the athlete code the athlete chose', async ({ browser 
     timeout: 30_000,
   });
 
-  // Anna sees the attempt as hers, filmed by Max, and can choose it.
-  await annaPhone.goto(`/battles/${battleId}`);
-  await expect(annaPhone.getByText('filmed by Max')).toBeVisible();
-  await expect(annaPhone.getByText('Uploaded', { exact: true })).toBeVisible();
+  // Offline: the friend prepares while online (reserves the two attempts left), then films
+  // without a connection; the video is uploaded once the phone is back online.
+  await friend.getByRole('button', { name: 'Prepare for offline filming' }).click();
+  await friend.getByRole('button', { name: 'Reserve', exact: true }).click();
+  const prepared = friend.locator('section', {
+    has: friend.getByRole('heading', { name: 'Prepared for offline filming' }),
+  });
+  await expect(prepared.getByText('Attempts left: 2')).toBeVisible();
+  await friend.context().setOffline(true);
+  await prepared.getByRole('button', { name: 'Record attempt' }).click();
+  const button = friend.locator('.camera-full').getByRole('button', { name: 'Record attempt' });
+  await button.click();
+  await expect(friend.locator('.camera-full').getByText(/● [2-9]\.\d s/)).toBeVisible();
+  await friend.getByRole('button', { name: 'Stop' }).click();
+  await friend.getByRole('button', { name: 'Upload', exact: true }).click();
+  await expect(prepared.getByText('Attempts left: 1')).toBeVisible();
+  await friend.context().setOffline(false);
+  await expect(friend.getByRole('heading', { name: 'Recordings on this phone' })).toHaveCount(0, {
+    timeout: 30_000,
+  });
 
-  await expect(annaPhone.getByRole('button', { name: 'This one counts' })).toBeVisible();
+  // Anna sees the attempts as hers, filmed by Max, and can choose them.
+  await annaPhone.goto(`/battles/${battleId}`);
+  await expect(annaPhone.getByText('filmed by Max')).toHaveCount(2);
+  await expect(annaPhone.getByText(/2 attempt\(s\) reserved · by Max \(friend\)/)).toBeVisible();
+  await expect(annaPhone.getByText('Uploaded', { exact: true })).toHaveCount(2);
+  await expect(annaPhone.getByRole('button', { name: 'This one counts' })).toHaveCount(2);
 
   // Ben sees who filmed it, but not the code.
   await benPhone.goto(`/battles/${battleId}`);
   await expect(benPhone.getByRole('heading', { name: 'Filmed by friends' })).toBeVisible();
-  await expect(benPhone.getByText('filmed by Max')).toBeVisible();
+  await expect(benPhone.getByText('filmed by Max')).toHaveCount(2);
   await expect(benPhone.getByText(code)).toHaveCount(0);
 });

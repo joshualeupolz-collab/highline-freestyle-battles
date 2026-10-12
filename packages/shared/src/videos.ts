@@ -20,6 +20,16 @@ export const MAX_VIDEO_BYTES = 95_000_000;
 
 export const VIDEO_CONTENT_TYPES = ['video/mp4', 'video/webm'] as const;
 
+/**
+ * Every installation of the app and every browser gets its own random device code, stored on the
+ * device (concept section 6). Deleting the app or its data gives a new one.
+ */
+export const deviceCodeSchema = z
+  .string()
+  .min(8)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
 /** Pressing Start creates an attempt on the phone; it is sent as soon as there is a connection. */
 export const registerAttemptSchema = z.object({
   /** UUIDv7 created on the phone. Sending the same attempt twice is fine. */
@@ -28,8 +38,43 @@ export const registerAttemptSchema = z.object({
   round: z.number().int().min(1).max(20).default(1),
   /** When Start was pressed (phone clock, ms since the epoch). */
   startedAt: z.number().int().positive(),
+  /** The installation or browser that recorded it (`deviceCodeSchema`). */
+  deviceCode: deviceCodeSchema.optional(),
+  /** Recorded under this device's reservation for offline recording. */
+  reservationId: z.uuid().optional(),
 });
 export type RegisterAttempt = z.infer<typeof registerAttemptSchema>;
+
+/**
+ * "Prepare for offline recording": reserve attempts per part while online. The server reserves
+ * at most what is free; with nothing free, the reservation takes over (attempts provisional).
+ */
+export const reserveAttemptsSchema = z.object({
+  deviceCode: deviceCodeSchema,
+  parts: z
+    .array(
+      z.object({
+        partIndex: z.number().int().min(0).max(19),
+        round: z.number().int().min(1).max(20).default(1),
+        count: z.number().int().min(1).max(99),
+      }),
+    )
+    .min(1)
+    .max(20),
+});
+export type ReserveAttempts = z.infer<typeof reserveAttemptsSchema>;
+
+/**
+ * Back online: the device has registered its attempts. `handBack` frees the unused units (also
+ * done automatically once the deadline passed or the battle no longer runs).
+ */
+export const reportReservationSchema = z.object({
+  deviceCode: deviceCodeSchema,
+  handBack: z.boolean().default(false),
+});
+
+/** How many days after the deadline the athletes still have to upload and choose (owner, 2026-10-12). */
+export const UPLOAD_GRACE_DAYS = 7;
 
 /** Announce the upload of an attempt's video; the answer says where to send the bytes. */
 export const createVideoSchema = z.object({

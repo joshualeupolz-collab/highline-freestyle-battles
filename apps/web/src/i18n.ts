@@ -457,6 +457,51 @@ const en = {
   'videos.noneLeft':
     'No attempts left. You can still record, but it is provisional: it only counts if your opponent grants an extra attempt.',
   'videos.noneLeftShort': 'No attempts left: provisional',
+  'offline.title': 'Reserved for offline recording',
+  'offline.prepare': 'Prepare for offline recording',
+  'offline.prepareTitle': 'Prepare for offline recording',
+  'offline.warning':
+    'Reserved attempts count as used right away, on this device only. You must come back online afterwards with this device: then the recordings are uploaded and unused attempts are handed back. If the app or its data is deleted before that, the reserved attempts are lost (your opponent sees that).',
+  'offline.howMany': 'How many attempts',
+  'offline.free': 'Free now: {n}',
+  'offline.takeoverWarning':
+    'Not that many are free; attempts are reserved on another device ({times}). You can take them over, but your recordings stay provisional until that device reports back: its own recordings count first.',
+  'offline.beyondWarning':
+    'Not that many are free. Recordings beyond the free attempts are provisional (they only count if your opponent grants extra attempts).',
+  'offline.since': '{n} since {date}',
+  'offline.reserve': 'Reserve',
+  'offline.reservedHere': '(+{n} reserved on this device)',
+  'offline.byFriend': 'by {name} (friend)',
+  'offline.byAFriend': 'by a friend',
+  'offline.thisDevice': 'this device',
+  'offline.otherDevice': 'another device ({label})',
+  'offline.reserved': '{n} attempt(s) reserved',
+  'offline.takenOver': '{n} attempt(s) taken over (provisional)',
+  'offline.sinceDate': 'since {date}',
+  'offline.closed': 'done, {used} recorded',
+  'offline.reported': '{used} recorded (reported {date})',
+  'offline.notReported': 'not reported back yet',
+  'offline.handBack': 'Hand back unused',
+  'offline.opponentReserved': 'Offline: {text}',
+  'offline.lost':
+    'Reservations never reported back in earlier battles (lost device or deleted app): {n}',
+  'offline.prepareFilm': 'Prepare for offline filming',
+  'offline.filmTitle': 'Prepared for offline filming',
+  'offline.filmHint':
+    'These work without a connection. Come back online afterwards so the videos are uploaded and the rest is handed back.',
+  'error.offline_needs_reservation':
+    'You are offline. Recording offline needs attempts reserved beforehand while online ("Prepare for offline recording").',
+  'error.reservation_mismatch': 'This recording does not belong to a reservation of this device.',
+  'error.others_may_still_deliver':
+    'Your opponent may still upload and choose attempts started before the deadline (up to 7 days after it). Decide after that, or wait for the automatic decision.',
+  'event.reserved': '{who} reserved {n} attempt(s) for offline recording',
+  'event.reservedNothingFree':
+    '{who} prepared {n} attempt(s) for offline recording, nothing was free (provisional)',
+  'event.byFriend': '(by {name}, a friend)',
+  'event.byAFriend': '(by a friend)',
+  'event.reservationReported': '{who}: device back online, {used} attempt(s) recorded offline',
+  'event.reservationClosed':
+    '{who}: reservation done, {used} attempt(s) recorded, {back} handed back',
   'videos.provisional': 'provisional',
   'videos.provisionalHint':
     'Beyond your attempts: it cannot be chosen unless your opponent grants an extra attempt (then the earliest provisional attempts become valid).',
@@ -798,7 +843,7 @@ const en = {
   'code.filmForFriend': 'Film for a friend',
   'film.title': 'Film for a friend',
   'film.intro':
-    'Enter the athlete code of the person you film. You do not need an account, but a connection: the battle is chosen before recording. The videos count as their attempts.',
+    'Enter the athlete code of the person you film. You do not need an account, but a connection: the battle is chosen before recording. To film without a connection, prepare the battle while online. The videos count as their attempts.',
   'film.code': 'Athlete code',
   'film.yourName': 'Your name (optional, shown to the athletes)',
   'film.continue': 'Continue',

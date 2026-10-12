@@ -46,6 +46,8 @@ export interface GuestAttempt {
   partIndex: number;
   round: number;
   recorderName?: string;
+  /** Recorded under this device's reservation (offline recording, see device.ts). */
+  reservationId?: string;
   /** The server knows about the attempt. */
   synced: boolean;
 }
@@ -54,6 +56,8 @@ export interface BattleAttempt {
   battleId: string;
   partIndex: number;
   round: number;
+  /** Recorded under this device's reservation (offline recording, see device.ts). */
+  reservationId?: string;
   /** The server knows about the attempt (it counts towards the limit there too). */
   synced: boolean;
 }

@@ -22,6 +22,7 @@ import {
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
 import { GroupPending, GroupResultList } from '../components/GroupResult';
+import { LostHint } from '../components/OfflineReservations';
 import { ReportButton } from '../components/ReportButton';
 import { ReviewCard, ReviewerCard } from '../components/Review';
 import { RatingText, UserLink } from '../components/UserLink';
@@ -210,6 +211,9 @@ export function BattleDetailPage() {
                 battle.participants.find((x) => x.userId !== userId)?.userId ?? ''
               }
               onAction={run}
+              lost={(userId) =>
+                battle.participants.find((x) => x.userId === userId)?.lostReservations ?? 0
+              }
               // Accepting the settings during negotiation starts the battle, accepting an
               // on-site result decides it: both are binding.
               binding={
@@ -452,6 +456,7 @@ function ProposalCard({
   otherThan,
   onAction,
   binding,
+  lost,
 }: {
   proposal: Proposal;
   myId: string;
@@ -459,6 +464,8 @@ function ProposalCard({
   otherThan: (userId: string) => string;
   onAction: (path: string, body?: unknown) => void;
   binding: boolean;
+  /** Reservations never reported back by this athlete (lost devices). */
+  lost: (userId: string) => number;
 }) {
   const value = proposal.payload.value ?? 0;
   const text =
@@ -485,6 +492,9 @@ function ProposalCard({
       <div>{text}</div>
       <div className="muted">{t('battle.proposedBy', { name: name(proposal.proposedBy) })}</div>
       {proposal.payload.videoId && <VideoPlayer id={proposal.payload.videoId} />}
+      {proposal.kind === 'extra_attempt' && !own && lost(proposal.proposedBy) > 0 && (
+        <LostHint n={lost(proposal.proposedBy)} />
+      )}
       <div className="actions">
         {own ? (
           <button type="button" className="secondary" onClick={() => onAction(`${base}/withdraw`)}>
