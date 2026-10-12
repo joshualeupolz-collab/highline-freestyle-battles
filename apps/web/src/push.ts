@@ -60,3 +60,26 @@ export async function disablePush(): Promise<void> {
   await api.pushUnsubscribe(sub.endpoint).catch(() => {});
   await sub.unsubscribe().catch(() => false);
 }
+
+/**
+ * At app start: tell the API about this device's subscription again. The server may have
+ * dropped it (push service said "gone", or another account logged out on this device) while
+ * the phone still shows notifications as on.
+ */
+export async function resyncPush(): Promise<void> {
+  if (!isPushSupported() || Notification.permission !== 'granted') return;
+  const sub = await currentSubscription();
+  if (sub) await api.pushSubscribe(sub.endpoint);
+}
+
+/**
+ * Sends a test notification to this device. Returns what the push service answered; `sent`
+ * means the push left the server, so if nothing shows up the phone's settings block it.
+ */
+export async function testPush() {
+  if (isPushSupported() && Notification.permission !== 'granted') return { outcome: 'denied' };
+  const sub = await currentSubscription();
+  if (!sub) return { outcome: 'gone' };
+  await api.pushSubscribe(sub.endpoint);
+  return api.pushTest(sub.endpoint);
+}

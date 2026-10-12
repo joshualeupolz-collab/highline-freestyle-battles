@@ -11,6 +11,7 @@ import type {
   CreateReport,
   CreateVideo,
   CurrentUser,
+  NotificationSettings,
   ReportCategory,
   ReportTarget,
   SpecialRole,
@@ -84,6 +85,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 const get = <T>(path: string) => request<T>('GET', path);
 const post = <T>(path: string, body?: unknown) => request<T>('POST', path, body);
+const put = <T>(path: string, body?: unknown) => request<T>('PUT', path, body);
 
 // ---------------------------------------------------------------------------------------------
 // Response types
@@ -547,6 +549,13 @@ export const api = {
   pushKey: () => get<{ publicKey: string | null }>('/push/key'),
   pushSubscribe: (endpoint: string) => post('/push/subscribe', { endpoint }),
   pushUnsubscribe: (endpoint: string) => post('/push/unsubscribe', { endpoint }),
+  pushTest: (endpoint: string) =>
+    post<{ outcome: 'sent' | 'gone' | 'failed'; status: number; detail?: string }>('/push/test', {
+      endpoint,
+    }),
+  pushSettings: () => get<NotificationSettings>('/push/settings'),
+  savePushSettings: (body: NotificationSettings) =>
+    put<NotificationSettings>('/push/settings', body),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

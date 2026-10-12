@@ -19,9 +19,12 @@ self.addEventListener('push', (event) => {
           body: n.body,
           icon: '/icon-192.png',
           tag: n.url,
+          // A second message in the same battle replaces the first one but still alerts.
+          renotify: true,
           data: { url: n.url },
         });
       }
+      await raiseBadge(list.length);
     })(),
   );
 });
@@ -41,3 +44,17 @@ self.addEventListener('notificationclick', (event) => {
     })(),
   );
 });
+
+// The number on the app icon (src/badge.ts): the app stores the exact count when it runs; a push
+// adds its new notifications until the app is opened again.
+async function raiseBadge(added) {
+  try {
+    const cache = await caches.open('hfb-badge');
+    const stored = await cache.match('/badge-count');
+    const count = (stored ? Number(await stored.text()) || 0 : 0) + added;
+    await cache.put('/badge-count', new Response(String(count)));
+    if (self.navigator.setAppBadge) await self.navigator.setAppBadge(count);
+  } catch {
+    // No badge on this platform.
+  }
+}

@@ -102,6 +102,8 @@ export const users = sqliteTable(
     /** Version of the terms of use accepted (`TERMS_VERSION`) and when. */
     termsVersion: text('terms_version'),
     termsAcceptedAt: integer('terms_accepted_at'),
+    /** Notification kinds the person turned off (JSON array of `NotificationKind`); NULL = all on. */
+    notifyOffJson: text('notify_off_json'),
   },
   (t) => [
     uniqueIndex('users_username_unique').on(lower(t.username)),

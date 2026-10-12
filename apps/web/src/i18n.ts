@@ -783,6 +783,16 @@ const en = {
   'push.denied':
     'Notifications are blocked. Allow them for this app in the settings of your phone or browser.',
   'push.not_configured': 'Notifications are not set up on the server yet.',
+  'push.test': 'Send a test',
+  'push.testSent':
+    'Sent. If no notification appears within a minute, notifications are blocked on this phone: allow them for this app (and for the browser) in the phone settings, and check battery saving.',
+  'push.testGone': 'This device is no longer registered. Turn notifications on again.',
+  'push.testFailed': 'The push service refused the notification ({detail}).',
+  'push.kinds': 'Notify me when',
+  'push.kind.accepted': 'my opponent accepts a battle',
+  'push.kind.unlocked': 'the videos of a battle are unlocked',
+  'push.kind.review': 'a battle waits for my review',
+  'push.kind.chat': 'someone writes in a battle chat',
   'audit.title': 'Audit log',
   'audit.hint': 'Every action using special permissions, newest first.',
   'audit.empty': 'No entries yet.',

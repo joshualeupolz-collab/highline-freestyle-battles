@@ -434,6 +434,18 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
   and account deletion remove them; notifications are deleted after 30 days (hourly job).
 - Secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`docs/deployment.md`); without
   them nothing is pushed. Profile → Notifications turns it on per device (iPhone: installed app).
+- Settings (owner, session 6): each kind can be turned off per account (`users.notify_off_json`,
+  migration 0015; `GET/PUT /api/push/settings`); turned-off kinds get no row and no push.
+- Diagnosis (session 6): "Send a test" (`POST /api/push/test`) pushes to this device and shows
+  the push service's answer (`sent` = the phone's settings block it). Failed pushes are logged
+  (Cloudflare observability). Pushes use `Urgency: high` (Android delays `normal` while the phone
+  sleeps); the app re-registers its subscription at every start; repeated notifications of one
+  battle alert again (`renotify`).
+- App icon number (`apps/web/src/badge.ts`, Badging API): battles that wait for me or have
+  unread messages plus open reviews, set while the app runs; the service worker adds new
+  notifications to it. Works where the platform allows it: installed app on iPhone (only with
+  notifications allowed) and on computers. Android has no Badging API: its launcher shows a
+  dot/number for the app's notifications, so there the number needs notifications on.
 
 ---
 

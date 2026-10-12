@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-12 (end of the fifth session: browser tests in CI, iPhone tests, and stage 2 except the athlete code).
+Last updated: 2026-10-12 (sixth session, part 1: push fixes, notification settings, app icon number).
 
 ---
 
@@ -59,6 +59,21 @@ Everything of `docs/stage-2-plan.md` except 2.10 (athlete code) and 2.12 (over-r
 needs data): roles + audit log, reports, annulment with federation approval, initial estimates,
 review levels 2–3 (pool + judge), on-site group battles, competitions with weight 1–5, combined
 rankings, push notifications. Details: `docs/architecture.md` §4g–§4l.
+
+### Session 6 (branch `claude/exciting-feynman-hd7dtr`)
+
+Owner reported: push can be turned on on Android, but no notification arrives for chat
+messages. Checked: the VAPID secrets are deployed; Google's push service accepts our VAPID
+signature (403 only for a broken token); the Worker sends the request correctly; the service
+worker fetches and shows the texts (Chromium, push delivered via DevTools). No bug found that
+explains it, so: `Urgency: high` (Android holds back `normal` pushes while the phone sleeps),
+re-registering the subscription at every app start, `renotify` for repeated battle
+notifications, logging of refused pushes, and a **"Send a test" button** in the profile that
+shows what the push service answered. Also new: **notification settings** per kind (migration
+0015) and the **number on the app icon** (Badging API; Android only via notifications, iPhone
+only with notifications allowed). Details: `docs/architecture.md` §4l.
+**Owner to test:** Profile → Notifications → "Send a test". "Sent" but nothing appears = the
+phone blocks it (Android settings → Apps → the app / Chrome → Notifications; battery saving).
 
 ### Not started yet
 
