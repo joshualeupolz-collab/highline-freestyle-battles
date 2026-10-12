@@ -22,7 +22,7 @@ import {
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
 import { ReportButton } from '../components/ReportButton';
-import { ReviewCard } from '../components/Review';
+import { ReviewCard, ReviewerCard } from '../components/Review';
 import { RatingText, UserLink } from '../components/UserLink';
 import { formatDate, formatShort, type MessageKey, t } from '../i18n';
 import { nextStep, todoOf } from '../nextStep';
@@ -273,8 +273,10 @@ export function BattleDetailPage() {
           myId={me.id}
           busy={action.isPending}
           onVote={(value) => run('vote', { value })}
+          onEscalate={() => run('escalate')}
         />
       )}
+      {!mine && <ReviewerCard battle={battle} />}
 
       {mine && battle.participants.length > 1 && (
         <Chat battleId={battle.id} myId={me.id} participants={battle.participants} />

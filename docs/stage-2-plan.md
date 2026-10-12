@@ -18,8 +18,8 @@ Parts that need no answer from the owner come first, so work can go on in the me
 | 2.3 | **Annulment:** federation annuls a decided battle with a reason → status `annulled`, replay request; admins only with federation approval | 2.1 | done (architecture §4g) |
 | 2.4 | **Initial estimates:** athletes estimate people they know (median of ≥ 3), federation/admin set a value; late estimates request a replay | 2.1 | done (architecture §4g) |
 | 2.5 | **Weight 4–5** only in official competitions (part of 2.9) | 2.9 | decided (§3.4) |
-| 2.6 | **Review level 2** (athlete pool, "To review" list) | 2.1 | decided (§3.1–3.2) |
-| 2.7 | **Review level 3** (judges) | 2.6 | decided (§3.3) |
+| 2.6 | **Review level 2** (athlete pool, "To review" list) | 2.1 | done (architecture §4h) |
+| 2.7 | **Review level 3** (judges) | 2.6 | done (architecture §4h) |
 | 2.8 | **Group battles** (n people online/on site, pairs weighted 1/(n−1)) | – | decided: on site first (§3.5) |
 | 2.9 | **Official competitions** (organizer, results or placements, confirmation) | 2.1, 2.8 | decided (§3.6) |
 | 2.10 | **Filming by friends** (athlete code, inbox) | – | decided (§3.7) |
@@ -85,8 +85,11 @@ These follow the concept; where it was silent, Claude picked the simplest fair o
    - after 48 h: R_high − 150 … R_high + 250
    - after 7 days: R_high − 250 … no upper limit
    These values are parameters (RuleSet), so they can be adjusted when the range proves too wide
-   or too narrow. *Open detail (Claude's default):* reviewers need at least `MIN_BATTLES`
-   battles in the format; reviewing is voluntary.
+   or too narrow. *Claude's defaults (to confirm):* reviewers need at least 5 battles in the
+   format; reviewing is voluntary; a review is anonymous and final; when both athletes disagree,
+   either can hand the battle to the pool at once (otherwise it goes there when the 7 days of
+   level 1 are over); a pool that is not full after 14 days goes to the judges; the judge sees
+   the earlier votes.
 3. **Level 3 – judges:** one judge decides for now. Later: three judges, 2:1 majority.
 4. **Weight 4–5:** only in **official competitions**, not in online battles. The organizer/judge
    sets the level of the competition (3, 4 or 5) beforehand and announces it.
@@ -112,6 +115,6 @@ These follow the concept; where it was silent, Claude picked the simplest fair o
 
 ## 4. Order after the decisions
 
-~~2.2 reports → 2.3 annulment → 2.4 initial estimates~~ (done) → 2.6/2.7 review levels 2–3 → 2.8 on-site group
+~~2.2 reports → 2.3 annulment → 2.4 initial estimates → 2.6/2.7 review levels 2–3~~ (done) → 2.8 on-site group
 battles → 2.9 competitions (with weight 4–5) → 2.11 combined rankings → 2.10 athlete code →
 2.13 push notifications (once the VAPID key exists).

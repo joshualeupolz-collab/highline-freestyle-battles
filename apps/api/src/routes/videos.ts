@@ -307,15 +307,10 @@ videoRoutes.get('/:id/file', async (c) => {
     .get();
   if (!video || (video.status !== 'uploaded' && video.status !== 'ready'))
     apiError(404, 'not_found');
-  let battleStatus = null;
+  let battle: typeof battles.$inferSelect | null = null;
   let participantIds: string[] = [];
   if (video.battleId) {
-    const battle = await db
-      .select({ status: battles.status })
-      .from(battles)
-      .where(eq(battles.id, video.battleId))
-      .get();
-    battleStatus = battle?.status ?? null;
+    battle = (await db.select().from(battles).where(eq(battles.id, video.battleId)).get()) ?? null;
     participantIds = (
       await db
         .select({ userId: battleParticipants.userId })
@@ -323,8 +318,7 @@ videoRoutes.get('/:id/file', async (c) => {
         .where(eq(battleParticipants.battleId, video.battleId))
     ).map((p) => p.userId);
   }
-  if (!(await mayViewVideo(db, video, user.id, participantIds, battleStatus)))
-    apiError(404, 'not_found');
+  if (!(await mayViewVideo(db, video, user.id, participantIds, battle))) apiError(404, 'not_found');
   const file = await db
     .select()
     .from(videoFiles)

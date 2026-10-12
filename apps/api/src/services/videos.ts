@@ -9,6 +9,7 @@ import type { Database } from '../db/client';
 import { attempts, battleProposals, battles, submissions, videoFiles, videos } from '../db/schema';
 import type { VideoStore } from '../storage/videoStore';
 import { cancelPendingProposalsStatement, requiredSubmissionsPerPerson } from './battles';
+import { reviewerRole } from './review';
 
 type BattleRow = typeof battles.$inferSelect;
 
@@ -41,6 +42,7 @@ export async function battleVideosView(
   battle: BattleRow,
   participantIds: readonly string[],
   viewerId: string | null,
+  isReviewer = false,
 ) {
   const [attemptRows, videoRows, submissionRows, shared] = await Promise.all([
     db
@@ -112,6 +114,7 @@ export async function battleVideosView(
         unlocked,
         visibility: video.visibility,
         sharedWithOpponent: false,
+        isReviewer,
       });
     if (visible) slot.videoId = s.videoId;
   }
@@ -161,10 +164,11 @@ export async function mayViewVideo(
   video: typeof videos.$inferSelect,
   viewerId: string,
   participantIds: readonly string[],
-  battleStatus: BattleRow['status'] | null,
+  battle: BattleRow | null,
 ): Promise<boolean> {
   if (video.ownerId === viewerId) return true;
-  if (!video.battleId || battleStatus === null) return false;
+  if (!video.battleId || battle === null) return false;
+  const battleStatus = battle.status;
   const submitted = await db
     .select({ videoId: submissions.videoId })
     .from(submissions)
@@ -179,6 +183,9 @@ export async function mayViewVideo(
     unlocked: isUnlocked(battleStatus),
     visibility: video.visibility,
     sharedWithOpponent: shared,
+    isReviewer:
+      video.visibility === 'review_only' &&
+      (await reviewerRole(db, battle, participantIds, viewerId)) !== null,
   });
 }
 

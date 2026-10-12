@@ -139,7 +139,7 @@ A person can hold several roles (e.g. athlete + judge).
 ### 7.5 Hand-off to the rating
 - Win/loss only: s = 1 / 0.
 - With margin: s from the 5-point scale (1 · 0.75 · 0.5 · 0.25 · 0) or from points (rating specification section 3).
-- **Stage 1 without levels 2–3 (decided 2026-10-11):** on disagreement (different sides, or "can't decide" on either side) both see the other vote and can change theirs, e.g. after talking in the chat. There is no draw in stage 1: two "can't decide" votes are no agreement. The review is open for 7 days after the videos unlock (`REVIEW_DAYS`). After that, a single vote for one side decides (whoever takes part is not punished); otherwise the battle ends without rating. In stage 2 the pool (level 2) takes over these cases.
+- **Stage 1 without levels 2–3 (decided 2026-10-11):** on disagreement (different sides, or "can't decide" on either side) both see the other vote and can change theirs, e.g. after talking in the chat. There is no draw in stage 1: two "can't decide" votes are no agreement. The review is open for 7 days after the videos unlock (`REVIEW_DAYS`). After that, a single vote for one side decides (whoever takes part is not punished); otherwise the battle ends without rating. In stage 2 the pool (level 2) takes over these cases (implemented: when both voted without agreement, either can hand the battle to the pool at once; otherwise it goes there when the 7 days are over).
 - Level 1 (decided 2026-10-11): s = mean of the two (mirrored) assessments. Example: "A clearly" (1) and "A somewhat" (0.75) give s(A) = 0.875. This only applies when both agree on the side (7.1); otherwise the battle goes to level 2. With "win/loss only", agreement gives s = 1 / 0.
 
 ---

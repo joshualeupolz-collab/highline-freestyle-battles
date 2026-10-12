@@ -11,6 +11,8 @@ export interface Todo {
   /** Level 1 votes so far (both voted without agreement = 2 while still in review). */
   votes: number;
   proposalForMe: boolean;
+  /** 1 = the two athletes, 2 = pool, 3 = judge. */
+  reviewLevel: number;
 }
 
 export interface NextStep {
@@ -46,6 +48,8 @@ export function nextStep(battle: Basics, todo: Todo, myId: string): NextStep | n
       return todo.submittedAll ? step('next.waitingVideos', false) : step('next.record', true);
     case 'reviewing':
       if (!mine) return null;
+      if (todo.reviewLevel === 2) return step('next.pool', false);
+      if (todo.reviewLevel === 3) return step('next.judge', false);
       if (!todo.iVoted) return step('next.vote', true);
       return todo.votes >= 2 ? step('next.noAgreement', true) : step('next.waitingVote', false);
     default:
@@ -61,5 +65,6 @@ export function todoOf(battle: Battle, myId: string, partsCount: number): Todo {
     iVoted: battle.review?.voted.includes(myId) ?? false,
     votes: battle.review?.voted.length ?? 0,
     proposalForMe: battle.proposals.some((p) => p.proposedBy !== myId),
+    reviewLevel: battle.review?.level ?? 1,
   };
 }

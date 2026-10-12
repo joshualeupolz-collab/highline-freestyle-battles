@@ -24,6 +24,21 @@ export const ruleSetParamsSchema = z
     comboFallbackSd: z.number().positive(),
     overrateZ: z.number(),
     volatilityEpsilon: z.number().positive().max(0.01),
+    /** Review levels 2–3 (concept 7.2–7.3); missing values use REVIEW_DEFAULTS. */
+    review: z
+      .object({
+        poolSize: z.number().int().min(1).max(9),
+        poolMinBattles: z.number().int().min(0),
+        windowBelow: z.number().min(0),
+        windowAbove: z.number().min(0),
+        widenAfterHours: z.number().min(0),
+        widenedAbove: z.number().min(0),
+        openAfterDays: z.number().min(0),
+        openBelow: z.number().min(0),
+        poolMaxDays: z.number().min(0),
+      })
+      .partial()
+      .optional(),
   })
   .strict()
   .refine((p) => p.rdStart <= p.rdUnknown, 'rdStart must not exceed rdUnknown');
@@ -34,3 +49,28 @@ export const createRulesetRequestSchema = z.object({
   validFrom: z.number().int().positive().optional(),
   note: z.string().trim().min(1).max(500),
 });
+
+/**
+ * Review levels 2–3 (concept 7.2–7.3, decided by the owner 2026-10-12). With R_high = the higher
+ * participant rating, the pool is R_high − windowBelow … R_high + windowAbove at first, up to
+ * R_high + widenedAbove after `widenAfterHours`, and R_high − openBelow … no upper limit after
+ * `openAfterDays`. If the pool is not full after `poolMaxDays`, a judge decides.
+ */
+export const REVIEW_DEFAULTS = {
+  poolSize: 3,
+  poolMinBattles: 5,
+  windowBelow: 150,
+  windowAbove: 150,
+  widenAfterHours: 48,
+  widenedAbove: 250,
+  openAfterDays: 7,
+  openBelow: 250,
+  poolMaxDays: 14,
+} as const;
+export type ReviewParams = { [K in keyof typeof REVIEW_DEFAULTS]: number };
+
+/** The review parameters of a RuleSet's params, with defaults for missing values. */
+export function reviewParams(params: object): ReviewParams {
+  const review = (params as { review?: Partial<ReviewParams> }).review;
+  return { ...REVIEW_DEFAULTS, ...review };
+}

@@ -11,6 +11,7 @@ import { estimateRoutes } from './routes/estimates';
 import { formatRoutes } from './routes/formats';
 import { onsiteRoutes } from './routes/onsite';
 import { reportRoutes } from './routes/reports';
+import { reviewBattleRoutes, reviewRoutes } from './routes/reviews';
 import { rulesetRoutes } from './routes/rulesets';
 import { userRoutes } from './routes/users';
 import { battleVideoRoutes, videoRoutes } from './routes/videos';
@@ -35,11 +36,13 @@ export function createApp() {
   app.route('/battles', battleVideoRoutes);
   app.route('/battles', onsiteRoutes);
   app.route('/battles', annulmentRoutes);
+  app.route('/battles', reviewBattleRoutes);
   app.route('/videos', videoRoutes);
   app.route('/audit', auditRoutes);
   app.route('/reports', reportRoutes);
   app.route('/federation-approvals', approvalRoutes);
   app.route('/estimates', estimateRoutes);
+  app.route('/reviews', reviewRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

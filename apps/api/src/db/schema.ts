@@ -329,6 +329,8 @@ export const battles = sqliteTable(
     reviewMode: text('review_mode', { enum: REVIEW_MODES }).notNull().default('quick'),
     /** Current review level 1 (athletes) … 3 (judges). */
     reviewLevel: integer('review_level').notNull().default(1),
+    /** Since when the battle is at its current review level 2 or 3 (pool window, timeouts). */
+    reviewLevelSince: integer('review_level_since'),
     rounds: integer('rounds').notNull().default(1),
     /** NULL = unlimited attempts per video. */
     attemptsPerVideo: integer('attempts_per_video'),

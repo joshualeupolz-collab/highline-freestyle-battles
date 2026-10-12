@@ -329,6 +329,35 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 
 ---
 
+## 4h. Review levels 2–3 (stage 2, parts 2.6–2.7)
+
+Rules in `apps/api/src/battles/review.ts` (pure), flow in `apps/api/src/services/review.ts`,
+routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
+`battles.review_level_since` (migration 0012) say where a battle is.
+
+- **Level 1 → 2:** when both athletes voted without agreement, either of them can hand the battle
+  to the pool at once (`POST /battles/:id/escalate`); otherwise the hourly job does it when the
+  level 1 review time (`REVIEW_DAYS`) is over. A single vote for one side still decides then;
+  no vote ends the battle unrated.
+- **Level 2 (pool):** `reviewerRole` decides who may review: an athlete who is not taking part,
+  has at least `poolMinBattles` battles in the battle's rating format and whose rating lies in
+  `poolWindow` around R_high (the higher participant rating): ±150 at first, up to +250 after
+  48 h, from −250 without upper limit after 7 days. One review per person, blind and final
+  (`POST /battles/:id/pool-vote`). With `poolSize` (3) reviews, `poolOutcome`: no contradiction →
+  decided, s = mean of the reviews ("can't decide" = 0.5); reviews for both sides or only "can't
+  decide" → level 3. A pool that is not full after `poolMaxDays` (14) goes to level 3 as well.
+- **Level 3 (judge):** any active judge who is not taking part decides with one vote −2/−1/+1/+2
+  (`POST /battles/:id/judge-decision`, optional note), audited as `review.judge_decision`. Judges
+  see the earlier votes (athletes and pool).
+- **Reviewers watch the videos:** `canViewVideo` lets the pool and the judge see "review only"
+  videos while they review.
+- **"To review":** `GET /reviews/open` lists the battles waiting for the viewer (pool or judge),
+  shown at the top of the start page with a dot on the Battles tab.
+- The window values are RuleSet parameters (`params.review`, defaults `REVIEW_DEFAULTS` in
+  `packages/shared/src/rulesets.ts`), so a new RuleSet version can change them.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |

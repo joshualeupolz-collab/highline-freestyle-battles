@@ -60,7 +60,7 @@ import {
   requiredSubmissionsPerPerson,
 } from '../services/battles';
 import { displayParams, ratingView } from '../services/ratingView';
-import { reviewView, settleReview } from '../services/review';
+import { reviewerRole, reviewView, settleReview } from '../services/review';
 import { battleVideosView } from '../services/videos';
 import { latestFormatVersion } from './formats';
 import { currentRuleset, parseRulesetParams } from './rulesets';
@@ -177,6 +177,13 @@ export async function battleResponse(
         battle,
         participants.map((p) => p.userId),
         viewerId,
+        (await reviewerRole(
+          db,
+          battle,
+          participants.map((p) => p.userId),
+          viewerId,
+          now,
+        )) !== null,
       ),
       review: await reviewView(
         db,
@@ -475,6 +482,7 @@ battleRoutes.get('/mine', async (c) => {
         iVoted: votes.some((v) => v.battleId === b.id && v.voterId === user.id),
         votes: votes.filter((v) => v.battleId === b.id).length,
         proposalForMe: proposalsForMe.some((p) => p.battleId === b.id),
+        reviewLevel: b.reviewLevel,
       },
       id: b.id,
       formatId: b.formatId,

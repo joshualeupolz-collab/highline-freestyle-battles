@@ -108,10 +108,21 @@ export const sendMessageRequestSchema = z.object({
  */
 export const reviewVoteSchema = z.object({ value: z.number().int().min(-2).max(2) });
 
+/** A judge's decision (level 3): one side has to be ahead, no "can't decide". */
+export const judgeDecisionSchema = z.object({
+  value: z
+    .number()
+    .int()
+    .min(-2)
+    .max(2)
+    .refine((v) => v !== 0, 'A judge decides for one side'),
+  note: z.string().trim().max(1000).optional(),
+});
+
 /**
  * Days after the videos unlock until the review of level 1 is closed. Without agreement by then
  * (stage 1, decided 2026-10-11): a single vote for one side decides; otherwise the battle ends
- * unrated. Level 2 (athlete pool) takes over this case in stage 2.
+ * unrated; two votes without agreement go to the athlete pool (level 2, stage 2).
  */
 export const REVIEW_DAYS = 7;
 

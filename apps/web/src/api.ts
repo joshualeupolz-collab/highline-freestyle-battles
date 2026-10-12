@@ -205,14 +205,26 @@ export interface Battle {
   participants: Participant[];
   proposals: Proposal[];
   videos: BattleVideos;
-  /** Review level 1 while reviewing (and after a decision by review). */
+  /** Review while reviewing (and after a decision by review), concept section 7. */
   review: {
+    /** 1 = the two athletes, 2 = athlete pool, 3 = judge. */
     level: number;
+    levelSince: number | null;
     endsAt: number | null;
-    /** Who has voted. */
+    /** Who has voted (level 1). */
     voted: string[];
-    /** Votes seen from seat 0; others' votes only once everyone has voted. */
+    /** Level 1 votes seen from seat 0; others' votes only once everyone has voted. */
     votes: { userId: string; value: number }[];
+    /** A participant may hand the dispute to the pool now. */
+    canEscalate: boolean;
+    poolSize: number;
+    poolCount: number;
+    /** Pool reviews (values), for the judge only. */
+    poolVotes: number[] | null;
+    myPoolVote: number | null;
+    judged: boolean;
+    /** What the viewer does in this review: pool reviewer, judge, or nothing. */
+    reviewerRole: 'pool' | 'judge' | null;
   } | null;
   /** Rating before and after, for decided battles. */
   ratingChanges: { userId: string; before: number; after: number }[];
@@ -370,6 +382,14 @@ export interface EstimateEntry {
   estimator?: UserHit;
 }
 
+export interface OpenReview {
+  battleId: string;
+  formatId: string;
+  level: number;
+  since: number | null;
+  participants: { userId: string; displayName: string }[];
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -443,6 +463,7 @@ export const api = {
   createEstimate: (body: CreateEstimate) =>
     post<{ id: string; replay: boolean }>('/estimates', body),
   withdrawEstimate: (id: string) => post(`/estimates/${id}/withdraw`),
+  openReviews: () => get<{ reviews: OpenReview[] }>('/reviews/open'),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

@@ -73,6 +73,10 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/estimates` | Initial rating estimate (athletes; `official` for federation/admin) |
 | GET | `/api/estimates?subjectId=` | My estimates of a person and the count (staff: all) |
 | POST | `/api/estimates/:id/withdraw` | Withdraw my estimate |
+| POST | `/api/battles/:id/escalate` | Level 1 without agreement: hand the battle to the pool |
+| POST | `/api/battles/:id/pool-vote` | Level 2: one blind review by an eligible athlete |
+| POST | `/api/battles/:id/judge-decision` | Level 3: the judge decides (audited) |
+| GET | `/api/reviews/open` | Battles waiting for my review (pool or judge) |
 | POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
 | POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
 | POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |

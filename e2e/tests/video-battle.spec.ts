@@ -1,18 +1,5 @@
-import { expect, type Page, test } from '@playwright/test';
-import { createAthlete, phoneOf } from '../helpers';
-
-/** Records one attempt of a few seconds with the (fake) camera and queues it for upload. */
-async function recordAttempt(phone: Page) {
-  await phone.getByRole('button', { name: 'Record attempt' }).first().click();
-  const record = phone.locator('.camera-full').getByRole('button', { name: 'Record attempt' });
-  await expect(record).toBeEnabled();
-  await record.click();
-  await expect(phone.locator('.camera-full').getByText(/● [2-9]\.\d s/)).toBeVisible();
-  await phone.getByRole('button', { name: 'Stop' }).click();
-  // Cut and upload: the whole recording, default visibility.
-  await expect(phone.getByRole('heading', { name: 'Cut and upload' })).toBeVisible();
-  await phone.getByRole('button', { name: 'Upload', exact: true }).click();
-}
+import { expect, test } from '@playwright/test';
+import { createAthlete, phoneOf, recordAttempt } from '../helpers';
 
 test('online battle: record, upload (one phone offline), choose, unlock, vote', async ({
   browser,

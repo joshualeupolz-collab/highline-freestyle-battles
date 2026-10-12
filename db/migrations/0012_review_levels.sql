@@ -1,0 +1,1 @@
+ALTER TABLE `battles` ADD `review_level_since` integer;
