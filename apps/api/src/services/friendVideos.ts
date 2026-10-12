@@ -140,7 +140,13 @@ export async function runningBattles(db: Database, athleteId: string, now: numbe
     db
       .select({ battleId: attempts.battleId, partIndex: attempts.partIndex, round: attempts.round })
       .from(attempts)
-      .where(and(inArray(attempts.battleId, ids), eq(attempts.userId, athleteId))),
+      .where(
+        and(
+          inArray(attempts.battleId, ids),
+          eq(attempts.userId, athleteId),
+          eq(attempts.provisional, false),
+        ),
+      ),
   ]);
   return rows.map(({ battle, formatName, partsJson }) => {
     const parts = JSON.parse(partsJson) as unknown[];
@@ -166,14 +172,13 @@ export async function runningBattles(db: Database, athleteId: string, now: numbe
 }
 
 /**
- * Checks that `userId` may add an attempt started at `startedAt` to this battle's slot: the
- * battle runs, the attempt was started before the deadline and attempts are left.
+ * Checks that an attempt started at `startedAt` may be added to this battle's slot: the battle
+ * runs and the attempt was started before the deadline. The attempt limit does not block it:
+ * attempts beyond the allowance are provisional (`services/attempts.ts`).
  */
 export async function checkAttemptAllowed(
   db: Database,
   battle: BattleRow,
-  participants: readonly { userId: string; extraAttempts: number }[],
-  userId: string,
   slot: { partIndex: number; round: number; startedAt: number },
   now: number,
 ) {
@@ -183,24 +188,6 @@ export async function checkAttemptAllowed(
     apiError(409, 'deadline_passed');
   const parts = (await requiredSubmissionsPerPerson(db, battle)) / battle.rounds;
   if (slot.partIndex >= parts || slot.round > battle.rounds) apiError(400, 'no_such_part');
-
-  const mine = await db
-    .select({ partIndex: attempts.partIndex, round: attempts.round })
-    .from(attempts)
-    .where(and(eq(attempts.battleId, battle.id), eq(attempts.userId, userId)));
-  const used = new Map<string, number>();
-  for (const a of mine) {
-    const key = slotKey(a.partIndex, a.round);
-    used.set(key, (used.get(key) ?? 0) + 1);
-  }
-  const me = participants.find((p) => p.userId === userId);
-  const left = attemptsLeft(
-    battle.attemptsPerVideo,
-    me?.extraAttempts ?? 0,
-    used,
-    slotKey(slot.partIndex, slot.round),
-  );
-  if (left !== null && left <= 0) apiError(409, 'no_attempts_left');
 }
 
 /**

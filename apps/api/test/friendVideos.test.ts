@@ -147,27 +147,31 @@ describe('filming by friends, online', () => {
       recorderName: 'Max',
     });
     expect(started.status, started.body.error).toBe(201);
-    // The attempt limit applies as for the athlete.
+    // The attempt limit applies as for the athlete: beyond it, the attempt is provisional.
+    const secondId = newId();
     const second = await guest('/api/guest/attempts', {
       code,
-      id: newId(),
+      id: secondId,
       battleId: id,
       partIndex: 0,
-      startedAt: Date.now(),
+      startedAt: Date.now() + 1,
     });
-    expect(second.body.error).toBe('no_attempts_left');
+    expect(second.status, second.body.error).toBe(201);
 
     const videoId = await guestUpload(code, attemptId);
     const mine = (await battle(anna, id)).videos.mine;
     expect(mine).toEqual([
       expect.objectContaining({
         id: attemptId,
+        provisional: false,
         friend: { name: 'Max' },
         video: expect.objectContaining({ id: videoId }),
       }),
+      expect.objectContaining({ id: secondId, provisional: true }),
     ]);
     expect((await battle(ben, id)).videos.byFriends).toEqual([
       expect.objectContaining({ id: attemptId, userId: anna.user.id }),
+      expect.objectContaining({ id: secondId, userId: anna.user.id }),
     ]);
     const chosen = await as(anna, `/api/battles/${id}/submissions`, { videoId });
     expect(chosen.status, chosen.body.error).toBe(200);

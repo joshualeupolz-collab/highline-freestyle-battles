@@ -2,7 +2,7 @@
  * Recording and upload (concept section 6, architecture step 8):
  *
  * 1. Pressing Start creates an attempt on the phone (`POST /battles/:id/attempts`, sent as soon
- *    as there is a connection). The attempt limit is checked here.
+ *    as there is a connection). Attempts beyond the limit are kept as provisional.
  * 2. The phone announces the video (`POST /videos`) and gets an upload target: a signed R2 URL,
  *    or `PUT /videos/:id/upload` through the Worker (see storage/videoStore.ts).
  * 3. After sending the bytes, `POST /videos/:id/complete` checks the stored file.
@@ -31,6 +31,7 @@ import {
 import type { AppEnv, Env } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
+import { settleUserAttempts } from '../services/attempts';
 import { eventStatement } from '../services/battleEvents';
 import { announceVideo, checkAttemptAllowed } from '../services/friendVideos';
 import { notify, requestNotifyContext } from '../services/notify';
@@ -66,7 +67,7 @@ battleVideoRoutes.post('/:id/attempts', async (c) => {
     return c.json(await battleResponse(db, battle.id, user.id, now));
   }
 
-  await checkAttemptAllowed(db, battle, participants, user.id, input, now);
+  await checkAttemptAllowed(db, battle, input, now);
 
   await db.insert(attempts).values({
     id: input.id,
@@ -76,7 +77,9 @@ battleVideoRoutes.post('/:id/attempts', async (c) => {
     round: input.round,
     startedAtClient: input.startedAt,
     syncedAt: now,
+    provisional: true,
   });
+  await settleUserAttempts(db, battle, user.id);
   return c.json(await battleResponse(db, battle.id, user.id, now), 201);
 });
 
@@ -99,6 +102,7 @@ battleVideoRoutes.post('/:id/submissions', async (c) => {
     apiError(404, 'not_found');
   if (video.status !== 'uploaded' && video.status !== 'ready') apiError(409, 'not_uploaded_yet');
   const attempt = await db.select().from(attempts).where(eq(attempts.id, video.attemptId)).get();
+  if (attempt?.provisional) apiError(409, 'attempt_provisional');
   if (battle.deadlineAt !== null && (attempt?.startedAtClient ?? now) > battle.deadlineAt)
     apiError(409, 'deadline_passed');
 

@@ -268,6 +268,8 @@ export interface BattleVideos {
     partIndex: number;
     round: number;
     attempts: number;
+    /** Beyond the allowance: cannot be chosen until extra attempts are granted. */
+    provisional: number;
     uploaded: number;
     submittedAt: number | null;
     videoId: string | null;
@@ -278,6 +280,8 @@ export interface BattleVideos {
     partIndex: number;
     round: number;
     startedAt: number;
+    /** Beyond the allowance: cannot be chosen until extra attempts are granted. */
+    provisional: boolean;
     /** Filmed by a friend with my athlete code (null = by me). */
     friend: FriendFilmed | null;
     video: MyVideo | null;

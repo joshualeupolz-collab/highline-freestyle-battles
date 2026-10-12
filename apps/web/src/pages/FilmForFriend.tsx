@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { api, type GuestBattle } from '../api';
 import { partText } from '../battleHelpers';
-import { PrepareUpload, RecordScreen } from '../components/BattleVideos';
+import { LeftText, PrepareUpload, RecordScreen } from '../components/BattleVideos';
 import { ErrorText } from '../components/ErrorText';
 import { errorText, formatDate, t } from '../i18n';
 import { QUALITIES, type Quality } from '../video/quality';
@@ -135,7 +135,7 @@ export function FilmForFriendPage() {
                   <div key={i} className="actions">
                     <button
                       type="button"
-                      disabled={(left !== null && left <= 0) || !isRecordingSupported()}
+                      disabled={!isRecordingSupported()}
                       onClick={() =>
                         setTarget({ ...base, battleId: b.id, partIndex: i, attemptsLeft: left })
                       }
@@ -144,9 +144,7 @@ export function FilmForFriendPage() {
                         ? `${t('videos.record')}: ${partText(part)}`
                         : t('videos.record')}
                     </button>
-                    <span className="muted">
-                      {left === null ? t('videos.unlimited') : t('videos.left', { n: left })}
-                    </span>
+                    <LeftText left={left} />
                   </div>
                 );
               })}

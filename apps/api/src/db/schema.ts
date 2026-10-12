@@ -538,6 +538,11 @@ export const attempts = sqliteTable(
     assignment: text('assignment'),
     assignedAt: integer('assigned_at'),
     confirmedBy: text('confirmed_by').references(() => users.id),
+    /**
+     * Beyond the allowance (agreed + granted extra attempts): kept, but cannot be chosen until
+     * extra attempts are granted (concept section 6). Set by `settleAttempts` in @hfb/shared.
+     */
+    provisional: integer('provisional', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => [index('attempts_slot_idx').on(t.battleId, t.userId, t.partIndex, t.round)],
 );

@@ -80,3 +80,82 @@ export function attemptsLeft(
   const normalLeft = Math.max(0, attemptsPerVideo - (usedBySlot.get(slot) ?? 0));
   return normalLeft + Math.max(0, extraAttempts - extraUsed);
 }
+
+/** One attempt as `settleAttempts` sees it. */
+export interface SettleAttempt {
+  id: string;
+  /** `slotKey(partIndex, round)`. */
+  slot: string;
+  startedAt: number;
+  /** Stored state: beyond the allowance, cannot be chosen (concept section 6). */
+  provisional: boolean;
+  /** Inside the units of a reservation for offline recording: always valid. */
+  covered: boolean;
+  /** Chosen as the attempt that counts: never made provisional again. */
+  submitted: boolean;
+}
+
+/**
+ * Which attempts are provisional (concept section 6, decided 2026-10-12). Recording is never
+ * blocked: attempts beyond the allowance (agreed attempts + granted extra attempts) are kept but
+ * cannot be chosen. Returns the new `provisional` value of every attempt whose value changes.
+ *
+ * The state is stored and only moves forward, so an attempt that arrives late (recorded offline)
+ * never takes the place of an attempt that was already valid:
+ * - reserved units (`reservedBySlot`, for offline recording) and valid attempts outside them use
+ *   up the allowance;
+ * - when there is room (extra attempts granted, reserved units handed back), provisional attempts
+ *   become valid in the order they were started;
+ * - only when the allowance shrank (an extra attempt taken back) do the latest valid attempts
+ *   that were not chosen become provisional again.
+ */
+export function settleAttempts(
+  attemptsPerVideo: number | null,
+  extraAttempts: number,
+  reservedBySlot: ReadonlyMap<string, number>,
+  list: readonly SettleAttempt[],
+): Map<string, boolean> {
+  const changes = new Map<string, boolean>();
+  if (attemptsPerVideo === null) {
+    for (const a of list) if (a.provisional) changes.set(a.id, false);
+    return changes;
+  }
+  const sorted = [...list].sort((a, b) => a.startedAt - b.startedAt || (a.id < b.id ? -1 : 1));
+  const used = new Map(reservedBySlot);
+  const valid = new Set<string>();
+  for (const a of sorted) {
+    if (a.covered) {
+      valid.add(a.id);
+    } else if (!a.provisional) {
+      valid.add(a.id);
+      used.set(a.slot, (used.get(a.slot) ?? 0) + 1);
+    }
+  }
+  const excess = () => {
+    let sum = 0;
+    for (const n of used.values()) sum += Math.max(0, n - attemptsPerVideo);
+    return sum - extraAttempts;
+  };
+  // Allowance shrank: the latest valid attempts that were not chosen go back.
+  for (const a of [...sorted].reverse()) {
+    if (excess() <= 0) break;
+    const n = used.get(a.slot) ?? 0;
+    if (!valid.has(a.id) || a.covered || a.submitted || n <= attemptsPerVideo) continue;
+    valid.delete(a.id);
+    used.set(a.slot, n - 1);
+  }
+  // Room left: provisional attempts become valid in the order they were started.
+  for (const a of sorted) {
+    if (valid.has(a.id)) continue;
+    const left = attemptsLeft(attemptsPerVideo, extraAttempts, used, a.slot);
+    if (left !== null && left > 0) {
+      valid.add(a.id);
+      used.set(a.slot, (used.get(a.slot) ?? 0) + 1);
+    }
+  }
+  for (const a of sorted) {
+    const provisional = !valid.has(a.id);
+    if (provisional !== a.provisional) changes.set(a.id, provisional);
+  }
+  return changes;
+}
