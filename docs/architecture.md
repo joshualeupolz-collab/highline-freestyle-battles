@@ -136,7 +136,7 @@ Notes:
 - Added after step 12 (additive): `battle_messages.event_json` (the chat documents proposals, answers, extra attempts, choices and votes).
 - Added in step 12 (additive): `battles.ended_at`, `users.deletion_token_hash`.
 - Added with the legal texts (additive, migration 0009): `users.terms_version`, `users.terms_accepted_at`.
-- Added in stage 2 (additive, migration 0010): `reports` (id, reporter_id, target_type battle|video|user, target_id, category, text, status open|closed, created_at, closed_by, closed_at, close_note); migration 0011: `federation_approvals` (id, action, target_type, target_id, reason, payload_json, requested_by, status pending|approved|rejected|withdrawn, created_at, decided_by, decided_at, decision_note).
+- Added in stage 2 (additive): migration 0013 `competitions.level/description`; migration 0014 `push_subscriptions` (id, user_id, endpoint UNIQUE, created_at) and `notifications` (id, user_id, kind, battle_id, actor_id, created_at, delivered_at). Migration 0010: `reports` (id, reporter_id, target_type battle|video|user, target_id, category, text, status open|closed, created_at, closed_by, closed_at, close_note); migration 0011: `federation_approvals` (id, action, target_type, target_id, reason, payload_json, requested_by, status pending|approved|rejected|withdrawn, created_at, decided_by, decided_at, decision_note).
 - Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
@@ -415,6 +415,25 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
   free combination (not stored).
 - Rankings page: "One format / Combined"; the combined view shows the official configuration,
   lets everyone choose formats and how many to drop, and shows the z-value per format.
+
+---
+
+## 4l. Push notifications (stage 2, part 2.13)
+
+- Events (owner, 2026-10-12): opponent accepted, videos unlocked, review needed (pool members in
+  range and judges, at most 30 each), chat message (at most one per battle and person per 15
+  minutes) – not new challenges. `services/notify.ts` writes a `notifications` row per person
+  (migration 0014) and, if the person registered a device, sends a push.
+- The push is **empty** (`services/push.ts`: VAPID JWT signed with WebCrypto, no payload): no
+  payload encryption, little CPU, no content at Google/Apple/Mozilla. The service worker
+  (`apps/web/public/push-sw.js`, loaded via `workbox.importScripts`) fetches
+  `GET /api/notifications/pending` (marks them delivered) and shows them; if that fails it shows
+  a general notification (iOS requires one per push).
+- Devices: `push_subscriptions` (endpoint only). `GET /api/push/key`, `POST /api/push/subscribe`,
+  `POST /api/push/unsubscribe`; 404/410 from the push service removes the subscription. Logout
+  and account deletion remove them; notifications are deleted after 30 days (hourly job).
+- Secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`docs/deployment.md`); without
+  them nothing is pushed. Profile → Notifications turns it on per device (iPhone: installed app).
 
 ---
 

@@ -104,6 +104,15 @@ export function PrivacyEn() {
       </p>
       <p>Legal basis: Art. 6(1)(b) GDPR.</p>
       <p>
+        <strong>Push notifications.</strong> If you turn on notifications on a device, we store the
+        address your browser's push service gives us for this device (Google for Chrome and Android,
+        Apple for iPhones and Safari, Mozilla for Firefox) and which events we have to tell you
+        about. The push we send contains no content and no personal data; your device then fetches
+        the text from us. You can turn notifications off in your profile at any time; they are also
+        removed when you log out or delete your account. Legal basis: Art. 6(1)(a) GDPR (your
+        consent when turning them on).
+      </p>
+      <p>
         <strong>Reports and special roles.</strong> You can report a battle, a video or a profile.
         We store the report (category, your text, who reported, when) and how it was handled. Only
         the federation and the admins see reports; the person reported does not learn who reported
@@ -359,6 +368,16 @@ export function PrivacyDe() {
         ähnlich erhebliche Wirkung.
       </p>
       <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO.</p>
+      <p>
+        <strong>Push-Benachrichtigungen.</strong> Wenn du Benachrichtigungen auf einem Gerät
+        einschaltest, speichern wir die Adresse, die uns der Push-Dienst deines Browsers für dieses
+        Gerät gibt (Google bei Chrome und Android, Apple bei iPhones und Safari, Mozilla bei
+        Firefox), und über welche Ereignisse wir dich informieren. Die Push-Nachricht selbst enthält
+        keinen Inhalt und keine personenbezogenen Daten; dein Gerät holt den Text danach bei uns ab.
+        Du kannst Benachrichtigungen jederzeit im Profil ausschalten; beim Abmelden und beim Löschen
+        des Kontos werden sie ebenfalls entfernt. Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO (deine
+        Einwilligung beim Einschalten).
+      </p>
       <p>
         <strong>Meldungen und Sonderrollen.</strong> Du kannst ein Battle, ein Video oder ein Profil
         melden. Wir speichern die Meldung (Kategorie, deinen Text, wer gemeldet hat, wann) und wie

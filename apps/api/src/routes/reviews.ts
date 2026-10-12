@@ -13,7 +13,14 @@ import type { AppEnv } from '../env';
 import { auditInsert } from '../lib/audit';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
-import { escalate, reviewerRole, settleJudge, settlePool } from '../services/review';
+import { requestNotifyContext } from '../services/notify';
+import {
+  escalate,
+  notifyReviewers,
+  reviewerRole,
+  settleJudge,
+  settlePool,
+} from '../services/review';
 import { battleResponse, loadBattle } from './battles';
 
 /** Mounted at /api/reviews. */
@@ -96,7 +103,8 @@ reviewBattleRoutes.post('/:id/escalate', async (c) => {
     .from(reviewVotes)
     .where(and(eq(reviewVotes.battleId, battle.id), eq(reviewVotes.reviewLevel, 1)));
   if (!levelOneDisagrees(votes.map((v) => v.value))) apiError(409, 'no_disagreement');
-  await escalate(db, battle, 2, now);
+  if (await escalate(db, battle, 2, now))
+    await notifyReviewers(requestNotifyContext(c), battle.id, now);
   return c.json(await battleResponse(db, battle.id, user.id, now));
 });
 
@@ -123,7 +131,8 @@ reviewBattleRoutes.post('/:id/pool-vote', async (c) => {
     .onConflictDoNothing()
     .returning({ voterId: reviewVotes.voterId });
   if (inserted.length === 0) apiError(409, 'already_reviewed');
-  await settlePool(db, battle, now);
+  if ((await settlePool(db, battle, now)) === 'judges')
+    await notifyReviewers(requestNotifyContext(c), battle.id, now);
   return c.json(await battleResponse(db, battle.id, user.id, now));
 });
 

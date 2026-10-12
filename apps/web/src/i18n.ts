@@ -771,6 +771,18 @@ const en = {
   'error.competition_closed': 'This competition is already confirmed or cancelled.',
   'error.competition_not_finished': 'The organizer has not finished entering the results yet.',
   'error.no_results': 'Enter at least one result first.',
+  'push.title': 'Notifications',
+  'push.hint':
+    'Get a notification when your opponent accepts, the videos are unlocked, a review waits for you or someone writes in a battle chat.',
+  'push.on': 'Notifications are on for this device.',
+  'push.enable': 'Turn on notifications',
+  'push.disable': 'Turn off on this device',
+  'push.unsupported': 'This browser cannot show notifications.',
+  'push.installFirst':
+    'On iPhones, notifications only work in the installed app: add it to the home screen first (Share → "Add to Home Screen").',
+  'push.denied':
+    'Notifications are blocked. Allow them for this app in the settings of your phone or browser.',
+  'push.not_configured': 'Notifications are not set up on the server yet.',
   'audit.title': 'Audit log',
   'audit.hint': 'Every action using special permissions, newest first.',
   'audit.empty': 'No entries yet.',

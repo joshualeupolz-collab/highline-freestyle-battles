@@ -35,6 +35,7 @@ import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
 import { eventStatement } from '../services/battleEvents';
 import { requiredSubmissionsPerPerson } from '../services/battles';
+import { notify, requestNotifyContext } from '../services/notify';
 import { mayViewVideo, unlockIfComplete } from '../services/videos';
 import { originalKey, uploadsThroughWorker, videoStore } from '../storage/videoStore';
 import { battleResponse, loadBattle, requireParticipant } from './battles';
@@ -151,8 +152,15 @@ battleVideoRoutes.post('/:id/submissions', async (c) => {
       participants.map((p) => p.userId),
       now,
     )
-  )
+  ) {
     await eventStatement(db, battle.id, user.id, { type: 'unlocked' }, now + 1);
+    await notify(requestNotifyContext(c), {
+      userIds: participants.map((p) => p.userId),
+      kind: 'unlocked',
+      battleId: battle.id,
+      actorId: user.id,
+    });
+  }
   return c.json(await battleResponse(db, battle.id, user.id, now));
 });
 

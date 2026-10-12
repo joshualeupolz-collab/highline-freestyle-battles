@@ -26,6 +26,8 @@ export default defineConfig({
       workbox: {
         // API calls always go to the network; only the app itself is cached.
         navigateFallbackDenylist: [/^\/api\//],
+        // Push notifications (public/push-sw.js).
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

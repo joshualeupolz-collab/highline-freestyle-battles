@@ -12,6 +12,7 @@ import { estimateRoutes } from './routes/estimates';
 import { formatRoutes } from './routes/formats';
 import { groupRoutes } from './routes/groups';
 import { onsiteRoutes } from './routes/onsite';
+import { notificationRoutes, pushRoutes } from './routes/push';
 import { rankingRoutes } from './routes/rankings';
 import { reportRoutes } from './routes/reports';
 import { reviewBattleRoutes, reviewRoutes } from './routes/reviews';
@@ -48,6 +49,8 @@ export function createApp() {
   app.route('/estimates', estimateRoutes);
   app.route('/competitions', competitionRoutes);
   app.route('/rankings', rankingRoutes);
+  app.route('/push', pushRoutes);
+  app.route('/notifications', notificationRoutes);
   app.route('/reviews', reviewRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));

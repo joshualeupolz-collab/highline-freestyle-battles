@@ -792,3 +792,48 @@ export const federationApprovals = sqliteTable(
     oneOf('federation_approvals_status_check', t.status, FEDERATION_APPROVAL_STATUSES),
   ],
 );
+
+// ---------------------------------------------------------------------------------------------
+// Push notifications (stage 2)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A device that wants push notifications (Web Push). Only the push service's address is
+ * needed: the push itself carries no content, the device fetches it (services/notify.ts).
+ */
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    endpoint: text('endpoint').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('push_subscriptions_endpoint_unique').on(t.endpoint),
+    index('push_subscriptions_user_idx').on(t.userId),
+  ],
+);
+
+/**
+ * What a person should be told (opponent accepted, videos unlocked, review needed, chat
+ * message). The device fetches undelivered ones when a push arrives; kept 30 days.
+ */
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    kind: text('kind').notNull(),
+    battleId: text('battle_id').references(() => battles.id),
+    /** Who caused it (e.g. the opponent who accepted or wrote). */
+    actorId: text('actor_id').references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    deliveredAt: integer('delivered_at'),
+  },
+  (t) => [index('notifications_user_idx').on(t.userId, t.deliveredAt)],
+);

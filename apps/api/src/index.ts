@@ -2,7 +2,8 @@ import { createApp } from './app';
 import { getDb } from './db/client';
 import type { Env } from './env';
 import { resolveAbandonedDeadlines } from './services/battles';
-import { resolveExpiredReviews } from './services/review';
+import { deleteOldNotifications } from './services/notify';
+import { notifyReviewers, resolveExpiredReviews } from './services/review';
 import {
   deleteFilesOfDeletedVideos,
   markUnneededVideos,
@@ -21,9 +22,13 @@ export default {
     ctx.waitUntil(
       resolveAbandonedDeadlines(db).then((n) => console.log(`resolved ${n} abandoned battles`)),
     );
+    const notifyCtx = { db, env, waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) };
     ctx.waitUntil(
-      resolveExpiredReviews(db).then((n) => console.log(`settled ${n} expired reviews`)),
+      resolveExpiredReviews(db, Date.now(), (battleId) =>
+        notifyReviewers(notifyCtx, battleId),
+      ).then((n) => console.log(`settled ${n} expired reviews`)),
     );
+    ctx.waitUntil(deleteOldNotifications(db));
     // Videos no longer needed after a battle: mark them, then remove their files.
     ctx.waitUntil(
       markUnneededVideos(db)

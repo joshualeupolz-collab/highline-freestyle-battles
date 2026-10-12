@@ -25,7 +25,7 @@ Parts that need no answer from the owner come first, so work can go on in the me
 | 2.10 | **Filming by friends** (athlete code, inbox) | – | decided (§3.7) |
 | 2.11 | **Combined rankings** (official + free) | – | done (architecture §4k) |
 | 2.12 | **Over-rating warning** (rating spec §6.2) | 2.4 | later: needs ≥ 10 battles per estimated person |
-| 2.13 | **Push notifications** (Web Push) | – | decided (§3.9); needs the VAPID key from the owner |
+| 2.13 | **Push notifications** (Web Push) | – | done (architecture §4l) |
 
 ## 2. Defaults for parts 2.1–2.4 (confirmed by the owner, 2026-10-12)
 
@@ -117,4 +117,4 @@ These follow the concept; where it was silent, Claude picked the simplest fair o
 ## 4. Order after the decisions
 
 ~~2.2 reports → 2.3 annulment → 2.4 initial estimates → 2.6/2.7 review levels 2–3~~ (done) → ~~2.8 on-site group battles~~ (done) → ~~2.9 competitions (with weight 4–5)~~ (done) → ~~2.11 combined rankings~~ (done) → 2.10 athlete code →
-2.13 push notifications (once the VAPID key exists).
+~~2.13 push notifications~~ (done).
