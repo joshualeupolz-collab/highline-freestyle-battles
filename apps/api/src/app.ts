@@ -12,6 +12,7 @@ import { estimateRoutes } from './routes/estimates';
 import { formatRoutes } from './routes/formats';
 import { groupRoutes } from './routes/groups';
 import { onsiteRoutes } from './routes/onsite';
+import { rankingRoutes } from './routes/rankings';
 import { reportRoutes } from './routes/reports';
 import { reviewBattleRoutes, reviewRoutes } from './routes/reviews';
 import { rulesetRoutes } from './routes/rulesets';
@@ -46,6 +47,7 @@ export function createApp() {
   app.route('/federation-approvals', approvalRoutes);
   app.route('/estimates', estimateRoutes);
   app.route('/competitions', competitionRoutes);
+  app.route('/rankings', rankingRoutes);
   app.route('/reviews', reviewRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));

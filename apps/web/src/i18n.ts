@@ -313,6 +313,17 @@ const en = {
   'rankings.athlete': 'Athlete',
   'rankings.rating': 'Rating',
   'rankings.battles': 'Battles',
+  'rankings.mode.format': 'One format',
+  'rankings.mode.combined': 'Combined',
+  'rankings.official': 'Official: {formats}, the worst {n} dropped.',
+  'rankings.custom': 'Your choice: {formats}, the worst {n} dropped.',
+  'rankings.combinedHint':
+    'Each format is scaled to the field (z-value: 0 = average, +1 = one spread above). A format you never played counts −1. Then the worst ones are dropped and the rest averaged.',
+  'rankings.choose': 'Choose formats yourself',
+  'rankings.drop': 'Drop the worst',
+  'rankings.useOfficial': 'Back to the official ranking',
+  'rankings.value': 'Value',
+  'rankings.formats': 'Formats',
 
   'chat.title': 'Chat',
   'chat.empty': 'No messages yet.',

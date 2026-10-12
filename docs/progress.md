@@ -22,13 +22,13 @@ prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3
 reports, annulment, estimates) waiting for the owner's merge. The owner merges; Claude's own
 merges are blocked by the session's safety check. A new session starts a fresh branch from `main`.
 
-**Tests:** 41 rating engine tests, 22 video cutting tests (`apps/web/test`), 142 API tests
+**Tests:** 22 video cutting tests (`apps/web/test`), 143 API tests, 44 rating tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
 which play for the opponent; both vote and the ratings change. These flows are now committed as
 browser tests (`e2e/`, `pnpm e2e`, CI job `e2e`; video battle, on-site result, sign-up + approval,
-reports, initial estimates, handing a dispute to the pool, on-site group battle, competition).
+reports, initial estimates, handing a dispute to the pool, on-site group battle, competition, combined ranking).
 Steps 8 and 9 were also tested by the owner on Android phones with direct R2 uploads: work.
 Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 
@@ -151,7 +151,7 @@ profile button for members waiting for approval, confirmation before approving.
    2.1 roles + audit log (PR #19), 2.2 reports, 2.3 annulment, 2.4 initial estimates, 2.6/2.7
    review levels 2–3 (pool + one judge; defaults to confirm in the plan §3.2) (PR #21) are done.
    2.8 on-site group battles (PR #22) and 2.9 competitions with weight 1–5 (PR #23) are done as
-   well. Next: combined rankings, athlete code, push notifications (the owner creates the
+   well, and 2.11 combined rankings (PR #24). Next: athlete code, push notifications (the owner creates the
    VAPID key: GitHub secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`).
 4. Multipart upload if large HD uploads fail on mobile connections; measure PBKDF2 CPU time on
    Cloudflare and raise `PASSWORD_ITERATIONS` if there is headroom.

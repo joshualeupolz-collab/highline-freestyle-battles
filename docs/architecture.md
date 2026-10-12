@@ -401,6 +401,23 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
 
 ---
 
+## 4k. Combined rankings (stage 2, part 2.11)
+
+- Pure functions in `packages/rating/src/ranking.ts` (rating spec §8.2): `formatNormalization`
+  (mean and spread of R = r − 2·RD over the non-provisional people; below `comboMinPop` the
+  fallback spread `comboFallbackSd` around the mean of everyone), `combineZ` (missing format =
+  `comboMissingZ`, the X worst dropped, at least one value kept) and `combinedRanking`. Tested
+  against the worked example of §8.2.
+- `GET /api/rankings/combined` (`apps/api/src/routes/rankings.ts`): without a query the official
+  ranking – all *relevant* formats (or `params.officialCombo.formatIds`), the
+  `params.officialCombo.dropWorst` worst dropped, 1 by default (owner, 2026-10-12). The
+  federation changes it with a new RuleSet version (rules are data). `?formats=a,b&drop=n` is a
+  free combination (not stored).
+- Rankings page: "One format / Combined"; the combined view shows the official configuration,
+  lets everyone choose formats and how many to drop, and shows the z-value per format.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |
