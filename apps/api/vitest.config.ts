@@ -21,6 +21,9 @@ export default defineConfig(async () => {
     ],
     test: {
       setupFiles: ['./test/apply-migrations.ts'],
+      // Tests that register many people hash many passwords (PBKDF2): about 1 s locally, but
+      // well over the 5 s default on a busy CI runner with all test files in parallel.
+      testTimeout: 20_000,
     },
   };
 });
