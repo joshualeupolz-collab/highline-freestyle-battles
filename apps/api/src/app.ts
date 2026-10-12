@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
 import { loadUser } from './auth/middleware';
 import type { AppEnv } from './env';
+import { annulmentRoutes, approvalRoutes } from './routes/annulment';
 import { auditRoutes } from './routes/audit';
 import { authRoutes } from './routes/auth';
 import { battleRoutes } from './routes/battles';
@@ -32,9 +33,11 @@ export function createApp() {
   app.route('/battles', battleRoutes);
   app.route('/battles', battleVideoRoutes);
   app.route('/battles', onsiteRoutes);
+  app.route('/battles', annulmentRoutes);
   app.route('/videos', videoRoutes);
   app.route('/audit', auditRoutes);
   app.route('/reports', reportRoutes);
+  app.route('/federation-approvals', approvalRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

@@ -196,6 +196,11 @@ export interface Battle {
   deadlinePassed: boolean;
   decisionReason: string | null;
   cancelReason: string | null;
+  /** Annulled (with the reason), or a request to annul waiting for the federation. */
+  annulment:
+    | { state: 'annulled'; at: number | null; reason: string | null; ratingsPending: boolean }
+    | { state: 'pending'; at: number; reason: string }
+    | null;
   participants: Participant[];
   proposals: Proposal[];
   videos: BattleVideos;
@@ -343,6 +348,18 @@ export interface ReportEntry extends MyReport {
   canHandle: boolean;
 }
 
+export interface FederationApproval {
+  id: string;
+  action: 'battle.annul';
+  targetType: string;
+  targetId: string;
+  reason: string;
+  createdAt: number;
+  requestedBy: UserHit;
+  canDecide: boolean;
+  canWithdraw: boolean;
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -403,6 +420,12 @@ export const api = {
     get<{ reports: ReportEntry[] }>(`/reports?status=${status}`),
   openReportCount: () => get<{ count: number }>('/reports/open-count'),
   closeReport: (id: string, note: string) => post(`/reports/${id}/close`, { note }),
+  annulBattle: (id: string, reason: string) =>
+    post<{ status: 'annulled' | 'pending_approval' }>(`/battles/${id}/annul`, { reason }),
+  federationApprovals: () => get<{ approvals: FederationApproval[] }>('/federation-approvals'),
+  decideApproval: (id: string, decision: 'approve' | 'reject', note?: string) =>
+    post(`/federation-approvals/${id}/decide`, { decision, note }),
+  withdrawApproval: (id: string) => post(`/federation-approvals/${id}/withdraw`),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

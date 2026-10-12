@@ -28,6 +28,8 @@ import {
   COMPETITION_STATUSES,
   DECISION_REASONS,
   ESTIMATE_KINDS,
+  FEDERATION_APPROVAL_ACTIONS,
+  FEDERATION_APPROVAL_STATUSES,
   FORMAT_STATUSES,
   PROPOSAL_DECISIONS,
   PROPOSAL_KINDS,
@@ -750,5 +752,35 @@ export const reports = sqliteTable(
     oneOf('reports_target_type_check', t.targetType, REPORT_TARGETS),
     oneOf('reports_category_check', t.category, REPORT_CATEGORIES),
     oneOf('reports_status_check', t.status, REPORT_STATUSES),
+  ],
+);
+
+/**
+ * A sport-related action requested by an admin that waits for a federation member's approval
+ * (concept section 2), e.g. annulling a battle. Approving carries the action out.
+ */
+export const federationApprovals = sqliteTable(
+  'federation_approvals',
+  {
+    id: text('id').primaryKey(),
+    action: text('action', { enum: FEDERATION_APPROVAL_ACTIONS }).notNull(),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id').notNull(),
+    reason: text('reason').notNull(),
+    payloadJson: text('payload_json'),
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => users.id),
+    status: text('status', { enum: FEDERATION_APPROVAL_STATUSES }).notNull().default('pending'),
+    createdAt: integer('created_at').notNull(),
+    decidedBy: text('decided_by').references(() => users.id),
+    decidedAt: integer('decided_at'),
+    decisionNote: text('decision_note'),
+  },
+  (t) => [
+    index('federation_approvals_status_idx').on(t.status, t.createdAt),
+    index('federation_approvals_target_idx').on(t.targetType, t.targetId),
+    oneOf('federation_approvals_action_check', t.action, FEDERATION_APPROVAL_ACTIONS),
+    oneOf('federation_approvals_status_check', t.status, FEDERATION_APPROVAL_STATUSES),
   ],
 );

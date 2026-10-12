@@ -15,7 +15,7 @@ Parts that need no answer from the owner come first, so work can go on in the me
 |---|---|---|---|
 | 2.1 | **Roles:** federation/admin hand out and take back judge, organizer, federation (admin: also admin); role list per person; audit log page | – | done (PR #19) |
 | 2.2 | **Reports:** report button on battles, videos and profiles; list for federation/admin; close with a note | 2.1 | done (architecture §4g) |
-| 2.3 | **Annulment:** federation annuls a decided battle with a reason → status `annulled`, replay request; admins only with federation approval | 2.1 | next |
+| 2.3 | **Annulment:** federation annuls a decided battle with a reason → status `annulled`, replay request; admins only with federation approval | 2.1 | done (architecture §4g) |
 | 2.4 | **Initial estimates:** athletes estimate people they know (median of ≥ 3), federation/admin set a value; late estimates request a replay | 2.1 | next |
 | 2.5 | **Weight 4–5** only in official competitions (part of 2.9) | 2.9 | decided (§3.4) |
 | 2.6 | **Review level 2** (athlete pool, "To review" list) | 2.1 | decided (§3.1–3.2) |

@@ -66,6 +66,10 @@ No Cloudflare account is needed for local development or tests.
 | GET | `/api/reports` | Reports for federation/admin (`?status=open|closed`) |
 | GET | `/api/reports/open-count` | Number of open reports (badge) |
 | POST | `/api/reports/:id/close` | Close a report with a note, audited |
+| POST | `/api/battles/:id/annul` | Annul a decided battle (federation; admins need approval) |
+| GET | `/api/federation-approvals` | Admin actions waiting for the federation |
+| POST | `/api/federation-approvals/:id/decide` | Approve (carries it out) or reject |
+| POST | `/api/federation-approvals/:id/withdraw` | The requester takes it back |
 | POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
 | POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
 | POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |

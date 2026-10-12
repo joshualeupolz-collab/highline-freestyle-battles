@@ -136,7 +136,7 @@ Notes:
 - Added after step 12 (additive): `battle_messages.event_json` (the chat documents proposals, answers, extra attempts, choices and votes).
 - Added in step 12 (additive): `battles.ended_at`, `users.deletion_token_hash`.
 - Added with the legal texts (additive, migration 0009): `users.terms_version`, `users.terms_accepted_at`.
-- Added in stage 2 (additive, migration 0010): `reports` (id, reporter_id, target_type battle|video|user, target_id, category, text, status open|closed, created_at, closed_by, closed_at, close_note).
+- Added in stage 2 (additive, migration 0010): `reports` (id, reporter_id, target_type battle|video|user, target_id, category, text, status open|closed, created_at, closed_by, closed_at, close_note); migration 0011: `federation_approvals` (id, action, target_type, target_id, reason, payload_json, requested_by, status pending|approved|rejected|withdrawn, created_at, decided_by, decided_at, decision_note).
 - Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
@@ -306,6 +306,16 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
   participants of the battle, the owner of the video) cannot close it (`canHandle: false`). The
   reporter sees only whether it was handled (`GET /api/reports/mine`). The badge on the profile
   button counts open reports for federation and admins.
+- **Annulment** (`apps/api/src/routes/annulment.ts`, part 2.3): `POST /api/battles/:id/annul`
+  with a reason, only for decided battles and never by a participant. A federation member annuls
+  at once: status `annulled`, `annulled_by/at`, `annul_reason`, a `replay_request` and an audit
+  entry. The next replay drops the battle from every rating (it reads decided battles only); the
+  battle page says so until then. An admin without the federation role creates a
+  `federation_approvals` request instead (202), unless nobody holds the federation role yet; a
+  federation member who is neither the requester nor a participant approves (the annulment is
+  then carried out in the admin's name, `audit_log.federation_approval_by` = the approver) or
+  rejects it; the admin can withdraw it. `GET /api/federation-approvals` lists the waiting
+  requests (admin page). The table is generic so later sport-related admin actions can use it.
 
 ---
 
