@@ -5,6 +5,7 @@
 import type {
   BattleSettings,
   CreateEstimate,
+  CreateGroupBattle,
   CreateOnsiteBattle,
   CreateReport,
   CreateVideo,
@@ -132,6 +133,8 @@ export interface Profile {
     createdAt: number;
     decidedAt: number | null;
     score: number | null;
+    /** Group battles: 1 = best. */
+    placement: number | null;
     opponents: { userId: string; username: string; displayName: string }[];
     ratingChange: number | null;
   }[];
@@ -150,6 +153,8 @@ export interface Participant {
   displayName: string;
   seat: number;
   score: number | null;
+  /** Group battles: 1 = best. */
+  placement?: number | null;
   extraAttempts?: number;
   rating?: RatingView | null;
 }
@@ -175,6 +180,8 @@ export interface Proposal {
     videoId?: string;
     /** result (on-site): 5-point value seen from the proposer, +2 … −2. */
     value?: number;
+    /** result of a group battle: everyone's placement (1 = best). */
+    placements?: { userId: string; placement: number }[];
   };
   proposedBy: string;
   createdAt: number;
@@ -184,6 +191,8 @@ export interface Proposal {
 export interface Battle {
   id: string;
   formatId: string;
+  /** single = two people; group = 3+ people on site with placements. */
+  kind: 'single' | 'group' | 'placement';
   mode: 'online' | 'onsite';
   status: BattleStatus;
   /** Online: when the videos unlocked; on-site: when the battle took place. */
@@ -296,6 +305,8 @@ export interface Message {
     kind?: string;
     choice?: string;
     payload?: Proposal['payload'];
+    /** official_confirmed: who confirmed (not a participant). */
+    name?: string;
   } | null;
 }
 
@@ -472,6 +483,8 @@ export const api = {
   battle: (id: string) => get<BattleResponse>(`/battles/${id}`),
   createBattle: (body: unknown) => post<BattleResponse>('/battles', body),
   createOnsiteBattle: (body: CreateOnsiteBattle) => post<BattleResponse>('/battles/onsite', body),
+  createGroupBattle: (body: CreateGroupBattle) =>
+    post<BattleResponse>('/battles/onsite-group', body),
   messages: (battleId: string) => get<{ messages: Message[] }>(`/battles/${battleId}/messages`),
   sendMessage: (battleId: string, body: string) =>
     post<{ message: Message }>(`/battles/${battleId}/messages`, { body }),

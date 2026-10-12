@@ -147,3 +147,33 @@ export const createOnsiteBattleSchema = z.object({
     .refine((v) => v !== 0, 'No draw'),
 });
 export type CreateOnsiteBattle = z.infer<typeof createOnsiteBattleSchema>;
+
+/** Size of an on-site group battle (concept section 8). */
+export const GROUP_MIN = 3;
+export const GROUP_MAX = 20;
+
+/**
+ * Placements of a group battle: everyone once, 1 = best, ties allowed (equal places),
+ * not everyone on the same place.
+ */
+export const placementsSchema = z
+  .array(
+    z.object({
+      userId: z.string().min(1).max(64),
+      placement: z.number().int().min(1).max(GROUP_MAX),
+    }),
+  )
+  .min(GROUP_MIN)
+  .max(GROUP_MAX)
+  .refine((list) => new Set(list.map((p) => p.userId)).size === list.length, 'Everyone once')
+  .refine((list) => list.every((p) => p.placement <= list.length), 'Placement too high')
+  .refine((list) => new Set(list.map((p) => p.placement)).size > 1, 'Not everyone on one place');
+
+/** An on-site group battle (owner, 2026-10-12): the person entering it takes part. */
+export const createGroupBattleSchema = z.object({
+  formatId: z.string().min(1).max(64),
+  playedAt: z.number().int().positive(),
+  level: z.number().int().min(1).max(5).default(3),
+  placements: placementsSchema,
+});
+export type CreateGroupBattle = z.infer<typeof createGroupBattleSchema>;

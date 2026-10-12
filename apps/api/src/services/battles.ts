@@ -13,7 +13,7 @@ import {
   formatVersions,
   submissions,
 } from '../db/schema';
-import { ratingStatements } from './rating';
+import { type BattleResult, ratingStatements } from './rating';
 
 type BattleRow = typeof battles.$inferSelect;
 
@@ -21,7 +21,7 @@ type BattleRow = typeof battles.$inferSelect;
 export async function decideStatements(
   db: Database,
   battle: BattleRow,
-  results: { userId: string; score: number }[],
+  results: BattleResult[],
   reason: 'forfeit' | 'deadline' | 'review' | 'onsite',
   now: number,
 ): Promise<BatchItem<'sqlite'>[]> {
@@ -39,7 +39,7 @@ export async function decideStatements(
     ...results.map((r) =>
       db
         .update(battleParticipants)
-        .set({ score: r.score })
+        .set(r.placement === undefined ? { score: r.score } : { placement: r.placement })
         .where(
           and(eq(battleParticipants.battleId, battle.id), eq(battleParticipants.userId, r.userId)),
         ),

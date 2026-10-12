@@ -64,7 +64,9 @@ export function todoOf(battle: Battle, myId: string, partsCount: number): Todo {
     submittedAll: chosen.length >= Math.max(partsCount, 1),
     iVoted: battle.review?.voted.includes(myId) ?? false,
     votes: battle.review?.voted.length ?? 0,
-    proposalForMe: battle.proposals.some((p) => p.proposedBy !== myId),
+    proposalForMe: battle.proposals.some(
+      (p) => p.proposedBy !== myId && !p.acceptedBy.includes(myId),
+    ),
     reviewLevel: battle.review?.level ?? 1,
   };
 }

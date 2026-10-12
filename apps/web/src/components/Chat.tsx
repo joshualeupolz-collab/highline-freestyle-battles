@@ -123,6 +123,8 @@ function eventText(event: NonNullable<Message['event']>, who: string): string {
         who,
         kind: t(`event.kind.${kind || 'settings'}` as MessageKey),
       });
+    case 'official_confirmed':
+      return t('event.official_confirmed', { who: event.name ?? who });
     case 'deadline_decision':
       return t(event.choice === 'claim_win' ? 'event.claimWin' : 'event.cancelUnrated', { who });
     default:

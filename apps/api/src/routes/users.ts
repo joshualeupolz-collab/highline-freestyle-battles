@@ -273,7 +273,11 @@ userRoutes.get('/:id', async (c) => {
   ]);
 
   const mine = await db
-    .select({ battle: battles, score: battleParticipants.score })
+    .select({
+      battle: battles,
+      score: battleParticipants.score,
+      placement: battleParticipants.placement,
+    })
     .from(battleParticipants)
     .innerJoin(battles, eq(battles.id, battleParticipants.battleId))
     .where(and(eq(battleParticipants.userId, id), sql`${battles.status} <> 'open'`))
@@ -322,7 +326,7 @@ userRoutes.get('/:id', async (c) => {
         ...ratingView(state, params),
       }))
       .sort((a, b) => b.nBattles - a.nBattles),
-    battles: mine.map(({ battle, score }) => {
+    battles: mine.map(({ battle, score, placement }) => {
       const h = history.find((x) => x.battleId === battle.id);
       return {
         id: battle.id,
@@ -332,6 +336,7 @@ userRoutes.get('/:id', async (c) => {
         createdAt: battle.createdAt,
         decidedAt: battle.decidedAt,
         score,
+        placement,
         opponents: opponents
           .filter((o) => o.battleId === battle.id)
           .map(({ battleId: _, ...o }) => o),

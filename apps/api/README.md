@@ -77,6 +77,11 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/battles/:id/pool-vote` | Level 2: one blind review by an eligible athlete |
 | POST | `/api/battles/:id/judge-decision` | Level 3: the judge decides (audited) |
 | GET | `/api/reviews/open` | Battles waiting for my review (pool or judge) |
+| POST | `/api/battles/onsite-group` | Enter an on-site group battle with everyone's placement |
+| POST | `/api/battles/:id/group-confirm` | Confirm the group result (counts once everyone did) |
+| POST | `/api/battles/:id/group-reject` | Reject it (someone enters a corrected one) |
+| POST | `/api/battles/:id/group-result` | Enter corrected placements |
+| POST | `/api/battles/:id/official-confirm` | Judge/organizer/federation confirms for everyone (audited) |
 | POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
 | POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
 | POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |
