@@ -130,6 +130,25 @@ export function BattleVideos({
   };
 
   const prepare = local.find((r) => r.id === prepareId);
+  const opponents = battle.participants.filter((p) => p.userId !== myId);
+  const opponentName = opponents[0]?.displayName ?? t('videos.opponent');
+
+  // Any uploaded attempt can be shown to the opponent with a request for an extra attempt
+  // (concept section 6), e.g. the recording broke off or the phone fell.
+  const askExtra = async (videoId: string) => {
+    if (!window.confirm(t('videos.askExtraConfirm', { name: opponentName }))) return;
+    setError(null);
+    try {
+      const res = await api.battleAction(battle.id, 'proposals', {
+        kind: 'extra_attempt',
+        change: 1,
+        videoId,
+      });
+      queryClient.setQueryData(['battle', battle.id], res);
+    } catch (e) {
+      setError(e);
+    }
+  };
 
   return (
     <section>
@@ -162,6 +181,7 @@ export function BattleVideos({
                 canChoose={battle.status === 'active'}
                 onPrepare={() => setPrepareId(row.id)}
                 onChoose={choose}
+                onAskExtra={battle.status === 'active' && opponents.length === 1 ? askExtra : null}
               />
             ))}
             {active && (
@@ -207,9 +227,7 @@ export function BattleVideos({
         <PrepareUpload
           key={prepare.id}
           recording={prepare}
-          opponentName={
-            battle.participants.find((p) => p.userId !== myId)?.displayName ?? t('videos.opponent')
-          }
+          opponentName={opponentName}
           onClose={() => setPrepareId(null)}
         />
       )}
@@ -223,12 +241,15 @@ function AttemptLine({
   canChoose,
   onPrepare,
   onChoose,
+  onAskExtra,
 }: {
   row: AttemptRow;
   number: number;
   canChoose: boolean;
   onPrepare: () => void;
   onChoose: (videoId: string) => void;
+  /** Null when no request is possible (battle not running, group battle). */
+  onAskExtra: ((videoId: string) => void) | null;
 }) {
   const friend = row.server?.friend ?? null;
   const [watch, setWatch] = useState(false);
@@ -274,6 +295,11 @@ function AttemptLine({
         {uploaded && canChoose && !video.counts && (
           <button type="button" onClick={() => onChoose(video.id)}>
             {t('videos.choose')}
+          </button>
+        )}
+        {uploaded && onAskExtra && !video.counts && (
+          <button type="button" className="link" onClick={() => onAskExtra(video.id)}>
+            {t('videos.askExtraShort')}
           </button>
         )}
       </div>

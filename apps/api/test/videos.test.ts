@@ -249,7 +249,26 @@ describe('upload, choosing and unlocking', () => {
   });
 });
 
-describe('extra attempt request with a cut-off video', () => {
+describe('extra attempt request with a video', () => {
+  it('only accepts an uploaded video of my own', async () => {
+    const id = await activeBattle({ attemptsPerVideo: 1 });
+    const res = await attempt(anna, id);
+    const attemptId = res.body.battle.videos.mine[0]?.id as string;
+    const announced = await post<{ video: { id: string } }>(anna, '/api/videos', {
+      attemptId,
+      contentType: 'video/mp4',
+      sizeBytes: 5,
+    });
+    const ask = (who: Person) =>
+      post(who, `/api/battles/${id}/proposals`, {
+        kind: 'extra_attempt',
+        change: 1,
+        videoId: announced.body.video.id,
+      });
+    expect((await ask(anna)).body.error).toBe('not_uploaded_yet');
+    expect((await ask(ben)).body.error).toBe('video_not_found');
+  });
+
   it('lets the opponent watch the video and grants the attempt on acceptance', async () => {
     const id = await activeBattle({ attemptsPerVideo: 1 });
     const res = await attempt(anna, id);

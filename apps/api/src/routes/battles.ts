@@ -640,11 +640,14 @@ battleRoutes.post('/:id/proposals', async (c) => {
       if (target.extraAttempts < 1) apiError(409, 'no_extra_attempt_to_take_back');
       payload = { change: -1, userId: target.userId };
     } else {
-      // A request for myself, optionally with the cut-off video for the opponent to watch.
+      // A request for myself, optionally with one of my uploaded attempts for the opponent to
+      // watch (concept section 6: any attempt, e.g. cut off, dirty lens, the phone fell).
       if (input.videoId) {
         const video = await db.select().from(videos).where(eq(videos.id, input.videoId)).get();
         if (!video || video.ownerId !== user.id || video.battleId !== battle.id)
           apiError(404, 'video_not_found');
+        if (video.status !== 'uploaded' && video.status !== 'ready')
+          apiError(409, 'not_uploaded_yet');
       }
       payload = { change: 1, userId: user.id, videoId: input.videoId };
     }
