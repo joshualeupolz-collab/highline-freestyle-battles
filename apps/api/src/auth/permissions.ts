@@ -35,6 +35,9 @@ export const can = {
     user.id !== targetUserId &&
     grantableRoles(user.roles).includes(role),
 
+  /** See and close reports (concept section 11). Not for reports that concern oneself. */
+  handleReports: (user: CurrentUser | null) => hasRole(user, 'federation', 'admin'),
+
   /** Read the audit log (concept section 2: the federation can view it). */
   viewAuditLog: (user: CurrentUser | null) => hasRole(user, 'federation', 'admin'),
 

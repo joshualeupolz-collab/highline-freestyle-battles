@@ -62,3 +62,8 @@ export async function phoneOf(browser: Browser, user: TestUser): Promise<Page> {
   page.on('dialog', (dialog) => void dialog.accept());
   return page;
 }
+
+/** A phone on which the admin from global-setup.ts is logged in. */
+export function adminPhone(browser: Browser): Promise<Page> {
+  return phoneOf(browser, { id: '', username: ADMIN, displayName: ADMIN });
+}

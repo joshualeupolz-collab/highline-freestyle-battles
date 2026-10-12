@@ -811,3 +811,10 @@ details.more {
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
+
+/* Small "Report" link under battles, videos and profiles */
+button.link.report-link {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}

@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth';
 import { battleRoutes } from './routes/battles';
 import { formatRoutes } from './routes/formats';
 import { onsiteRoutes } from './routes/onsite';
+import { reportRoutes } from './routes/reports';
 import { rulesetRoutes } from './routes/rulesets';
 import { userRoutes } from './routes/users';
 import { battleVideoRoutes, videoRoutes } from './routes/videos';
@@ -33,6 +34,7 @@ export function createApp() {
   app.route('/battles', onsiteRoutes);
   app.route('/videos', videoRoutes);
   app.route('/audit', auditRoutes);
+  app.route('/reports', reportRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

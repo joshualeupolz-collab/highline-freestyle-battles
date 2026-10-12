@@ -17,6 +17,7 @@ import { ProfilePage } from './pages/Profile';
 import { ProposeFormatPage } from './pages/ProposeFormat';
 import { RankingsPage } from './pages/Rankings';
 import { RegisterPage } from './pages/Register';
+import { ReportsPage } from './pages/Reports';
 import { ResetPasswordPage } from './pages/ResetPassword';
 import { UserProfilePage } from './pages/UserProfile';
 import { VideoLabPage } from './pages/VideoLab';
@@ -64,6 +65,7 @@ const router = createBrowserRouter([
       { path: '/users/:id', element: <UserProfilePage /> },
       { path: '/battles/:id', element: <BattleDetailPage /> },
       { path: '/approvals', element: <ApprovalsPage /> },
+      { path: '/reports', element: <ReportsPage /> },
       { path: '/admin', element: <AdminPage /> },
       { path: '/profile', element: <ProfilePage /> },
     ],

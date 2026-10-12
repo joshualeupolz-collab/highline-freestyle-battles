@@ -21,6 +21,7 @@ import {
 } from '../components/BattleVideos';
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
+import { ReportButton } from '../components/ReportButton';
 import { ReviewCard } from '../components/Review';
 import { RatingText, UserLink } from '../components/UserLink';
 import { formatDate, formatShort, type MessageKey, t } from '../i18n';
@@ -343,6 +344,7 @@ export function BattleDetailPage() {
           )}
         </details>
       )}
+      {battle.status !== 'open' && <ReportButton targetType="battle" targetId={battle.id} />}
     </>
   );
 }

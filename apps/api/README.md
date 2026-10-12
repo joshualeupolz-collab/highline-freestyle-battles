@@ -57,6 +57,15 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/videos` | Announce an upload; returns where to send the bytes |
 | PUT | `/api/videos/:id/upload` | Upload through the Worker (only without R2 access key, e.g. locally) |
 | POST | `/api/videos/:id/complete` | Check the stored file and mark the video as uploaded |
+| GET | `/api/users/staff` | Everyone with a special role |
+| POST | `/api/users/:id/roles` | Hand out a role (`grantableRoles`), audited |
+| POST | `/api/users/:id/roles/revoke` | Take back a role, audited |
+| GET | `/api/audit` | Audit log (federation/admin), `?before=<id>` for the next page |
+| POST | `/api/reports` | Report a battle, video or profile |
+| GET | `/api/reports/mine` | My reports and whether they were handled |
+| GET | `/api/reports` | Reports for federation/admin (`?status=open|closed`) |
+| GET | `/api/reports/open-count` | Number of open reports (badge) |
+| POST | `/api/reports/:id/close` | Close a report with a note, audited |
 | POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
 | POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
 | POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |

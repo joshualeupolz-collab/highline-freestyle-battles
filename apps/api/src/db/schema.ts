@@ -32,6 +32,9 @@ import {
   PROPOSAL_DECISIONS,
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,
+  REPORT_CATEGORIES,
+  REPORT_STATUSES,
+  REPORT_TARGETS,
   REVIEW_MODES,
   ROLES,
   STORAGE_BACKENDS,
@@ -712,4 +715,40 @@ export const replayRequests = sqliteTable(
     doneAt: integer('done_at'),
   },
   (t) => [index('replay_requests_open_idx').on(t.doneAt)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Moderation
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Reports about a battle, a video or a profile (concept section 11). Handled by the federation
+ * and admins; closing one is audited.
+ */
+export const reports = sqliteTable(
+  'reports',
+  {
+    id: text('id').primaryKey(),
+    reporterId: text('reporter_id')
+      .notNull()
+      .references(() => users.id),
+    targetType: text('target_type', { enum: REPORT_TARGETS }).notNull(),
+    targetId: text('target_id').notNull(),
+    category: text('category', { enum: REPORT_CATEGORIES }).notNull(),
+    text: text('text').notNull(),
+    status: text('status', { enum: REPORT_STATUSES }).notNull().default('open'),
+    createdAt: integer('created_at').notNull(),
+    closedBy: text('closed_by').references(() => users.id),
+    closedAt: integer('closed_at'),
+    /** What was done; visible to federation and admins only. */
+    closeNote: text('close_note'),
+  },
+  (t) => [
+    index('reports_status_idx').on(t.status, t.createdAt),
+    index('reports_target_idx').on(t.targetType, t.targetId),
+    index('reports_reporter_idx').on(t.reporterId, t.createdAt),
+    oneOf('reports_target_type_check', t.targetType, REPORT_TARGETS),
+    oneOf('reports_category_check', t.category, REPORT_CATEGORIES),
+    oneOf('reports_status_check', t.status, REPORT_STATUSES),
+  ],
 );

@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router';
 import { api } from '../api';
 import { hasRole, useMe, useSetMe } from '../auth';
 import { ErrorText } from '../components/ErrorText';
-import { usePendingCount } from '../components/Layout';
+import { useOpenReportCount, usePendingCount } from '../components/Layout';
 import { t } from '../i18n';
 import { LegalLinks } from './Legal';
 
@@ -34,6 +34,7 @@ export function ProfilePage() {
   });
   const canApprove = hasRole(me, 'athlete', 'federation', 'admin');
   const pending = usePendingCount(canApprove);
+  const reports = useOpenReportCount(hasRole(me, 'federation', 'admin'));
   if (!me) return null;
 
   return (
@@ -49,6 +50,10 @@ export function ProfilePage() {
         )}
         <Link to="/formats/propose">{t('new.proposeFormat')}</Link>
         {hasRole(me, 'federation', 'admin') && <Link to="/admin">{t('nav.admin')}</Link>}
+        <Link to="/reports">
+          {t('reports.title')}
+          {reports > 0 && <span className="count-badge">{reports}</span>}
+        </Link>
         {/* The installed app has no address bar, so testers reach the test page from here. */}
         <Link to="/lab/video">{t('profile.videoTest')}</Link>
       </div>

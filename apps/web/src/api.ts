@@ -5,8 +5,11 @@
 import type {
   BattleSettings,
   CreateOnsiteBattle,
+  CreateReport,
   CreateVideo,
   CurrentUser,
+  ReportCategory,
+  ReportTarget,
   SpecialRole,
   UploadTarget,
 } from '@hfb/shared';
@@ -320,6 +323,26 @@ export interface AuditEntry {
   createdAt: number;
 }
 
+export interface MyReport {
+  id: string;
+  targetType: ReportTarget;
+  targetId: string;
+  category: ReportCategory;
+  text: string;
+  status: 'open' | 'closed';
+  createdAt: number;
+  closedAt: number | null;
+}
+
+export interface ReportEntry extends MyReport {
+  battleId: string | null;
+  involved: UserHit[];
+  reporter: UserHit | null;
+  closedBy: UserHit | null;
+  closeNote: string | null;
+  canHandle: boolean;
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -374,6 +397,12 @@ export const api = {
     get<{ entries: AuditEntry[]; next: string | null }>(
       before ? `/audit?before=${encodeURIComponent(before)}` : '/audit',
     ),
+  createReport: (body: CreateReport) => post<{ id: string }>('/reports', body),
+  myReports: () => get<{ reports: MyReport[] }>('/reports/mine'),
+  reports: (status: 'open' | 'closed') =>
+    get<{ reports: ReportEntry[] }>(`/reports?status=${status}`),
+  openReportCount: () => get<{ count: number }>('/reports/open-count'),
+  closeReport: (id: string, note: string) => post(`/reports/${id}/close`, { note }),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

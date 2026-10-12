@@ -5,6 +5,7 @@ import { api } from '../api';
 import { useMe } from '../auth';
 import { StatusBadge } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
+import { ReportButton } from '../components/ReportButton';
 import { UserLink } from '../components/UserLink';
 import { formatDate, type MessageKey, t } from '../i18n';
 
@@ -12,11 +13,13 @@ const roleName = (role: string) => t(`role.${role}` as MessageKey);
 
 export function UserProfilePage() {
   const { id = '' } = useParams();
+  const { data: currentUser } = useMe();
   const profile = useQuery({ queryKey: ['profile', id], queryFn: () => api.profile(id) });
   if (profile.isLoading) return <p className="muted">{t('common.loading')}</p>;
   const data = profile.data;
   if (!data) return <ErrorText error={profile.error} />;
   const { user, ratings, battles } = data;
+  const me = currentUser;
 
   return (
     <>
@@ -87,6 +90,7 @@ export function UserProfilePage() {
           </div>
         </Link>
       ))}
+      {me && me.id !== user.id && <ReportButton targetType="user" targetId={user.id} />}
     </>
   );
 }

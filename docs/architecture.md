@@ -136,6 +136,7 @@ Notes:
 - Added after step 12 (additive): `battle_messages.event_json` (the chat documents proposals, answers, extra attempts, choices and votes).
 - Added in step 12 (additive): `battles.ended_at`, `users.deletion_token_hash`.
 - Added with the legal texts (additive, migration 0009): `users.terms_version`, `users.terms_accepted_at`.
+- Added in stage 2 (additive, migration 0010): `reports` (id, reporter_id, target_type battle|video|user, target_id, category, text, status open|closed, created_at, closed_by, closed_at, close_note).
 - Added in step 8 (additive): `videos.end_reason` (stopped / app left / camera lost) and `video_files.content_type`.
 - Indexes follow the access patterns: open requests `battles(status, format_id, created_at)`, "my battles" `battle_participants(user_id)`, rankings `rating_states(format_id)`, replay `battles(format_id, event_at)`, clean-up jobs `videos(status)`.
 
@@ -286,6 +287,25 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
   `TERMS_VERSION` (accounts from before, or after raising it), the app shows only a request to
   accept (`POST /auth/accept-terms`); the profile stays reachable so the person can delete the
   account instead. Raise `TERMS_VERSION` only for changes people must agree to.
+
+---
+
+## 4g. Roles, audit log and reports (stage 2, parts 2.1–2.2)
+
+- **Roles:** `grantableRoles` (`packages/shared/src/roles.ts`) is the one rule: admins hand out
+  judge, organizer, federation and admin; the federation hands out judge, organizer and
+  federation. Nobody changes their own roles; the athlete role comes with the approval. Roles are
+  read per request, so a change applies at once. `POST /api/users/:id/roles`, `…/roles/revoke`,
+  `GET /api/users/staff`.
+- **Audit log:** `GET /api/audit` for federation and admins, newest first, paged by id (`?before=`),
+  filter `?targetType=&targetId=`. Shown on the admin page.
+- **Reports** (`apps/api/src/routes/reports.ts`): approved users report a battle, a video or a
+  profile (category + text). One open report per person and target, at most 10 open per person.
+  Federation and admins list them (`GET /api/reports?status=open|closed`) and close them with a
+  note (audited). The conflict-of-interest rule: whoever is concerned (the reported person, the
+  participants of the battle, the owner of the video) cannot close it (`canHandle: false`). The
+  reporter sees only whether it was handled (`GET /api/reports/mine`). The badge on the profile
+  button counts open reports for federation and admins.
 
 ---
 

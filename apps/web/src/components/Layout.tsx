@@ -39,6 +39,7 @@ export function Layout() {
     refetchInterval: 60_000,
   });
   const pending = usePendingCount(active && hasRole(user, 'athlete', 'federation', 'admin'));
+  const reports = useOpenReportCount(active && hasRole(user, 'federation', 'admin'));
   const { pathname } = useLocation();
   if (isLoading) return <main className="muted">{t('common.loading')}</main>;
   if (!user) return <Navigate to="/login" replace />;
@@ -54,13 +55,18 @@ export function Layout() {
         </Link>
         <Link to="/profile" className="avatar" aria-label={t('nav.profile')}>
           {user.displayName.slice(0, 1).toUpperCase()}
-          {pending > 0 && (
+          {pending + reports > 0 && (
             <span
               className="avatar-badge"
               role="img"
-              aria-label={t('approvals.waiting', { n: pending })}
+              aria-label={[
+                pending > 0 && t('approvals.waiting', { n: pending }),
+                reports > 0 && t('reports.waiting', { n: reports }),
+              ]
+                .filter(Boolean)
+                .join(', ')}
             >
-              {pending}
+              {pending + reports}
             </span>
           )}
         </Link>
@@ -144,4 +150,16 @@ export function usePendingCount(enabled: boolean): number {
     refetchInterval: 5 * 60_000,
   });
   return enabled ? (pending.data?.users.length ?? 0) : 0;
+}
+
+/** How many reports are open (for the federation and admins). */
+export function useOpenReportCount(enabled: boolean): number {
+  const open = useQuery({
+    queryKey: ['openReportCount'],
+    queryFn: api.openReportCount,
+    enabled,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  return enabled ? (open.data?.count ?? 0) : 0;
 }
