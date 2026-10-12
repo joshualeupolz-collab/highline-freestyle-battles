@@ -88,6 +88,22 @@ Without the access key everything still works: videos go through the Worker inst
 95 MB per video (Workers Free accepts at most 100 MB per request). The deploy run shows a warning
 in that case.
 
+## Push notifications
+
+Push notifications (opponent accepted, videos unlocked, review needed, chat message) use Web
+Push with a VAPID key pair. It is free; the pushes go through the browsers' push services (Google,
+Apple, Mozilla) and carry no content – the app fetches the texts itself.
+
+1. On a computer with Node.js, in a normal terminal (PowerShell: use `npx.cmd`):
+   `npx web-push generate-vapid-keys` – it prints a public and a private key.
+2. GitHub secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (`mailto:…` or the
+   app's https address).
+3. The next deployment passes them to the Worker. Never generate new keys afterwards: every
+   device would have to turn notifications on again.
+
+Without the keys the app works as before; the profile says that notifications are not set up.
+On iPhones, push only works in the installed app (home screen).
+
 ## Rating replay
 
 `.github/workflows/replay.yml` recalculates all ratings when a recalculation was requested

@@ -77,7 +77,13 @@ jobs:
           SETUP_TOKEN: ${{ secrets.SETUP_TOKEN }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         run: |
+          if [ -z "$VAPID_PUBLIC_KEY" ] || [ -z "$VAPID_PRIVATE_KEY" ]; then
+            echo "::warning::No VAPID keys: push notifications are off. See docs/deployment.md, Push notifications."
+          fi
           if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ]; then
             echo "::warning::No R2 access key: videos are uploaded through the Worker (max 95 MB each). See docs/deployment.md, Videos."
           fi
@@ -90,6 +96,11 @@ jobs:
               s.R2_ACCESS_KEY_ID = e.R2_ACCESS_KEY_ID;
               s.R2_SECRET_ACCESS_KEY = e.R2_SECRET_ACCESS_KEY;
               s.R2_ACCOUNT_ID = e.CLOUDFLARE_ACCOUNT_ID;
+            }
+            if (e.VAPID_PUBLIC_KEY && e.VAPID_PRIVATE_KEY) {
+              s.VAPID_PUBLIC_KEY = e.VAPID_PUBLIC_KEY;
+              s.VAPID_PRIVATE_KEY = e.VAPID_PRIVATE_KEY;
+              if (e.VAPID_SUBJECT) s.VAPID_SUBJECT = e.VAPID_SUBJECT;
             }
             require("fs").writeFileSync(e.RUNNER_TEMP + "/secrets.json", JSON.stringify(s));
           '

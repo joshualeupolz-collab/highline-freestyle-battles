@@ -91,6 +91,9 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/competitions/:id/submit` / `reopen` / `cancel` | Organizer: ask for confirmation, edit again, call off |
 | POST | `/api/competitions/:id/confirm` | Judge/federation: confirm, all results count (audited) |
 | GET | `/api/rankings/combined` | Official combined ranking; `?formats=a,b&drop=n` for a free one |
+| GET | `/api/push/key` | Public VAPID key (null = push not set up) |
+| POST | `/api/push/subscribe` / `unsubscribe` | Register or remove this device for push |
+| GET | `/api/notifications/pending` | My undelivered notifications as texts (marks them delivered) |
 | POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
 | POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
 | POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |

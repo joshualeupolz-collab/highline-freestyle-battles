@@ -10,7 +10,7 @@
  * Shared by the vote routes and the scheduled job.
  */
 import { REVIEW_DAYS, reviewParams } from '@hfb/shared';
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lt, lte } from 'drizzle-orm';
 import {
   levelOneDisagrees,
   poolOutcome,
@@ -28,6 +28,7 @@ import {
   userRoles,
 } from '../db/schema';
 import { cancelStatements, decideStatements } from './battles';
+import { type NotifyContext, notify } from './notify';
 import { displayParams } from './ratingView';
 
 type BattleRow = typeof battles.$inferSelect;
@@ -135,6 +136,52 @@ export async function reviewerRole(
   if (!mine || mine.nBattles < review.poolMinBattles) return null;
   const inRange = mine.r >= window.min && (window.max === null || mine.r <= window.max);
   return inRange ? 'pool' : null;
+}
+
+/** At most this many people are told about one review (pool or judges). */
+const NOTIFY_REVIEWERS_MAX = 30;
+
+/**
+ * Who should hear that a battle waits for their review: at level 2 the athletes in the pool's
+ * current range, at level 3 the judges – never the participants.
+ */
+export async function reviewersToNotify(db: Database, battle: BattleRow, now = Date.now()) {
+  const participantIds = (
+    await db
+      .select({ userId: battleParticipants.userId })
+      .from(battleParticipants)
+      .where(eq(battleParticipants.battleId, battle.id))
+  ).map((p) => p.userId);
+  const outsider = (id: string) => !participantIds.includes(id);
+  if (battle.reviewLevel === 3) {
+    const judges = await db
+      .select({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(and(eq(userRoles.role, 'judge'), isNull(userRoles.revokedAt)))
+      .limit(NOTIFY_REVIEWERS_MAX + participantIds.length);
+    return judges
+      .map((j) => j.userId)
+      .filter(outsider)
+      .slice(0, NOTIFY_REVIEWERS_MAX);
+  }
+  if (battle.reviewLevel !== 2) return [];
+  const { formatId, review, window } = await poolRange(db, battle, participantIds, now);
+  const rows = await db
+    .select({ userId: ratingStates.userId })
+    .from(ratingStates)
+    .where(
+      and(
+        eq(ratingStates.formatId, formatId),
+        gte(ratingStates.nBattles, review.poolMinBattles),
+        gte(ratingStates.r, window.min),
+        ...(window.max === null ? [] : [lte(ratingStates.r, window.max)]),
+      ),
+    )
+    .limit(NOTIFY_REVIEWERS_MAX + participantIds.length);
+  return rows
+    .map((r) => r.userId)
+    .filter(outsider)
+    .slice(0, NOTIFY_REVIEWERS_MAX);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -276,7 +323,12 @@ export async function settleJudge(db: Database, battle: BattleRow, value: number
  * votes without agreement go to the pool, otherwise unrated) and pools that did not fill up in
  * time (→ judges). Returns how many battles were settled or moved on.
  */
-export async function resolveExpiredReviews(db: Database, now = Date.now()): Promise<number> {
+export async function resolveExpiredReviews(
+  db: Database,
+  now = Date.now(),
+  /** Called for every battle that moved to the pool or the judges (to notify them). */
+  onEscalated: (battleId: string) => Promise<void> = async () => {},
+): Promise<number> {
   const due = await db
     .select()
     .from(battles)
@@ -288,7 +340,8 @@ export async function resolveExpiredReviews(db: Database, now = Date.now()): Pro
       ),
     )
     .limit(50);
-  for (const battle of due) await settleReview(db, battle, now, true);
+  for (const battle of due)
+    if ((await settleReview(db, battle, now, true)) === 'pool') await onEscalated(battle.id);
 
   const { poolMaxDays } = reviewParams(await displayParams(db));
   const stalePools = await db
@@ -302,6 +355,15 @@ export async function resolveExpiredReviews(db: Database, now = Date.now()): Pro
       ),
     )
     .limit(50);
-  for (const battle of stalePools) await escalate(db, battle, 3, now);
+  for (const battle of stalePools)
+    if (await escalate(db, battle, 3, now)) await onEscalated(battle.id);
   return due.length + stalePools.length;
+}
+
+/** Tell the pool or the judges that a battle (now at level 2 or 3) waits for them. */
+export async function notifyReviewers(ctx: NotifyContext, battleId: string, now = Date.now()) {
+  const battle = await ctx.db.select().from(battles).where(eq(battles.id, battleId)).get();
+  if (battle?.status !== 'reviewing') return;
+  const userIds = await reviewersToNotify(ctx.db, battle, now);
+  await notify(ctx, { userIds, kind: 'review', battleId }, now);
 }

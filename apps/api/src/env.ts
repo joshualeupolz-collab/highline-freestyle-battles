@@ -21,6 +21,11 @@ export interface Env {
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
   R2_ACCOUNT_ID?: string;
+  /** Web Push keys (secrets, `npx web-push generate-vapid-keys`). Without them, no pushes. */
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  /** Contact for the push services (`mailto:…` or https URL). */
+  VAPID_SUBJECT?: string;
 }
 
 /** Values set by middleware for the current request. */

@@ -59,6 +59,7 @@ import {
   decideStatements,
   requiredSubmissionsPerPerson,
 } from '../services/battles';
+import { notify, requestNotifyContext } from '../services/notify';
 import { displayParams, ratingView } from '../services/ratingView';
 import { reviewerRole, reviewView, settleReview } from '../services/review';
 import { battleVideosView } from '../services/videos';
@@ -543,6 +544,12 @@ battleRoutes.post('/:id/accept', async (c) => {
     if (String(err).includes('UNIQUE')) apiError(409, 'not_open');
     throw err;
   }
+  await notify(requestNotifyContext(c), {
+    userIds: [battle.createdBy],
+    kind: 'accepted',
+    battleId: battle.id,
+    actorId: user.id,
+  });
   return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 
@@ -1017,5 +1024,11 @@ battleRoutes.post('/:id/messages', async (c) => {
         and(eq(battleParticipants.battleId, battle.id), eq(battleParticipants.userId, user.id)),
       ),
   ]);
+  await notify(requestNotifyContext(c), {
+    userIds: participants.map((p) => p.userId),
+    kind: 'chat',
+    battleId: battle.id,
+    actorId: user.id,
+  });
   return c.json({ message: { id: message.id, senderId: user.id, body, createdAt: now } }, 201);
 });

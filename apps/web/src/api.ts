@@ -544,6 +544,9 @@ export const api = {
         ? `/rankings/combined?formats=${choice.formats.map(encodeURIComponent).join(',')}&drop=${choice.drop}`
         : '/rankings/combined',
     ),
+  pushKey: () => get<{ publicKey: string | null }>('/push/key'),
+  pushSubscribe: (endpoint: string) => post('/push/subscribe', { endpoint }),
+  pushUnsubscribe: (endpoint: string) => post('/push/unsubscribe', { endpoint }),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

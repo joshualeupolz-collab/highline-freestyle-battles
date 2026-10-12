@@ -20,8 +20,10 @@ import {
   battleMessages,
   battleParticipants,
   battles,
+  notifications,
   oauthAccounts,
   passwordResetCodes,
+  pushSubscriptions,
   sessions,
   userRoles,
   users,
@@ -102,6 +104,8 @@ export async function deleteAccount(
       .set({ revokedAt: now })
       .where(and(eq(userRoles.userId, userId), isNull(userRoles.revokedAt))),
     db.delete(battleMessages).where(eq(battleMessages.senderId, userId)),
+    db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)),
+    db.delete(notifications).where(eq(notifications.userId, userId)),
     auditInsert(
       db,
       {

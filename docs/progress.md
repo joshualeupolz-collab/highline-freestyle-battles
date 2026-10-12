@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-12 (fifth session: browser tests in CI, iPhone tests, stage 2 decisions, roles, audit log, reports, annulment, initial estimates).
+Last updated: 2026-10-12 (end of the fifth session: browser tests in CI, iPhone tests, and stage 2 except the athlete code).
 
 ---
 
@@ -18,11 +18,13 @@ prototype on branch `claude/wonderful-ramanujan-50o2jk` (PRs #5–#8). Session 3
 #14 and #15 (UI rounds 1 and 2), all merged and deployed. Session 4 = branch
 `claude/gallant-ritchie-r1n4tv`: legal texts. Session 5 = branch
 `claude/bold-planck-lrea7q`: PRs #18 (browser tests), #19 (stage 2 plan, roles, audit log),
-#20 (iPhone results, video test link in the profile) merged; PR #21 (stage 2 decisions,
-reports, annulment, estimates) waiting for the owner's merge. The owner merges; Claude's own
-merges are blocked by the session's safety check. A new session starts a fresh branch from `main`.
+#20 (iPhone results), #21 (reports, annulment, estimates, review levels 2–3), #22 (on-site group
+battles), #23 (competitions), #24 (combined rankings) merged; PR #25 (push notifications) waiting
+for the owner's merge. **The owner merges**; Claude's own merges are blocked by the session's
+safety check (Claude opens the PR, watches CI and says when it is green). A new session starts a
+fresh branch from `main`.
 
-**Tests:** 22 video cutting tests (`apps/web/test`), 143 API tests, 44 rating tests
+**Tests:** 22 video cutting tests (`apps/web/test`), 148 API tests, 44 rating tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
@@ -50,6 +52,13 @@ Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 | 9 Review level 1 | 5-point vote by both athletes, hidden until both voted, changeable; agreement decides and updates the ratings (s = mean of both votes); after 7 days a single vote for one side decides, otherwise unrated; result shows the rating change. Details: `docs/architecture.md` §4c |
 | Legal texts (session 4) | privacy policy, terms of use and legal notice in English and German (`/privacy`, `/terms`, `/imprint`, `apps/web/src/legal/`); sign-up requires accepting the terms (version stored, migration 0009); existing accounts accept once in the app; links on login/sign-up and in the profile. Details: `docs/architecture.md` §4f |
 | 8 Upload and unlocking | recording on the battle page (attempt registered at Start, limit checked on phone and server), offline storage + upload queue, cut before upload, visibility/keep per video, R2 storage layer (signed URLs, or through the Worker without access key), choosing the attempt that counts, unlocking when everyone chose (`reviewing`), cut-off video with extra-attempt request, offline copies of battle data. Details: `docs/architecture.md` §4b |
+
+### Done (development stage 2, session 5)
+
+Everything of `docs/stage-2-plan.md` except 2.10 (athlete code) and 2.12 (over-rating warning,
+needs data): roles + audit log, reports, annulment with federation approval, initial estimates,
+review levels 2–3 (pool + judge), on-site group battles, competitions with weight 1–5, combined
+rankings, push notifications. Details: `docs/architecture.md` §4g–§4l.
 
 ### Not started yet
 
@@ -147,11 +156,16 @@ profile button for members waiting for approval, confirmation before approving.
 1. **More UI feedback** from the owner (announced for the next session).
 2. **Legal texts:** done except the operator data (open question 00). Keep the privacy policy in
    line with new features (push, public video pages, Telegram archive, Google login, e-mails).
-3. **Stage 2** (`docs/stage-2-plan.md`; the owner answered all questions on 2026-10-12, §3):
-   2.1 roles + audit log (PR #19), 2.2 reports, 2.3 annulment, 2.4 initial estimates, 2.6/2.7
-   review levels 2–3 (pool + one judge; defaults to confirm in the plan §3.2) (PR #21) are done.
-   2.8 on-site group battles (PR #22) and 2.9 competitions with weight 1–5 (PR #23) are done as
-   well, and 2.11 combined rankings (PR #24). Next: athlete code, push notifications (the owner creates the
-   VAPID key: GitHub secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`).
-4. Multipart upload if large HD uploads fail on mobile connections; measure PBKDF2 CPU time on
+3. **Stage 2, rest:** 2.10 **filming by friends with the athlete code** (rules decided, plan §3.7 /
+   concept §6: online the friend picks one of the athlete's running battles; offline a
+   free-text description, assigned later, the opponent confirms). Schema is prepared
+   (`users.athlete_code`, `attempts.recorded_by/code_used/opponent_name_entered`,
+   `videos.battle_id` NULL = inbox). 2.12 over-rating warning later (needs ≥ 10 battles per
+   estimated person). Online group battles later.
+4. **Owner to confirm** the five review defaults (plan §3.2: ≥ 5 battles to review, anonymous and
+   final, 14 days until the judge, judge sees earlier votes, voluntary) and test push on phones
+   (Profile → Notifications; iPhone only in the installed app).
+5. **First real replay:** *Actions → Rating replay → Run workflow* with "force" – annulments and
+   late estimates only take effect through it.
+6. Multipart upload if large HD uploads fail on mobile connections; measure PBKDF2 CPU time on
    Cloudflare and raise `PASSWORD_ITERATIONS` if there is headroom.
