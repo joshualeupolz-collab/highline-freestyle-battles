@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
 import { loadUser } from './auth/middleware';
 import type { AppEnv } from './env';
+import { auditRoutes } from './routes/audit';
 import { authRoutes } from './routes/auth';
 import { battleRoutes } from './routes/battles';
 import { formatRoutes } from './routes/formats';
@@ -31,6 +32,7 @@ export function createApp() {
   app.route('/battles', battleVideoRoutes);
   app.route('/battles', onsiteRoutes);
   app.route('/videos', videoRoutes);
+  app.route('/audit', auditRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

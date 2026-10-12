@@ -1,6 +1,8 @@
 /**
- * Managing other accounts: approval of new users, password reset codes.
+ * Managing other accounts: approval of new users, password reset codes, roles.
  */
+
+import { roleChangeRequestSchema, SPECIAL_ROLES } from '@hfb/shared';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { randomCode, sha256Hex } from '../auth/crypto';
@@ -21,6 +23,7 @@ import type { AppEnv } from '../env';
 import { auditInsert } from '../lib/audit';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
+import { parseJson } from '../lib/validate';
 import { displayParams, ratingView } from '../services/ratingView';
 
 const RESET_CODE_VALIDITY = 24 * 60 * 60_000;
@@ -140,6 +143,103 @@ userRoutes.post('/:id/password-reset-code', async (c) => {
     ),
   ]);
   return c.json({ code, expiresAt }, 201);
+});
+
+/** Everyone holding a special role (judge, organizer, federation, admin), for the team list. */
+userRoutes.get('/staff', async (c) => {
+  const rows = await getDb(c.env.DB)
+    .select({
+      userId: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      role: userRoles.role,
+      grantedAt: userRoles.grantedAt,
+    })
+    .from(userRoles)
+    .innerJoin(users, eq(users.id, userRoles.userId))
+    .where(and(isNull(userRoles.revokedAt), inArray(userRoles.role, [...SPECIAL_ROLES])))
+    .orderBy(userRoles.role, sql`lower(${users.username})`);
+  return c.json({ staff: rows });
+});
+
+/** Hand out a special role (see `can.changeRole`). */
+userRoutes.post('/:id/roles', async (c) => {
+  const actor = c.get('user');
+  const targetId = c.req.param('id');
+  const { role, reason } = await parseJson(c, roleChangeRequestSchema);
+  if (!actor || !can.changeRole(actor, role, targetId)) apiError(403, 'forbidden');
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+
+  const target = await db.select().from(users).where(eq(users.id, targetId)).get();
+  if (!target) apiError(404, 'not_found');
+  if (target.status !== 'active') apiError(409, 'user_not_active');
+  const existing = await db
+    .select({ id: userRoles.id })
+    .from(userRoles)
+    .where(
+      and(eq(userRoles.userId, targetId), eq(userRoles.role, role), isNull(userRoles.revokedAt)),
+    )
+    .get();
+  if (existing) apiError(409, 'role_already_held');
+
+  await db.batch([
+    db
+      .insert(userRoles)
+      .values({ id: newId(now), userId: targetId, role, grantedBy: actor.id, grantedAt: now }),
+    auditInsert(
+      db,
+      {
+        actorId: actor.id,
+        action: 'user.role_grant',
+        targetType: 'user',
+        targetId,
+        reason: reason || null,
+        payload: { role },
+      },
+      now,
+    ),
+  ]);
+  return c.json({ ok: true }, 201);
+});
+
+/** Take back a special role. The grant stays as history (`revoked_at`). */
+userRoutes.post('/:id/roles/revoke', async (c) => {
+  const actor = c.get('user');
+  const targetId = c.req.param('id');
+  const { role, reason } = await parseJson(c, roleChangeRequestSchema);
+  if (!actor || !can.changeRole(actor, role, targetId)) apiError(403, 'forbidden');
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+
+  const grant = await db
+    .select({ id: userRoles.id })
+    .from(userRoles)
+    .where(
+      and(eq(userRoles.userId, targetId), eq(userRoles.role, role), isNull(userRoles.revokedAt)),
+    )
+    .get();
+  if (!grant) apiError(404, 'role_not_held');
+
+  await db.batch([
+    db
+      .update(userRoles)
+      .set({ revokedAt: now, revokedBy: actor.id })
+      .where(eq(userRoles.id, grant.id)),
+    auditInsert(
+      db,
+      {
+        actorId: actor.id,
+        action: 'user.role_revoke',
+        targetType: 'user',
+        targetId,
+        reason: reason || null,
+        payload: { role },
+      },
+      now,
+    ),
+  ]);
+  return c.json({ ok: true });
 });
 
 /**

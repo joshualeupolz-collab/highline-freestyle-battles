@@ -538,6 +538,29 @@ const en = {
   'error.too_many_open_proposals': 'You already have 5 proposals waiting for review.',
   'error.terms_outdated': 'The terms of use were just updated. Please reload the app.',
   'error.no_extra_attempt_to_take_back': 'Your opponent has no extra attempt to take back.',
+  'error.user_not_active': 'This account is not active.',
+  'error.role_already_held': 'This person already has this role.',
+  'error.role_not_held': 'This person does not have this role.',
+
+  'role.athlete': 'Athlete',
+  'role.judge': 'Judge',
+  'role.organizer': 'Organizer',
+  'role.federation': 'Federation',
+  'role.admin': 'Admin',
+  'roles.title': 'Roles',
+  'roles.hint':
+    'Judges decide reviews and approve weight 4–5, organizers run official competitions, the federation decides on sport questions. Every change goes into the audit log.',
+  'roles.grant': 'Make {role}',
+  'roles.revoke': 'Remove {role}',
+  'roles.reasonPrompt': 'Reason (optional, goes into the audit log)',
+  'team.title': 'Team',
+  'team.empty': 'Nobody holds a special role yet.',
+  'audit.title': 'Audit log',
+  'audit.hint': 'Every action using special permissions, newest first.',
+  'audit.empty': 'No entries yet.',
+  'audit.more': 'Show older entries',
+  'audit.approvedBy': 'approved by {name}',
+  'audit.system': 'system',
 } as const;
 
 export type MessageKey = keyof typeof en;

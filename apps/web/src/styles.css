@@ -803,3 +803,11 @@ details.more {
   text-align: center;
   margin-top: 2rem;
 }
+
+/* Audit log (admin page) */
+.audit-line {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
