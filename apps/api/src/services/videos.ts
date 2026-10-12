@@ -54,6 +54,7 @@ export async function battleVideosView(
         startedAt: attempts.startedAtClient,
         codeUsed: attempts.codeUsed,
         recorderName: attempts.recorderName,
+        provisional: attempts.provisional,
       })
       .from(attempts)
       .where(eq(attempts.battleId, battle.id))
@@ -75,6 +76,8 @@ export async function battleVideosView(
       partIndex: number;
       round: number;
       attempts: number;
+      /** Beyond the allowance: cannot be chosen (concept section 6). */
+      provisional: number;
       uploaded: number;
       submittedAt: number | null;
       videoId: string | null;
@@ -89,6 +92,7 @@ export async function battleVideosView(
         partIndex,
         round,
         attempts: 0,
+        provisional: 0,
         uploaded: 0,
         submittedAt: null,
         videoId: null,
@@ -100,6 +104,7 @@ export async function battleVideosView(
   for (const a of attemptRows) {
     const slot = slotOf(a.userId, a.partIndex, a.round);
     slot.attempts++;
+    if (a.provisional) slot.provisional++;
     if (uploaded(videoByAttempt.get(a.id))) slot.uploaded++;
   }
   for (const s of submissionRows) {
@@ -143,6 +148,7 @@ export async function battleVideosView(
             partIndex: a.partIndex,
             round: a.round,
             startedAt: a.startedAt,
+            provisional: a.provisional,
             ...friendView(a),
             video: video && video.status !== 'deleted' ? videoView(video) : null,
           };

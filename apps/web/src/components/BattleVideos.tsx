@@ -114,8 +114,11 @@ export function BattleVideos({
     }
     return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt);
   };
+  // Provisional attempts (beyond the allowance) do not use it up; recordings the server does
+  // not know yet probably will.
   const used = new Map<string, number>();
-  for (let i = 0; i < format.parts.length; i++) used.set(slotKey(i, ROUND), rows(i).length);
+  for (let i = 0; i < format.parts.length; i++)
+    used.set(slotKey(i, ROUND), rows(i).filter((r) => !r.server?.provisional).length);
   const left = (i: number) =>
     attemptsLeft(battle.settings.attemptsPerVideo, me?.extraAttempts ?? 0, used, slotKey(i, ROUND));
 
@@ -188,14 +191,12 @@ export function BattleVideos({
               <div className="actions">
                 <button
                   type="button"
-                  disabled={(n !== null && n <= 0) || !isRecordingSupported()}
+                  disabled={!isRecordingSupported()}
                   onClick={() => setRecordPart(i)}
                 >
                   {t('videos.record')}
                 </button>
-                <span className="muted">
-                  {n === null ? t('videos.unlimited') : t('videos.left', { n })}
-                </span>
+                <LeftText left={n} />
               </div>
             )}
           </div>
@@ -258,6 +259,7 @@ function AttemptLine({
   const local = row.local;
   const progress = local ? uploadProgress(local.id) : undefined;
   const cutOff = (local?.endReason ?? video?.endReason ?? 'stopped') !== 'stopped';
+  const provisional = row.server?.provisional ?? false;
 
   let state: string;
   if (uploaded) state = video.counts ? t('videos.counts') : t('videos.uploaded');
@@ -276,10 +278,12 @@ function AttemptLine({
         <span className="muted">
           {formatDate(row.startedAt)}
           {cutOff && ` · ${t('videos.cutOff')}`}
+          {provisional && ` · ${t('videos.provisional')}`}
           {friend &&
             ` · ${friend.name ? t('film.filmedBy', { name: friend.name }) : t('film.filmedByFriend')}`}
         </span>
         <div>{state}</div>
+        {provisional && <div className="hint">{t('videos.provisionalHint')}</div>}
       </div>
       <div className="actions">
         {local && local.status !== 'recording' && local.upload?.state !== 'queued' && (
@@ -292,7 +296,7 @@ function AttemptLine({
             {watch ? t('videos.hide') : t('videos.watch')}
           </button>
         )}
-        {uploaded && canChoose && !video.counts && (
+        {uploaded && canChoose && !video.counts && !provisional && (
           <button type="button" onClick={() => onChoose(video.id)}>
             {t('videos.choose')}
           </button>
@@ -382,6 +386,16 @@ function FilmedByFriends({ battle }: { battle: Battle }) {
       ))}
     </div>
   );
+}
+
+/**
+ * Attempts left for a part. At 0 recording still works, but further attempts are provisional
+ * (concept section 6): they only count if the opponent grants extra attempts.
+ */
+export function LeftText({ left, short = false }: { left: number | null; short?: boolean }) {
+  if (left === null) return <span className="muted">{t('videos.unlimited')}</span>;
+  if (left > 0) return <span className="muted">{t('videos.left', { n: left })}</span>;
+  return <span className="muted">{t(short ? 'videos.noneLeftShort' : 'videos.noneLeft')}</span>;
 }
 
 export function VideoPlayer({ id }: { id: string }) {
@@ -553,16 +567,12 @@ export function RecordScreen({
         <button
           type="button"
           className={`record-button${active ? ' recording' : ''}`}
-          disabled={!stream || (!active && left !== null && left <= 0)}
+          disabled={!stream}
           aria-label={active ? t('lab.stop') : t('videos.record')}
           onClick={active ? stop : start}
         />
         <div className="camera-status">
-          {active ? (
-            <strong>● {elapsed.toFixed(1)} s</strong>
-          ) : (
-            <span>{left === null ? t('videos.unlimited') : t('videos.left', { n: left })}</span>
-          )}
+          {active ? <strong>● {elapsed.toFixed(1)} s</strong> : <LeftText left={left} short />}
           {error && <span className="error">{error}</span>}
         </div>
       </div>
@@ -783,11 +793,13 @@ export function OpponentProgress({ battle, myId }: { battle: Battle; myId: strin
       {others.map((p) => {
         const slots = battle.videos.slots.filter((s) => s.userId === p.userId);
         const attempts = slots.reduce((sum, s) => sum + s.attempts, 0);
+        const provisional = slots.reduce((sum, s) => sum + (s.provisional ?? 0), 0);
         const uploaded = slots.reduce((sum, s) => sum + s.uploaded, 0);
         const chosen = slots.filter((s) => s.submittedAt !== null).length;
         return (
           <p key={p.userId} className="muted" style={{ margin: 0 }}>
             {t('videos.opponentProgress', { name: p.displayName, attempts, uploaded, chosen })}
+            {provisional > 0 && ` ${t('videos.opponentProvisional', { n: provisional })}`}
           </p>
         );
       })}

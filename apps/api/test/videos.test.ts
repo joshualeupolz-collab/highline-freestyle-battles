@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { attemptsLeft, newId } from '@hfb/shared';
+import { attemptsLeft, newId, type SettleAttempt, settleAttempts } from '@hfb/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { canViewVideo } from '../src/auth/permissions';
@@ -14,6 +14,7 @@ interface Slot {
   userId: string;
   partIndex: number;
   attempts: number;
+  provisional: number;
   uploaded: number;
   submittedAt: number | null;
   videoId: string | null;
@@ -26,7 +27,11 @@ interface Battle {
   videos: {
     unlocked: boolean;
     slots: Slot[];
-    mine: { id: string; video: { id: string; status: string; counts: boolean } | null }[];
+    mine: {
+      id: string;
+      provisional: boolean;
+      video: { id: string; status: string; counts: boolean } | null;
+    }[];
     sharedWithMe: { id: string; ownerId: string }[];
   };
 }
@@ -122,26 +127,57 @@ const file = (who: Person, videoId: string, headers: Record<string, string> = {}
   call(`/api/videos/${videoId}/file`, { session: who.session, headers });
 
 describe('attempts', () => {
-  it('counts attempts per part and stops at the limit', async () => {
+  it('counts attempts per part; beyond the limit they are provisional', async () => {
     const id = await activeBattle({ attemptsPerVideo: 2 });
-    expect((await attempt(anna, id)).status).toBe(201);
-    expect((await attempt(anna, id)).status).toBe(201);
-    const third = await attempt(anna, id);
-    expect(third.status).toBe(409);
-    expect(third.body.error).toBe('no_attempts_left');
+    const t0 = Date.now();
+    const at = (n: number) =>
+      post(anna, `/api/battles/${id}/attempts`, { id: newId(), partIndex: 0, startedAt: t0 + n });
+    expect((await at(1)).status).toBe(201);
+    expect((await at(2)).status).toBe(201);
+    const third = await at(3);
+    expect(third.status).toBe(201);
+    expect(third.body.battle.videos.mine.map((m) => m.provisional)).toEqual([false, false, true]);
+    expect((await at(4)).status).toBe(201);
 
-    // Goodwill: one extra attempt.
-    await post(ben, `/api/battles/${id}/grant-attempt`);
-    expect((await attempt(anna, id)).status).toBe(201);
-    expect((await attempt(anna, id)).status).toBe(409);
+    // A provisional attempt cannot be chosen.
+    const mine = (
+      await json<{ battle: Battle }>(call(`/api/battles/${id}`, { session: anna.session }))
+    ).body.battle.videos.mine;
+    const videoId = await upload(anna, mine[2]?.id as string);
+    const refused = await post(anna, `/api/battles/${id}/submissions`, { videoId });
+    expect(refused.body.error).toBe('attempt_provisional');
 
+    // Goodwill: one extra attempt makes the earliest provisional attempt valid.
+    const granted = await post(ben, `/api/battles/${id}/grant-attempt`);
+    expect(granted.body.battle.videos.mine).toEqual([]);
     const view = await json<{ battle: Battle }>(
+      call(`/api/battles/${id}`, { session: anna.session }),
+    );
+    expect(view.body.battle.videos.mine.map((m) => m.provisional)).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ]);
+    expect((await post(anna, `/api/battles/${id}/submissions`, { videoId })).status).toBe(200);
+
+    // Taking the extra attempt back: the chosen one stays valid, the latest other one that was
+    // valid becomes provisional again.
+    const takeBack = await post(ben, `/api/battles/${id}/proposals`, {
+      kind: 'extra_attempt',
+      change: -1,
+    });
+    const proposalId = takeBack.body.battle.proposals[0]?.id as string;
+    await post(anna, `/api/battles/${id}/proposals/${proposalId}/respond`, { decision: 'accept' });
+
+    const benView = await json<{ battle: Battle }>(
       call(`/api/battles/${id}`, { session: ben.session }),
     );
-    const annaSlot = view.body.battle.videos.slots.find((s) => s.userId === anna.user.id);
-    expect(annaSlot?.attempts).toBe(3);
+    const annaSlot = benView.body.battle.videos.slots.find((s) => s.userId === anna.user.id);
+    expect(annaSlot?.attempts).toBe(4);
+    expect(annaSlot?.provisional).toBe(2);
     // Ben does not see Anna's attempts in detail.
-    expect(view.body.battle.videos.mine).toEqual([]);
+    expect(benView.body.battle.videos.mine).toEqual([]);
   });
 
   it('accepts the same attempt twice without counting it twice', async () => {
@@ -357,6 +393,49 @@ describe('canViewVideo', () => {
     expect(canViewVideo({ ...base, viewerId: 'owner', submitted: false, unlocked: false })).toBe(
       true,
     );
+  });
+});
+
+describe('settleAttempts', () => {
+  const a = (id: string, slot: string, startedAt: number, more: Partial<SettleAttempt> = {}) => ({
+    id,
+    slot,
+    startedAt,
+    provisional: true,
+    covered: false,
+    submitted: false,
+    ...more,
+  });
+  it('makes the first attempts valid in start order, shares extra attempts', () => {
+    const list = [a('x3', '0:1', 3), a('x1', '0:1', 1), a('x2', '0:1', 2), a('y1', '1:1', 4)];
+    expect(Object.fromEntries(settleAttempts(2, 0, new Map(), list))).toEqual({
+      x1: false,
+      x2: false,
+      y1: false,
+    });
+    expect(settleAttempts(2, 1, new Map(), list).get('x3')).toBe(false);
+    expect(settleAttempts(null, 0, new Map(), list).size).toBe(4);
+  });
+  it('never replaces a valid attempt by one that arrives later with an earlier start', () => {
+    const list = [a('late', '0:1', 1), a('valid', '0:1', 2, { provisional: false })];
+    expect(settleAttempts(1, 0, new Map(), list).size).toBe(0);
+  });
+  it('counts reserved units and covered attempts', () => {
+    const reserved = new Map([['0:1', 2]]);
+    const list = [a('c', '0:1', 1, { covered: true }), a('n', '0:1', 2)];
+    expect(Object.fromEntries(settleAttempts(3, 0, reserved, list))).toEqual({
+      c: false,
+      n: false,
+    });
+    expect(Object.fromEntries(settleAttempts(2, 0, reserved, list))).toEqual({ c: false });
+  });
+  it('takes back the latest valid attempt that was not chosen', () => {
+    const list = [
+      a('1', '0:1', 1, { provisional: false }),
+      a('2', '0:1', 2, { provisional: false, submitted: true }),
+      a('3', '0:1', 3, { provisional: false }),
+    ];
+    expect(Object.fromEntries(settleAttempts(2, 0, new Map(), list))).toEqual({ '3': true });
   });
 });
 

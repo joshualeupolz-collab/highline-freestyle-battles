@@ -454,6 +454,15 @@ const en = {
   'videos.record': 'Record attempt',
   'videos.left': 'Attempts left: {n}',
   'videos.unlimited': 'Unlimited attempts',
+  'videos.noneLeft':
+    'No attempts left. You can still record, but it is provisional: it only counts if your opponent grants an extra attempt.',
+  'videos.noneLeftShort': 'No attempts left: provisional',
+  'videos.provisional': 'provisional',
+  'videos.provisionalHint':
+    'Beyond your attempts: it cannot be chosen unless your opponent grants an extra attempt (then the earliest provisional attempts become valid).',
+  'videos.opponentProvisional': '({n} provisional, beyond the limit)',
+  'error.attempt_provisional':
+    'This attempt is provisional (beyond your attempts) and cannot be chosen unless your opponent grants an extra attempt.',
   'videos.attempt': 'Attempt {n}',
   'videos.cutOff': 'cut off',
   'videos.counts': '✓ This attempt counts',

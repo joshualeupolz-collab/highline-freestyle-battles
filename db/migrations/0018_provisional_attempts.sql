@@ -1,0 +1,1 @@
+ALTER TABLE `attempts` ADD `provisional` integer DEFAULT false NOT NULL;

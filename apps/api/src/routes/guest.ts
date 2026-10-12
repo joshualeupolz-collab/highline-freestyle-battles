@@ -24,6 +24,7 @@ import { attempts, battleParticipants, battles, videos } from '../db/schema';
 import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
+import { settleUserAttempts } from '../services/attempts';
 import {
   announceVideo,
   athleteByCode,
@@ -74,11 +75,11 @@ guestRoutes.post('/attempts', async (c) => {
   const battle = await db.select().from(battles).where(eq(battles.id, input.battleId)).get();
   if (!battle) apiError(404, 'not_found');
   const participants = await db
-    .select({ userId: battleParticipants.userId, extraAttempts: battleParticipants.extraAttempts })
+    .select({ userId: battleParticipants.userId })
     .from(battleParticipants)
     .where(eq(battleParticipants.battleId, battle.id));
   if (!participants.some((p) => p.userId === athlete.id)) apiError(404, 'not_found');
-  await checkAttemptAllowed(db, battle, participants, athlete.id, input, now);
+  await checkAttemptAllowed(db, battle, input, now);
 
   await db.insert(attempts).values({
     id: input.id,
@@ -92,7 +93,9 @@ guestRoutes.post('/attempts', async (c) => {
     codeUsed: input.code,
     recorderName: input.recorderName || null,
     assignment: 'direct',
+    provisional: true,
   });
+  await settleUserAttempts(db, battle, athlete.id);
   return c.json({ ok: true, battleId: input.battleId }, 201);
 });
 

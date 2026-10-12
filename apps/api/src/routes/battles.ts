@@ -52,6 +52,7 @@ import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
+import { settleUserAttempts } from '../services/attempts';
 import { eventStatement } from '../services/battleEvents';
 import {
   cancelPendingProposalsStatement,
@@ -855,6 +856,8 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
       apiError(400, 'unsupported_proposal');
   }
   await runBatch(db, statements);
+  if (proposal.kind === 'extra_attempt')
+    await settleUserAttempts(db, battle, payload.userId as string);
   return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 
@@ -885,6 +888,7 @@ battleRoutes.post('/:id/grant-attempt', async (c) => {
       ),
     eventStatement(db, battle.id, user.id, { type: 'attempt_granted' }, Date.now()),
   ]);
+  await settleUserAttempts(db, battle, target.userId);
   return c.json(await battleResponse(db, battle.id, user?.id ?? null));
 });
 

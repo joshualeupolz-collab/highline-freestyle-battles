@@ -186,7 +186,7 @@ open ──accept──▶ active ─────────────▶ rev
 ## 4b. Recording and upload (implemented in step 8)
 
 ```
-Start pressed ──▶ attempt (id from the phone, IndexedDB) ──▶ POST /battles/:id/attempts (limit check)
+Start pressed ──▶ attempt (id from the phone, IndexedDB) ──▶ POST /battles/:id/attempts (valid / provisional)
 Stop ──▶ cut + visibility ──▶ upload queue: POST /videos ─▶ PUT bytes ─▶ POST /videos/:id/complete
 Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶ everyone chose ─▶ reviewing
 ```
@@ -199,6 +199,16 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 - **Attempt limit:** `attemptsPerVideo` per part; goodwill extra attempts are one pool for the
   whole battle (`attemptsLeft` in `packages/shared/src/videos.ts`, used by phone and server).
   Attempts started before the deadline count even if they arrive later, while the battle runs.
+- **Provisional attempts (session 7):** the limit never blocks recording. Every new attempt is
+  stored with `attempts.provisional` and then `settleUserAttempts` (`services/attempts.ts`,
+  rules in `settleAttempts`, `@hfb/shared`) decides: valid attempts and reserved units use up
+  the allowance; when there is room, provisional attempts become valid in start order. The
+  state only moves forward, so an attempt arriving late never replaces one that was already
+  valid; only taking back an extra attempt turns the latest valid, not chosen attempt back.
+  It runs after a new attempt and after extra attempts change. Provisional attempts cannot be
+  chosen (`attempt_provisional`); the opponent sees their number per part.
+- **Request with any video:** every uploaded attempt can be attached to an `extra_attempt`
+  request (not only cut-off ones); the server only accepts uploaded videos of the requester.
 - **Cut** without re-encoding before the upload (also makes the file seekable). If the phone
   cannot cut a file, it uploads the whole recording with the cut points (`trim_start_ms`,
   `trim_end_ms`) for the server to cut later.
