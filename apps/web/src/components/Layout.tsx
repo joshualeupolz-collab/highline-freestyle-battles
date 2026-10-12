@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { nextStep } from '../nextStep';
 import { LegalLinks } from '../pages/Legal';
 import { ErrorText } from './ErrorText';
+import { InstallHint } from './InstallHint';
 
 /** Small line icons for the tab bar (24×24, drawn with the text color). */
 const ICONS = {
@@ -72,6 +73,7 @@ export function Layout() {
         </Link>
       </header>
       <main className="with-tabs">
+        <InstallHint />
         {/* The profile stays reachable, so someone who does not agree can delete the account. */}
         {user.termsVersion === TERMS_VERSION || pathname === '/profile' ? (
           <Outlet />

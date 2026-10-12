@@ -644,6 +644,10 @@ const en = {
   'error.cannot_estimate_yourself': 'You cannot estimate yourself.',
   'error.too_many_battles':
     'This person has already played enough battles in this format; their rating no longer needs an estimate.',
+  'install.title': 'Tip: install the app',
+  'install.text':
+    'In Safari, tap Share → "Add to Home Screen" and open the app from there. Only then does the iPhone keep your recordings safely; in the browser it may delete them after 7 days without use.',
+  'install.dismiss': 'Got it',
   'audit.title': 'Audit log',
   'audit.hint': 'Every action using special permissions, newest first.',
   'audit.empty': 'No entries yet.',
