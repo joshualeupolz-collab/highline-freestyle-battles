@@ -16,6 +16,7 @@ import type {
   NotificationSettings,
   ReportCategory,
   ReportTarget,
+  ReserveAttempts,
   SpecialRole,
   UploadTarget,
 } from '@hfb/shared';
@@ -128,6 +129,8 @@ export interface Profile {
     createdAt: number;
     roles: string[];
     approvedBy: UserHit | null;
+    /** Federation and admins only: reservations never reported back (lost devices). */
+    lostReservations?: number | null;
   };
   ratings: (RatingView & { formatId: string; formatName: string })[];
   battles: {
@@ -162,6 +165,8 @@ export interface Participant {
   placement?: number | null;
   extraAttempts?: number;
   rating?: RatingView | null;
+  /** Reservations for offline recording never reported back (lost devices). */
+  lostReservations?: number;
 }
 
 export type BattleStatus =
@@ -211,6 +216,8 @@ export interface Battle {
   createdAt: number;
   deadlineAt: number | null;
   deadlinePassed: boolean;
+  /** Uploading and choosing stay possible until then (7 days after the deadline). */
+  graceUntil?: number | null;
   decisionReason: string | null;
   cancelReason: string | null;
   /** Annulled (with the reason), or a request to annul waiting for the federation. */
@@ -282,6 +289,8 @@ export interface BattleVideos {
     startedAt: number;
     /** Beyond the allowance: cannot be chosen until extra attempts are granted. */
     provisional: boolean;
+    /** Inside a reservation's units (recorded offline on the reserving device). */
+    reservationId?: string | null;
     /** Filmed by a friend with my athlete code (null = by me). */
     friend: FriendFilmed | null;
     video: MyVideo | null;
@@ -296,6 +305,29 @@ export interface BattleVideos {
     startedAt: number;
     friend: FriendFilmed;
   }[];
+  /** Attempts reserved for offline recording (concept section 6), oldest first. */
+  reservations: BattleReservation[];
+}
+
+export interface BattleReservation {
+  id: string;
+  userId: string;
+  partIndex: number;
+  round: number;
+  /** Units that use up the allowance (0 = nothing was free: attempts provisional). */
+  count: number;
+  requested: number;
+  /** Attempts recorded under it so far (as far as the server knows). */
+  used: number;
+  takeover: boolean;
+  createdAt: number;
+  reportedAt: number | null;
+  /** Handed back: unused units are free again. */
+  closedAt: number | null;
+  friend: FriendFilmed | null;
+  /** Only for my own reservations. */
+  deviceCode: string | null;
+  deviceLabel: string;
 }
 
 /** Filming by friends (concept section 6): the name the friend gave, if any. */
@@ -310,8 +342,24 @@ export interface GuestBattle {
   parts: Format['parts'];
   opponents: string[];
   deadlineAt: number | null;
+  attemptsPerVideo: number | null;
+  /** Open reservations of devices (for the take-over warning). */
+  reservations: { partIndex: number; count: number; createdAt: number }[];
   /** Per part; null = unlimited. */
   attemptsLeft: (number | null)[];
+}
+
+/** A friend's reservation (POST /guest/reservations). */
+export interface GuestReservation {
+  id: string;
+  battleId: string;
+  partIndex: number;
+  round: number;
+  count: number;
+  requested: number;
+  takeover: boolean;
+  createdAt: number;
+  closedAt: number | null;
 }
 
 export type BattleSummary = Omit<
@@ -344,6 +392,15 @@ export interface Message {
     payload?: Proposal['payload'];
     /** official_confirmed: who confirmed (not a participant). */
     name?: string;
+    /** reserved / reservation_reported (offline recording). */
+    partIndex?: number;
+    count?: number;
+    requested?: number;
+    takeover?: boolean;
+    friend?: string | null;
+    used?: number;
+    handedBack?: number;
+    closed?: boolean;
   } | null;
 }
 
@@ -606,8 +663,22 @@ export const api = {
 
   registerAttempt: (
     battleId: string,
-    body: { id: string; partIndex: number; round: number; startedAt: number },
+    body: {
+      id: string;
+      partIndex: number;
+      round: number;
+      startedAt: number;
+      deviceCode?: string;
+      reservationId?: string;
+    },
   ) => post<BattleResponse>(`/battles/${battleId}/attempts`, body),
+  reserveAttempts: (battleId: string, body: ReserveAttempts) =>
+    post<BattleResponse>(`/battles/${battleId}/reservations`, body),
+  reportReservation: (
+    battleId: string,
+    id: string,
+    body: { deviceCode: string; handBack: boolean },
+  ) => post<BattleResponse>(`/battles/${battleId}/reservations/${id}/report`, body),
   createVideo: (body: CreateVideo) =>
     post<{ video: { id: string; status: string }; upload: UploadTarget }>('/videos', body),
   completeVideo: (id: string) =>
@@ -624,6 +695,11 @@ export const api = {
   guestLookup: (code: string) =>
     post<{ athlete: { displayName: string }; battles: GuestBattle[] }>('/guest/lookup', { code }),
   guestAttempt: (body: GuestAttempt) => post<{ battleId: string | null }>('/guest/attempts', body),
+  guestReserve: (
+    body: ReserveAttempts & { code: string; battleId: string; recorderName?: string },
+  ) => post<{ reservations: GuestReservation[] }>('/guest/reservations', body),
+  guestReport: (id: string, body: { code: string; deviceCode: string; handBack: boolean }) =>
+    post<{ reservation: GuestReservation }>(`/guest/reservations/${id}/report`, body),
   guestVideo: (body: GuestVideo) =>
     post<{ video: { id: string; status: string }; upload: UploadTarget }>('/guest/videos', body),
   guestCompleteVideo: (id: string, code: string) =>

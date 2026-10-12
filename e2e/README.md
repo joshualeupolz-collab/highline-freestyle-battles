@@ -6,9 +6,11 @@ all local, nothing from Cloudflare is needed.
 
 | Test | What it checks |
 |---|---|
-| `tests/video-battle.spec.ts` | open request → accept → record with the camera → one phone offline, upload starts by itself when back online → choose the attempt → videos unlock and play → both vote → decided with margin |
+| `tests/video-battle.spec.ts` | open request → accept → record with the camera → one phone reserves and records offline, upload starts by itself when back online → choose the attempt → videos unlock and play → both vote → decided with margin |
 | `tests/onsite.spec.ts` | on-site result entered by one side, confirmed by the other, both ratings change |
 | `tests/signup.spec.ts` | sign-up in the app → waiting for approval → an athlete approves → the app opens |
+| `tests/offline-reservation.spec.ts` | offline without reservation refused → reserve → record offline → a second device takes over (provisional) → the first device reports and hands back → the take-over attempt becomes valid |
+| `tests/film-for-friend.spec.ts` | a friend films with the chosen athlete code, online and offline after preparing |
 
 ## Run
 

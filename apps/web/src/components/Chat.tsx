@@ -125,6 +125,20 @@ function eventText(event: NonNullable<Message['event']>, who: string): string {
       });
     case 'official_confirmed':
       return t('event.official_confirmed', { who: event.name ?? who });
+    case 'reserved': {
+      const n = event.count ?? 0;
+      const text =
+        n > 0
+          ? t('event.reserved', { who, n })
+          : t('event.reservedNothingFree', { who, n: event.requested ?? 0 });
+      return event.friend != null
+        ? `${text} ${event.friend ? t('event.byFriend', { name: event.friend }) : t('event.byAFriend')}`
+        : text;
+    }
+    case 'reservation_reported':
+      return event.closed
+        ? t('event.reservationClosed', { who, used: event.used ?? 0, back: event.handedBack ?? 0 })
+        : t('event.reservationReported', { who, used: event.used ?? 0 });
     case 'deadline_decision':
       return t(event.choice === 'claim_win' ? 'event.claimWin' : 'event.cancelUnrated', { who });
     default:

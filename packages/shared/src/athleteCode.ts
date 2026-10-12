@@ -8,6 +8,8 @@ import { z } from 'zod';
 import {
   createVideoSchema,
   registerAttemptSchema,
+  reportReservationSchema,
+  reserveAttemptsSchema,
   VIDEO_RETENTION_VALUES,
   VIDEO_VISIBILITY_VALUES,
 } from './videos';
@@ -58,6 +60,16 @@ export const guestVideoSchema = createVideoSchema.extend({ code: athleteCodeSche
 export type GuestVideo = z.infer<typeof guestVideoSchema>;
 
 export const guestCodeSchema = z.object({ code: athleteCodeSchema });
+
+/** POST /api/guest/reservations: a friend prepares for filming offline. */
+export const guestReserveSchema = reserveAttemptsSchema.extend({
+  code: athleteCodeSchema,
+  battleId: z.uuid(),
+  recorderName: z.string().trim().max(60).optional(),
+});
+
+/** POST /api/guest/reservations/:id/report */
+export const guestReportSchema = reportReservationSchema.extend({ code: athleteCodeSchema });
 
 /** The owner changes who may watch a video and whether it is kept after the battle. */
 export const videoSettingsSchema = z.object({

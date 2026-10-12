@@ -19,7 +19,24 @@ export type BattleEvent =
   | { type: 'deadline_decision'; choice: string }
   | { type: 'onsite_withdrawn' }
   | { type: 'group_result' | 'group_confirmed' | 'group_rejected' }
-  | { type: 'official_confirmed'; name: string };
+  | { type: 'official_confirmed'; name: string }
+  // Offline recording (concept section 6): reserved attempts and the device's report.
+  | {
+      type: 'reserved';
+      partIndex: number;
+      count: number;
+      requested: number;
+      takeover: boolean;
+      /** Reserved by a friend with the athlete code (their name, may be empty). */
+      friend: string | null;
+    }
+  | {
+      type: 'reservation_reported';
+      partIndex: number;
+      used: number;
+      handedBack: number;
+      closed: boolean;
+    };
 
 /** Statement for one chat entry; put it into the same batch as the change it documents. */
 export function eventStatement(

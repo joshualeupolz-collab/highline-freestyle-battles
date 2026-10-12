@@ -14,6 +14,7 @@ import { hasRole, useMe } from '../auth';
 import { StatusBadge, useFormats } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
 import { ordinal } from '../components/GroupResult';
+import { LostHint } from '../components/OfflineReservations';
 import { ReportButton } from '../components/ReportButton';
 import { UserLink } from '../components/UserLink';
 import { formatDate, type MessageKey, t } from '../i18n';
@@ -44,6 +45,7 @@ export function UserProfilePage() {
           </>
         )}
       </p>
+      {(user.lostReservations ?? 0) > 0 && <LostHint n={user.lostReservations ?? 0} />}
       {user.roles.some((r) => r !== 'athlete') && (
         <div className="chips">
           {user.roles

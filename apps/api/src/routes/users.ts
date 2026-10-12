@@ -7,7 +7,7 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { randomCode, sha256Hex } from '../auth/crypto';
 import { requireUser } from '../auth/middleware';
-import { can } from '../auth/permissions';
+import { can, hasRole } from '../auth/permissions';
 import { getDb } from '../db/client';
 import {
   battleParticipants,
@@ -24,6 +24,7 @@ import { auditInsert } from '../lib/audit';
 import { apiError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { parseJson } from '../lib/validate';
+import { lostReservations } from '../services/attempts';
 import { displayParams, ratingView } from '../services/ratingView';
 
 const RESET_CODE_VALIDITY = 24 * 60 * 60_000;
@@ -309,6 +310,13 @@ userRoutes.get('/:id', async (c) => {
       ])
     : [[], [], []];
 
+  // Reservations for offline recording never reported back (concept section 6): only for the
+  // federation and admins (opponents see the number in the battle).
+  const viewer = c.get('user') ?? null;
+  const lost = hasRole(viewer, 'federation', 'admin')
+    ? ((await lostReservations(db, [id])).get(id) ?? 0)
+    : null;
+
   return c.json({
     user: {
       id: user.id,
@@ -318,6 +326,7 @@ userRoutes.get('/:id', async (c) => {
       createdAt: user.createdAt,
       roles: roles.map((r) => r.role).sort(),
       approvedBy: approver ?? null,
+      lostReservations: lost,
     },
     ratings: states
       .map(({ state, formatName }) => ({
