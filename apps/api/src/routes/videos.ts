@@ -10,15 +10,13 @@
  *    Once everyone has chosen, the videos unlock and the battle moves on to the review.
  */
 import {
-  assignAttemptSchema,
-  assignmentDecisionSchema,
   createVideoSchema,
   MAX_VIDEO_BYTES,
   registerAttemptSchema,
   submitVideoSchema,
   videoSettingsSchema,
 } from '@hfb/shared';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
 import { requireUser } from '../auth/middleware';
 import { type Database, getDb } from '../db/client';
@@ -34,15 +32,9 @@ import type { AppEnv, Env } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
 import { eventStatement } from '../services/battleEvents';
-import {
-  announceVideo,
-  assignInboxAttempt,
-  backToInbox,
-  battlesRunningAt,
-  checkAttemptAllowed,
-} from '../services/friendVideos';
+import { announceVideo, checkAttemptAllowed } from '../services/friendVideos';
 import { notify, requestNotifyContext } from '../services/notify';
-import { markVideosDeleted, mayViewVideo, unlockIfComplete } from '../services/videos';
+import { mayViewVideo, unlockIfComplete } from '../services/videos';
 import { uploadsThroughWorker, videoStore } from '../storage/videoStore';
 import { battleResponse, loadBattle, requireParticipant } from './battles';
 
@@ -107,8 +99,6 @@ battleVideoRoutes.post('/:id/submissions', async (c) => {
     apiError(404, 'not_found');
   if (video.status !== 'uploaded' && video.status !== 'ready') apiError(409, 'not_uploaded_yet');
   const attempt = await db.select().from(attempts).where(eq(attempts.id, video.attemptId)).get();
-  // Filmed by a friend and assigned later: counts once the opponent confirmed it.
-  if (attempt?.assignment === 'pending') apiError(409, 'assignment_unconfirmed');
   if (battle.deadlineAt !== null && (attempt?.startedAtClient ?? now) > battle.deadlineAt)
     apiError(409, 'deadline_passed');
 
@@ -143,46 +133,6 @@ battleVideoRoutes.post('/:id/submissions', async (c) => {
       actorId: user.id,
     });
   }
-  return c.json(await battleResponse(db, battle.id, user.id, now));
-});
-
-/**
- * A video a friend filmed offline and that was assigned to this battle later: the opponent
- * confirms that it belongs here or rejects it; the athlete can take it back (wrong battle).
- * Rejected or taken back, it returns to the athlete's inbox.
- */
-battleVideoRoutes.post('/:id/assignments/:attemptId', async (c) => {
-  const user = c.get('user');
-  if (!user) apiError(401, 'not_logged_in');
-  const { action } = await parseJson(c, assignmentDecisionSchema);
-  const db = getDb(c.env.DB);
-  const now = Date.now();
-  const { battle, participants } = await loadBattle(db, c.req.param('id'));
-  requireParticipant(participants, user.id);
-  const attempt = await db
-    .select()
-    .from(attempts)
-    .where(eq(attempts.id, c.req.param('attemptId')))
-    .get();
-  if (!attempt || attempt.battleId !== battle.id || attempt.assignment !== 'pending')
-    apiError(404, 'not_found');
-  const isAthlete = attempt.userId === user.id;
-  if (action === 'confirm') {
-    if (isAthlete) apiError(403, 'opponent_confirms');
-    await db
-      .update(attempts)
-      .set({ assignment: 'confirmed', confirmedBy: user.id })
-      .where(eq(attempts.id, attempt.id));
-  } else {
-    await backToInbox(db, attempt.id);
-  }
-  await eventStatement(
-    db,
-    battle.id,
-    user.id,
-    { type: action === 'confirm' ? 'video_confirmed' : 'video_rejected' },
-    now,
-  );
   return c.json(await battleResponse(db, battle.id, user.id, now));
 });
 
@@ -294,79 +244,6 @@ videoRoutes.post('/:id/settings', async (c) => {
   if (!video || video.ownerId !== user.id || video.status === 'deleted') apiError(404, 'not_found');
   await db.update(videos).set(input).where(eq(videos.id, video.id));
   return c.json({ video: { id: video.id, ...input } });
-});
-
-// ---------------------------------------------------------------------------------------------
-// Inbox: attempts friends recorded offline with my code (filming by friends)
-// ---------------------------------------------------------------------------------------------
-
-/** My inbox, each with the battles that were running at its recording time. */
-videoRoutes.get('/inbox', async (c) => {
-  const user = c.get('user');
-  if (!user) apiError(401, 'not_logged_in');
-  const db = getDb(c.env.DB);
-  const rows = await db
-    .select({ attempt: attempts, video: videos })
-    .from(attempts)
-    .leftJoin(videos, eq(videos.attemptId, attempts.id))
-    .where(and(eq(attempts.userId, user.id), isNull(attempts.battleId)))
-    .orderBy(desc(attempts.startedAtClient))
-    .limit(30);
-  const items = [];
-  for (const { attempt, video } of rows) {
-    if (video?.status === 'deleted') continue;
-    items.push({
-      id: attempt.id,
-      recordedAt: attempt.startedAtClient,
-      recorderName: attempt.recorderName,
-      description: attempt.description,
-      video: video
-        ? {
-            id: video.id,
-            status: video.status,
-            durationMs: video.durationMs,
-            visibility: video.visibility,
-            retention: video.retention,
-          }
-        : null,
-      battles: await battlesRunningAt(db, user.id, attempt.startedAtClient),
-    });
-  }
-  return c.json({ inbox: items });
-});
-
-async function myInboxAttempt(c: Context<AppEnv>) {
-  const user = c.get('user');
-  if (!user) apiError(401, 'not_logged_in');
-  const db = getDb(c.env.DB);
-  const attempt = await db
-    .select()
-    .from(attempts)
-    .where(eq(attempts.id, c.req.param('attemptId') ?? ''))
-    .get();
-  if (!attempt || attempt.userId !== user.id) apiError(404, 'not_found');
-  return { db, user, attempt };
-}
-
-/** Assign an inbox video to a battle that was running then; the opponent confirms it. */
-videoRoutes.post('/inbox/:attemptId/assign', async (c) => {
-  const input = await parseJson(c, assignAttemptSchema);
-  const { db, user, attempt } = await myInboxAttempt(c);
-  const now = Date.now();
-  const battle = await assignInboxAttempt(db, attempt, input, now);
-  await eventStatement(db, battle.id, user.id, { type: 'video_assigned' }, now);
-  return c.json({ ok: true, battleId: battle.id });
-});
-
-/** Delete an inbox video (e.g. filmed for nothing). */
-videoRoutes.post('/inbox/:attemptId/delete', async (c) => {
-  const { db, attempt } = await myInboxAttempt(c);
-  if (attempt.battleId !== null) apiError(409, 'already_assigned');
-  const now = Date.now();
-  const video = await db.select().from(videos).where(eq(videos.attemptId, attempt.id)).get();
-  if (video) await markVideosDeleted(db, [video.id], now);
-  else await db.delete(attempts).where(eq(attempts.id, attempt.id));
-  return c.json({ ok: true });
 });
 
 /** Watch a video (owner; participants and others once unlocked, see canViewVideo). */

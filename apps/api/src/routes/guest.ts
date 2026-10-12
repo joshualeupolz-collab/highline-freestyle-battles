@@ -1,20 +1,20 @@
 /**
- * Filming by friends without an account (concept section 6): every call carries the athlete's
- * code instead of a login. See services/friendVideos.ts for the flow.
+ * Filming by friends without an account, online only (concept section 6): every call carries
+ * the athlete's code instead of a login. See services/friendVideos.ts.
  *
  * Whoever knows the code can see the athlete's running battles and use up their attempts, so the
- * athlete can renew the code at any time (`POST /api/athlete-code/renew`). Uploads already
- * started keep working with the code they were started with.
+ * athlete can change the code at any time (`PUT /api/athlete-code`, or a random one with
+ * `POST /api/athlete-code/renew`). Uploads already started keep working with the code they
+ * were started with.
  */
 import {
+  athleteCodeKey,
+  chooseAthleteCodeSchema,
   createVideoSchema,
-  formatAthleteCode,
-  guestAssignSchema,
   guestAttemptSchema,
   guestCodeSchema,
   guestLookupSchema,
   guestVideoSchema,
-  normalizeAthleteCode,
 } from '@hfb/shared';
 import { eq } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
@@ -24,15 +24,14 @@ import { attempts, battleParticipants, battles, videos } from '../db/schema';
 import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
-import { eventStatement } from '../services/battleEvents';
 import {
   announceVideo,
-  assignInboxAttempt,
   athleteByCode,
   athleteCode,
-  battlesRunningAt,
   CLOCK_TOLERANCE_MS,
   checkAttemptAllowed,
+  chooseAthleteCode,
+  runningBattles,
 } from '../services/friendVideos';
 import { uploadsThroughWorker } from '../storage/videoStore';
 import { completeUpload, originalOf, storeUploadBody } from './videos';
@@ -43,20 +42,20 @@ const CODE_HEADER = 'X-Athlete-Code';
 /** Mounted at /api/guest. No login needed. */
 export const guestRoutes = new Hono<AppEnv>();
 
-/** Whose code is it, and which of their battles can be filmed (now, or at `at`)? */
+/** Whose code is it, and which of their battles can be filmed now? */
 guestRoutes.post('/lookup', async (c) => {
-  const { code, at } = await parseJson(c, guestLookupSchema);
+  const { code } = await parseJson(c, guestLookupSchema);
   const db = getDb(c.env.DB);
   const athlete = await athleteByCode(db, code);
   return c.json({
     athlete: { displayName: athlete.displayName },
-    battles: await battlesRunningAt(db, athlete.id, at ?? Date.now()),
+    battles: await runningBattles(db, athlete.id, Date.now()),
   });
 });
 
 /**
- * Start pressed on the friend's phone. With a battle, the attempt counts there at once (same
- * checks as the athlete's own attempts); without, it goes to the athlete's inbox.
+ * Start pressed on the friend's phone: the attempt counts in the chosen battle at once (same
+ * checks as the athlete's own attempts).
  */
 guestRoutes.post('/attempts', async (c) => {
   const input = await parseJson(c, guestAttemptSchema);
@@ -72,33 +71,27 @@ guestRoutes.post('/attempts', async (c) => {
   }
   if (input.startedAt > now + CLOCK_TOLERANCE_MS) apiError(400, 'start_in_the_future');
 
-  if (input.battleId) {
-    const battle = await db.select().from(battles).where(eq(battles.id, input.battleId)).get();
-    if (!battle) apiError(404, 'not_found');
-    const participants = await db
-      .select({
-        userId: battleParticipants.userId,
-        extraAttempts: battleParticipants.extraAttempts,
-      })
-      .from(battleParticipants)
-      .where(eq(battleParticipants.battleId, battle.id));
-    if (!participants.some((p) => p.userId === athlete.id)) apiError(404, 'not_found');
-    await checkAttemptAllowed(db, battle, participants, athlete.id, input, now);
-  } else if (!input.description) apiError(400, 'description_required');
+  const battle = await db.select().from(battles).where(eq(battles.id, input.battleId)).get();
+  if (!battle) apiError(404, 'not_found');
+  const participants = await db
+    .select({ userId: battleParticipants.userId, extraAttempts: battleParticipants.extraAttempts })
+    .from(battleParticipants)
+    .where(eq(battleParticipants.battleId, battle.id));
+  if (!participants.some((p) => p.userId === athlete.id)) apiError(404, 'not_found');
+  await checkAttemptAllowed(db, battle, participants, athlete.id, input, now);
 
   await db.insert(attempts).values({
     id: input.id,
     battleId: input.battleId,
     userId: athlete.id,
-    partIndex: input.battleId ? input.partIndex : 0,
-    round: input.battleId ? input.round : 1,
+    partIndex: input.partIndex,
+    round: input.round,
     startedAtClient: input.startedAt,
     syncedAt: now,
     recordedBy: c.get('user')?.id ?? null,
     codeUsed: input.code,
     recorderName: input.recorderName || null,
-    description: input.description || null,
-    assignment: input.battleId ? 'direct' : null,
+    assignment: 'direct',
   });
   return c.json({ ok: true, battleId: input.battleId }, 201);
 });
@@ -109,17 +102,6 @@ async function codeAttempt(db: Database, attemptId: string, code: string) {
   if (!attempt || attempt.codeUsed !== code) apiError(404, 'not_found');
   return attempt;
 }
-
-/** Back online: the friend assigns an attempt recorded offline to one of the battles then. */
-guestRoutes.post('/attempts/:id/assign', async (c) => {
-  const input = await parseJson(c, guestAssignSchema);
-  const db = getDb(c.env.DB);
-  const now = Date.now();
-  const attempt = await codeAttempt(db, c.req.param('id'), input.code);
-  const battle = await assignInboxAttempt(db, attempt, input, now);
-  await eventStatement(db, battle.id, attempt.userId, { type: 'video_assigned' }, now);
-  return c.json({ ok: true, battleId: battle.id });
-});
 
 /** Announce the upload of an attempt's video (like POST /api/videos). */
 guestRoutes.post('/videos', async (c) => {
@@ -155,7 +137,7 @@ async function codeVideo(c: Context<AppEnv>, code: string) {
 
 guestRoutes.put('/videos/:id/upload', async (c) => {
   if (!uploadsThroughWorker(c.env)) apiError(404, 'not_found');
-  const { video, file } = await codeVideo(c, normalizeAthleteCode(c.req.header(CODE_HEADER) ?? ''));
+  const { video, file } = await codeVideo(c, athleteCodeKey(c.req.header(CODE_HEADER) ?? ''));
   await storeUploadBody(c, video, file);
   return c.json({ ok: true });
 });
@@ -173,14 +155,20 @@ athleteCodeRoutes.use(requireUser({ active: true }));
 athleteCodeRoutes.get('/', async (c) => {
   const user = c.get('user');
   if (!user) apiError(401, 'not_logged_in');
-  const code = await athleteCode(getDb(c.env.DB), user.id);
-  return c.json({ code: formatAthleteCode(code) });
+  return c.json({ code: await athleteCode(getDb(c.env.DB), user.id) });
 });
 
-/** A new code; the old one stops working for new recordings. */
+/** Choose my own code (any text, unique); the old one stops working for new recordings. */
+athleteCodeRoutes.put('/', async (c) => {
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const { code } = await parseJson(c, chooseAthleteCodeSchema);
+  return c.json({ code: await chooseAthleteCode(getDb(c.env.DB), user.id, code) });
+});
+
+/** A new random code; the old one stops working for new recordings. */
 athleteCodeRoutes.post('/renew', async (c) => {
   const user = c.get('user');
   if (!user) apiError(401, 'not_logged_in');
-  const code = await athleteCode(getDb(c.env.DB), user.id, true);
-  return c.json({ code: formatAthleteCode(code) });
+  return c.json({ code: await athleteCode(getDb(c.env.DB), user.id, true) });
 });

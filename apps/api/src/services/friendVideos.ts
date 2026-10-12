@@ -1,24 +1,21 @@
 /**
  * Filming by friends (concept section 6, stage 2 plan §3.7). Whoever knows an athlete's code
- * can film attempts for them without an account:
+ * can film attempts for them without an account, online only (owner, 2026-10-12): the friend
+ * picks one of the athlete's running battles before recording and the attempt belongs to that
+ * battle at once (`assignment = 'direct'`).
  *
- * - online, the friend picks one of the athlete's running battles before recording – the attempt
- *   belongs to that battle at once (`assignment = 'direct'`);
- * - offline, the friend writes a short description; the video goes to the athlete's inbox
- *   (`attempts.battle_id` NULL). Later the friend or the athlete assigns it to a battle that was
- *   running at the recording time (`pending`), and the opponent confirms it (`confirmed`) or
- *   rejects it (back to the inbox).
- *
- * The attempts belong to the athlete (`user_id`); `code_used` and `recorder_name` say who filmed.
+ * The attempts belong to the athlete (`user_id`); `code_used` (the code's key) and
+ * `recorder_name` say who filmed.
  */
 import {
   ATHLETE_CODE_ALPHABET,
   ATHLETE_CODE_LENGTH,
+  athleteCodeKey,
   attemptsLeft,
   type CreateVideo,
   slotKey,
 } from '@hfb/shared';
-import { and, eq, gte, inArray, isNull, lt, lte, ne, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
   attempts,
@@ -42,14 +39,33 @@ type AttemptRow = typeof attempts.$inferSelect;
 /** The phone's clock may be a little ahead of ours. */
 export const CLOCK_TOLERANCE_MS = 5 * 60_000;
 
+/** A random code like `K7M2-QX9P` (until the athlete chooses their own). */
 function randomCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(ATHLETE_CODE_LENGTH));
   // 256 is not a multiple of 31: the first characters are very slightly more likely. Irrelevant
   // for a code that only needs to be hard to guess, not perfectly uniform.
-  return [...bytes].map((b) => ATHLETE_CODE_ALPHABET[b % ATHLETE_CODE_ALPHABET.length]).join('');
+  const code = [...bytes]
+    .map((b) => ATHLETE_CODE_ALPHABET[b % ATHLETE_CODE_ALPHABET.length])
+    .join('');
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
-/** The athlete's code; created on first use. With `renew`, a new one replaces it. */
+/** Stores `code` for the athlete; false if another athlete has the same code (key). */
+async function storeCode(db: Database, userId: string, code: string): Promise<boolean> {
+  try {
+    await db
+      .update(users)
+      .set({ athleteCode: code, athleteCodeKey: athleteCodeKey(code) })
+      .where(eq(users.id, userId));
+    return true;
+  } catch (err) {
+    // Drizzle wraps the D1 error: the constraint is named in the cause.
+    if (`${err} ${(err as { cause?: unknown })?.cause}`.includes('UNIQUE')) return false;
+    throw err;
+  }
+}
+
+/** The athlete's code; a random one is created on first use and with `renew`. */
 export async function athleteCode(db: Database, userId: string, renew = false): Promise<string> {
   if (!renew) {
     const row = await db
@@ -61,32 +77,30 @@ export async function athleteCode(db: Database, userId: string, renew = false): 
   }
   for (let i = 0; i < 5; i++) {
     const code = randomCode();
-    try {
-      await db.update(users).set({ athleteCode: code }).where(eq(users.id, userId));
-      return code;
-    } catch (err) {
-      if (!String(err).includes('UNIQUE')) throw err;
-    }
+    if (await storeCode(db, userId, code)) return code;
   }
   throw new Error('No free athlete code found');
 }
 
-/** The active athlete with this code (already normalized), or a 404. */
+/** The athlete chooses their own code (any text); 409 if someone else has it. */
+export async function chooseAthleteCode(db: Database, userId: string, code: string) {
+  if (!(await storeCode(db, userId, code))) apiError(409, 'code_taken');
+  return code;
+}
+
+/** The active athlete with this code key (`athleteCodeKey`), or a 404. */
 export async function athleteByCode(db: Database, code: string) {
   const athlete = await db
     .select({ id: users.id, displayName: users.displayName, status: users.status })
     .from(users)
-    .where(and(eq(users.athleteCode, code), isNull(users.deletedAt)))
+    .where(and(eq(users.athleteCodeKey, code), isNull(users.deletedAt)))
     .get();
   if (athlete?.status !== 'active') apiError(404, 'unknown_code');
   return athlete;
 }
 
-/**
- * The athlete's battles that were running at `at`: accepted by then, deadline not passed by
- * then, and still running now (only those can still take a video).
- */
-export async function battlesRunningAt(db: Database, athleteId: string, at: number) {
+/** The athlete's running battles whose deadline has not passed: a friend can film for these. */
+export async function runningBattles(db: Database, athleteId: string, now: number) {
   const mine = db
     .select({ id: battleParticipants.battleId })
     .from(battleParticipants)
@@ -106,8 +120,7 @@ export async function battlesRunningAt(db: Database, athleteId: string, at: numb
       and(
         inArray(battles.id, mine),
         eq(battles.status, 'active'),
-        lte(battles.acceptedAt, at),
-        or(isNull(battles.deadlineAt), gte(battles.deadlineAt, at)),
+        or(isNull(battles.deadlineAt), gte(battles.deadlineAt, now)),
       ),
     )
     .limit(30);
@@ -191,65 +204,6 @@ export async function checkAttemptAllowed(
 }
 
 /**
- * Assigns an inbox attempt (recorded offline by a friend) to a battle of its athlete that was
- * running at the recording time. The opponent must confirm it before it can count.
- */
-export async function assignInboxAttempt(
-  db: Database,
-  attempt: AttemptRow,
-  input: { battleId: string; partIndex: number },
-  now: number,
-) {
-  if (attempt.battleId !== null) apiError(409, 'already_assigned');
-  const battle = await db.select().from(battles).where(eq(battles.id, input.battleId)).get();
-  if (!battle) apiError(404, 'not_found');
-  const participants = await db
-    .select({ userId: battleParticipants.userId, extraAttempts: battleParticipants.extraAttempts })
-    .from(battleParticipants)
-    .where(eq(battleParticipants.battleId, battle.id));
-  if (!participants.some((p) => p.userId === attempt.userId)) apiError(404, 'not_found');
-  if (battle.acceptedAt === null || attempt.startedAtClient < battle.acceptedAt)
-    apiError(409, 'not_running_then');
-  await checkAttemptAllowed(
-    db,
-    battle,
-    participants,
-    attempt.userId,
-    { partIndex: input.partIndex, round: 1, startedAt: attempt.startedAtClient },
-    now,
-  );
-  await db.batch([
-    db
-      .update(attempts)
-      .set({
-        battleId: battle.id,
-        partIndex: input.partIndex,
-        round: 1,
-        assignment: 'pending',
-        assignedAt: now,
-        confirmedBy: null,
-      })
-      .where(and(eq(attempts.id, attempt.id), isNull(attempts.battleId))),
-    db
-      .update(videos)
-      .set({ battleId: battle.id, partIndex: input.partIndex, round: 1 })
-      .where(eq(videos.attemptId, attempt.id)),
-  ]);
-  return battle;
-}
-
-/** A later assignment was wrong: the attempt goes back to the athlete's inbox. */
-export async function backToInbox(db: Database, attemptId: string) {
-  await db.batch([
-    db
-      .update(attempts)
-      .set({ battleId: null, partIndex: 0, assignment: null, assignedAt: null, confirmedBy: null })
-      .where(eq(attempts.id, attemptId)),
-    db.update(videos).set({ battleId: null, partIndex: 0 }).where(eq(videos.attemptId, attemptId)),
-  ]);
-}
-
-/**
  * Announces the upload of an attempt's video and returns where to send the bytes. Repeating it
  * (e.g. after a failed upload) is fine. Used by the athlete and by friends with the code.
  */
@@ -328,37 +282,4 @@ export async function announceVideo(
     videoId,
   );
   return { videoId, upload, created: !existing };
-}
-
-/** Inbox attempts are deleted this long after the recording if nobody assigned them. */
-export const INBOX_KEEP_DAYS = 30;
-
-/**
- * Scheduled job: videos that stayed in an inbox for INBOX_KEEP_DAYS are marked deleted (their
- * files are removed by deleteFilesOfDeletedVideos), unless the athlete chose to keep them.
- */
-export async function markOldInboxVideos(db: Database, now = Date.now()): Promise<number> {
-  const rows = await db
-    .select({ id: videos.id })
-    .from(videos)
-    .where(
-      and(
-        isNull(videos.battleId),
-        lt(videos.recordedAt, now - INBOX_KEEP_DAYS * 86_400_000),
-        ne(videos.status, 'deleted'),
-        eq(videos.retention, 'delete_after_battle'),
-      ),
-    )
-    .limit(90);
-  if (rows.length === 0) return 0;
-  await db
-    .update(videos)
-    .set({ status: 'deleted', deletedAt: now })
-    .where(
-      inArray(
-        videos.id,
-        rows.map((r) => r.id),
-      ),
-    );
-  return rows.length;
 }

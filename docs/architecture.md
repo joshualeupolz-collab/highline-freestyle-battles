@@ -440,7 +440,9 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
   the push service's answer (`sent` = the phone's settings block it). Failed pushes are logged
   (Cloudflare observability). Pushes use `Urgency: high` (Android delays `normal` while the phone
   sleeps); the app re-registers its subscription at every start; repeated notifications of one
-  battle alert again (`renotify`).
+  battle alert again (`renotify`). Tapping a notification focuses the app first (Android allows
+  it only right after the tap), then navigates; if that fails the app switches pages itself
+  (message to `main.tsx`), and with no open window a new one is opened.
 - App icon number (`apps/web/src/badge.ts`, Badging API): battles that wait for me or have
   unread messages plus open reviews, set while the app runs; the service worker adds new
   notifications to it. Works where the platform allows it: installed app on iPhone (only with
@@ -449,35 +451,33 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
 
 ## 4m. Filming by friends with the athlete code (stage 2, part 2.10)
 
-- **Code:** `users.athlete_code`, 8 characters from 31 unambiguous ones (no 0/O/1/I/L), shown
-  as `K7M2-QX9P`; created on first use (`GET /api/athlete-code`), renewable
-  (`POST /api/athlete-code/renew`). Profile → "Your athlete code" (share link
-  `/film?code=…`). Rules: `packages/shared/src/athleteCode.ts`.
-- **Friend's page `/film`** (public, no login; works offline once the app was opened):
-  `POST /api/guest/lookup` → the athlete's running battles with attempts left. Online the
-  friend picks battle + part and records (`POST /api/guest/attempts` with `battleId`: same
-  checks as the athlete's own attempts, `assignment = 'direct'`). Offline (or "not listed") the
-  friend writes a description; the attempt goes to the athlete's **inbox** (`battle_id` NULL).
-  Uploads: `POST /api/guest/videos`, `PUT /api/guest/videos/:id/upload` (code in the
-  `X-Athlete-Code` header, only without R2 keys), `POST /api/guest/videos/:id/complete`. The
-  code is checked against the attempt's `code_used`, so uploads keep working after a renewal.
-  Phone side: `StoredRecording.guest`, `uploadQueue.ts` (`processGuest`).
-- **Assignment** (migration 0016: `attempts.recorder_name/description/assignment/assigned_at/
-  confirmed_by`): the friend (`/film`, once online: battles running at the recording time via
-  `lookup` with `at`) or the athlete (Battles page → "Videos from friends",
-  `GET /api/videos/inbox`, `POST /api/videos/inbox/:attemptId/assign`) assigns it →
-  `pending`; it counts towards the attempt limit at once. The opponent confirms or rejects it
-  (`POST /api/battles/:id/assignments/:attemptId`); the athlete can take it back ("Wrong
-  battle"). Rejected → back to the inbox. A pending video cannot be chosen
-  (`assignment_unconfirmed`). The opponent's next step shows it (`todo.assignmentForMe`).
-- **Shown:** the athlete's own attempt list says "filmed by …"; the opponent sees a "Filmed by
-  friends" card with name, time and description – **not the code** (it would let the opponent
-  use up the athlete's attempts).
+- **Code:** `users.athlete_code` (as shown) and `users.athlete_code_key` (unique; lower case
+  without spaces and dashes, `athleteCodeKey` in `packages/shared/src/athleteCode.ts`, migration
+  0017). Starts as a random code like `K7M2-QX9P` (`GET /api/athlete-code`); the athlete can
+  choose any text up to 40 characters (`PUT /api/athlete-code`, owner 2026-10-12; 409
+  `code_taken`) or get a new random one (`POST /api/athlete-code/renew`). Profile → "Your
+  athlete code" (share link `/film?code=…`).
+- **Online only** (owner, 2026-10-12): the friend's page `/film` (public, no login) calls
+  `POST /api/guest/lookup` → the athlete's running battles with attempts left; the friend picks
+  battle + part and records (`POST /api/guest/attempts`: same checks as the athlete's own
+  attempts, `assignment = 'direct'`). Only the upload may wait for a connection. Uploads:
+  `POST /api/guest/videos`, `PUT /api/guest/videos/:id/upload` (code in the `X-Athlete-Code`
+  header, only without R2 keys), `POST /api/guest/videos/:id/complete`. The code key is checked
+  against the attempt's `code_used`, so uploads keep working after a code change. Phone side:
+  `StoredRecording.guest`, `uploadQueue.ts` (`processGuest`).
+- **Shown:** the athlete's attempt list says "filmed by …"; the opponent sees a "Filmed by
+  friends" card with name and time – **not the code** (it would let the opponent use up the
+  athlete's attempts).
 - **Defaults (owner to confirm):** friends' videos are uploaded as *review only*, not kept; the
-  athlete changes that per video (`POST /api/videos/:id/settings`, owner only). Inbox videos
-  nobody assigns are deleted after 30 days (hourly job, `markOldInboxVideos`) unless kept.
-  Whoever knows the code can use up the athlete's attempts – that is why the code can be
-  renewed at any time ("moderately secure", concept section 6).
+  athlete changes that per video (`POST /api/videos/:id/settings`, owner only). Whoever knows
+  the code can use up the athlete's attempts; a short chosen code is easy to guess (the profile
+  says so), so it can be changed at any time.
+- **Dropped again (owner, 2026-10-12):** offline filming with a description, the inbox and the
+  opponent's confirmation of later assignments – too many open problems. Their columns
+  (`attempts.description/assigned_at/confirmed_by`, migration 0016) stay unused.
+- **Offline recording of one's own battles:** running battles are loaded in the background when
+  the app opens online (`Layout.tsx`, up to 10), so they can be opened and recorded for without
+  a connection even if they were not opened before (offline copies in `api.ts`).
 
 ---
 

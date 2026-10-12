@@ -86,6 +86,14 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (hadWorker) window.location.reload();
   });
+  // A tapped notification whose page the service worker could not open itself (public/push-sw.js).
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const data = event.data as { type?: string; url?: string } | null;
+    if (data?.type === 'open' && data.url) {
+      const target = new URL(data.url, window.location.origin);
+      if (target.origin === window.location.origin) void router.navigate(target.pathname);
+    }
+  });
 }
 
 // Battle videos recorded offline are uploaded whenever the app is open and online.

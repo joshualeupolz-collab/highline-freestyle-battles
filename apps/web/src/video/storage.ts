@@ -42,13 +42,10 @@ export interface GuestAttempt {
   code: string;
   /** The athlete's name, as shown when the code was entered (empty if entered offline). */
   athleteName: string;
-  /** null = recorded offline: goes to the athlete's inbox and is assigned later. */
-  battleId: string | null;
+  battleId: string;
   partIndex: number;
   round: number;
   recorderName?: string;
-  /** Offline: opponent, format … so the right battle can be found later. */
-  description?: string;
   /** The server knows about the attempt. */
   synced: boolean;
 }

@@ -284,7 +284,7 @@ export interface BattleVideos {
   }[];
   /** Cut-off videos the opponent attached to a request for an extra attempt. */
   sharedWithMe: { id: string; ownerId: string; partIndex: number; round: number }[];
-  /** Attempts friends filmed for the others; `pending` ones wait for my confirmation. */
+  /** Attempts friends filmed for the others (who and when). */
   byFriends: {
     id: string;
     userId: string;
@@ -294,12 +294,9 @@ export interface BattleVideos {
   }[];
 }
 
-/** Filming by friends (concept section 6). */
+/** Filming by friends (concept section 6): the name the friend gave, if any. */
 export interface FriendFilmed {
   name: string | null;
-  description: string | null;
-  /** direct: picked before recording; pending: assigned later, waits for the opponent; confirmed. */
-  assignment: 'direct' | 'pending' | 'confirmed';
 }
 
 /** One of an athlete's battles a friend can film for (POST /guest/lookup). */
@@ -311,23 +308,6 @@ export interface GuestBattle {
   deadlineAt: number | null;
   /** Per part; null = unlimited. */
   attemptsLeft: (number | null)[];
-}
-
-/** A video a friend filmed offline for me, not assigned to a battle yet. */
-export interface InboxItem {
-  id: string;
-  recordedAt: number;
-  recorderName: string | null;
-  description: string | null;
-  video: {
-    id: string;
-    status: string;
-    durationMs: number | null;
-    visibility: string;
-    retention: string;
-  } | null;
-  /** My battles that were running at the recording time. */
-  battles: GuestBattle[];
 }
 
 export type BattleSummary = Omit<
@@ -631,29 +611,15 @@ export const api = {
   videoSettings: (id: string, body: { visibility: string; retention: string }) =>
     post(`/videos/${id}/settings`, body),
 
-  // Filming by friends: my code, my inbox, confirming assignments.
+  // Filming by friends: my code.
   athleteCode: () => get<{ code: string }>('/athlete-code'),
+  chooseAthleteCode: (code: string) => put<{ code: string }>('/athlete-code', { code }),
   renewAthleteCode: () => post<{ code: string }>('/athlete-code/renew'),
-  inbox: () => get<{ inbox: InboxItem[] }>('/videos/inbox'),
-  assignInbox: (attemptId: string, battleId: string, partIndex: number) =>
-    post<{ battleId: string }>(`/videos/inbox/${attemptId}/assign`, { battleId, partIndex }),
-  deleteInbox: (attemptId: string) => post(`/videos/inbox/${attemptId}/delete`),
-  decideAssignment: (battleId: string, attemptId: string, action: 'confirm' | 'reject') =>
-    post<BattleResponse>(`/battles/${battleId}/assignments/${attemptId}`, { action }),
 
   // Filming for a friend with their code (no login needed).
-  guestLookup: (code: string, at?: number) =>
-    post<{ athlete: { displayName: string }; battles: GuestBattle[] }>('/guest/lookup', {
-      code,
-      at,
-    }),
+  guestLookup: (code: string) =>
+    post<{ athlete: { displayName: string }; battles: GuestBattle[] }>('/guest/lookup', { code }),
   guestAttempt: (body: GuestAttempt) => post<{ battleId: string | null }>('/guest/attempts', body),
-  guestAssign: (attemptId: string, code: string, battleId: string, partIndex: number) =>
-    post<{ battleId: string }>(`/guest/attempts/${attemptId}/assign`, {
-      code,
-      battleId,
-      partIndex,
-    }),
   guestVideo: (body: GuestVideo) =>
     post<{ video: { id: string; status: string }; upload: UploadTarget }>('/guest/videos', body),
   guestCompleteVideo: (id: string, code: string) =>

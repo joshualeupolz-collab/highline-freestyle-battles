@@ -1,4 +1,9 @@
-import { NOTIFICATION_KINDS, type NotificationKind, PASSWORD_MIN } from '@hfb/shared';
+import {
+  ATHLETE_CODE_MAX,
+  NOTIFICATION_KINDS,
+  type NotificationKind,
+  PASSWORD_MIN,
+} from '@hfb/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -168,18 +173,21 @@ export function ProfilePage() {
 
 /**
  * My athlete code (concept section 6): friends enter it to film my attempts without an account.
- * A new code stops the old one from working for new recordings.
+ * I can choose it freely (owner, 2026-10-12); changing it stops the old one for new recordings.
  */
 function AthleteCodeCard() {
   const queryClient = useQueryClient();
   const code = useQuery({ queryKey: ['athleteCode'], queryFn: api.athleteCode });
-  const renew = useMutation({
-    mutationFn: api.renewAthleteCode,
-    onSuccess: (res) => queryClient.setQueryData(['athleteCode'], res),
-  });
+  const [draft, setDraft] = useState<string | null>(null);
+  const saved = (res: { code: string }) => {
+    queryClient.setQueryData(['athleteCode'], res);
+    setDraft(null);
+  };
+  const choose = useMutation({ mutationFn: api.chooseAthleteCode, onSuccess: saved });
+  const renew = useMutation({ mutationFn: api.renewAthleteCode, onSuccess: saved });
   const [copied, setCopied] = useState(false);
   const value = code.data?.code;
-  const link = value ? `${location.origin}/film?code=${value}` : '';
+  const link = value ? `${location.origin}/film?code=${encodeURIComponent(value)}` : '';
   const share = async () => {
     try {
       if (navigator.share) await navigator.share({ title: t('film.title'), url: link });
@@ -195,23 +203,61 @@ function AthleteCodeCard() {
     <div className="card">
       <strong>{t('code.title')}</strong>
       <p className="hint">{t('code.hint')}</p>
-      {value && <p className="athlete-code">{value}</p>}
-      <ErrorText error={code.error ?? renew.error} />
-      <div className="inline">
-        <button type="button" className="secondary" disabled={!value} onClick={share}>
-          {copied ? t('code.copied') : t('code.share')}
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          disabled={!value || renew.isPending}
-          onClick={() => {
-            if (window.confirm(t('code.renewConfirm'))) renew.mutate();
+      {draft === null ? (
+        <>
+          {value && <p className="athlete-code">{value}</p>}
+          <div className="inline">
+            <button type="button" className="secondary" disabled={!value} onClick={share}>
+              {copied ? t('code.copied') : t('code.share')}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!value}
+              onClick={() => setDraft(value ?? '')}
+            >
+              {t('code.change')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            choose.mutate(draft);
           }}
         >
-          {t('code.renew')}
-        </button>
-      </div>
+          <label>
+            {t('code.own')}
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={ATHLETE_CODE_MAX}
+              autoCapitalize="none"
+              autoComplete="off"
+              required
+            />
+          </label>
+          <p className="hint">{t('code.ownHint')}</p>
+          <div className="inline">
+            <button type="submit" disabled={choose.isPending || !draft.trim()}>
+              {t('code.save')}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={renew.isPending}
+              onClick={() => renew.mutate()}
+            >
+              {t('code.random')}
+            </button>
+            <button type="button" className="link" onClick={() => setDraft(null)}>
+              {t('common.cancel')}
+            </button>
+          </div>
+        </form>
+      )}
+      <ErrorText error={code.error ?? choose.error ?? renew.error} />
       <p className="muted">
         <Link to="/film">{t('code.filmForFriend')}</Link>
       </p>

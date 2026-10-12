@@ -2,8 +2,6 @@ import { env } from 'cloudflare:workers';
 import { newId } from '@hfb/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
-import { getDb } from '../src/db/client';
-import { INBOX_KEEP_DAYS, markOldInboxVideos } from '../src/services/friendVideos';
 import { call, registerAdmin, registerAthlete } from './helpers';
 
 const BEST_TRICK = '01a12842-5c02-7d6b-bce2-b6212ef6a4df';
@@ -15,8 +13,6 @@ let ben: Person;
 
 interface FriendInfo {
   name: string | null;
-  description: string | null;
-  assignment: string;
 }
 interface Battle {
   id: string;
@@ -102,19 +98,31 @@ async function guestUpload(code: string, attemptId: string) {
 }
 
 describe('athlete code', () => {
-  it('is created once, can be renewed, and the old one stops working', async () => {
+  it('starts random, can be chosen freely and renewed; the old one stops working', async () => {
     const code = await codeOf(anna);
     expect(code).toMatch(/^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/);
     expect(await codeOf(anna)).toBe(code);
-
+    // Case, spaces and dashes do not matter when a friend types it.
     const lookup = await guest<{ athlete: { displayName: string } }>('/api/guest/lookup', {
       code: code.toLowerCase().replace('-', ' '),
     });
     expect(lookup.body.athlete.displayName).toBe('anna');
 
-    const renewed = await as<{ code: string }>(anna, '/api/athlete-code/renew');
-    expect(renewed.body.code).not.toBe(code);
+    const put = (who: Person, code: string) =>
+      json<{ code: string; error?: string }>(
+        call('/api/athlete-code', { method: 'PUT', session: who.session, body: { code } }),
+      );
+    const chosen = await put(anna, ' Anna Flips! ');
+    expect(chosen.body.code).toBe('Anna Flips!');
     expect((await guest('/api/guest/lookup', { code })).status).toBe(404);
+    expect((await guest('/api/guest/lookup', { code: 'annaflips!' })).status).toBe(200);
+    // Only one athlete can have a code (compared without case, spaces and dashes).
+    expect((await put(ben, 'ANNA-FLIPS!')).body.error).toBe('code_taken');
+    expect((await put(ben, '  ')).status).toBe(400);
+
+    const renewed = await as<{ code: string }>(anna, '/api/athlete-code/renew');
+    expect(renewed.body.code).toMatch(/^\w{4}-\w{4}$/);
+    expect((await guest('/api/guest/lookup', { code: 'Anna Flips!' })).status).toBe(404);
   });
 });
 
@@ -154,7 +162,7 @@ describe('filming by friends, online', () => {
     expect(mine).toEqual([
       expect.objectContaining({
         id: attemptId,
-        friend: { name: 'Max', description: null, assignment: 'direct' },
+        friend: { name: 'Max' },
         video: expect.objectContaining({ id: videoId }),
       }),
     ]);
@@ -180,137 +188,17 @@ describe('filming by friends, online', () => {
   });
 });
 
-describe('filming by friends, offline', () => {
-  it('goes to the inbox, is assigned later and counts once the opponent confirmed it', async () => {
+describe('video settings', () => {
+  it('the owner changes who may watch a video a friend filmed', async () => {
     const id = await activeBattle();
     const code = await codeOf(anna);
     const attemptId = newId();
-    const noText = await guest('/api/guest/attempts', {
-      code,
-      id: attemptId,
-      battleId: null,
-      partIndex: 0,
-      startedAt: Date.now(),
-    });
-    expect(noText.body.error).toBe('description_required');
-    const started = await guest('/api/guest/attempts', {
-      code,
-      id: attemptId,
-      battleId: null,
-      partIndex: 0,
-      startedAt: Date.now(),
-      description: 'Best trick vs Ben',
-    });
-    expect(started.status).toBe(201);
-    const videoId = await guestUpload(code, attemptId);
-
-    const inbox = await json<{
-      inbox: { id: string; description: string; battles: { id: string }[] }[];
-    }>(call('/api/videos/inbox', { session: anna.session }));
-    expect(inbox.body.inbox).toEqual([
-      expect.objectContaining({
-        id: attemptId,
-        description: 'Best trick vs Ben',
-        battles: [expect.objectContaining({ id })],
-      }),
-    ]);
-
-    // Back online, the friend assigns it.
-    const assigned = await guest(`/api/guest/attempts/${attemptId}/assign`, {
-      code,
-      battleId: id,
-      partIndex: 0,
-    });
-    expect(assigned.status, assigned.body.error).toBe(200);
-    expect(
-      (await json<{ inbox: unknown[] }>(call('/api/videos/inbox', { session: anna.session }))).body
-        .inbox,
-    ).toEqual([]);
-
-    // Not before the opponent confirmed it.
-    const early = await as(anna, `/api/battles/${id}/submissions`, { videoId });
-    expect(early.body.error).toBe('assignment_unconfirmed');
-    const benBattles = await json<{
-      battles: { id: string; todo: { assignmentForMe: boolean } }[];
-    }>(call('/api/battles/mine', { session: ben.session }));
-    expect(benBattles.body.battles.find((b) => b.id === id)?.todo.assignmentForMe).toBe(true);
-    expect((await battle(ben, id)).videos.byFriends[0]?.friend).toEqual({
-      name: null,
-      description: 'Best trick vs Ben',
-      assignment: 'pending',
-    });
-    // The athlete cannot confirm it alone.
-    const self = await as(anna, `/api/battles/${id}/assignments/${attemptId}`, {
-      action: 'confirm',
-    });
-    expect(self.status).toBe(403);
-    const confirmed = await as(ben, `/api/battles/${id}/assignments/${attemptId}`, {
-      action: 'confirm',
-    });
-    expect(confirmed.status, confirmed.body.error).toBe(200);
-    const chosen = await as(anna, `/api/battles/${id}/submissions`, { videoId });
-    expect(chosen.status, chosen.body.error).toBe(200);
-  });
-
-  it('a rejected assignment goes back to the inbox; old recordings do not fit', async () => {
-    const id = await activeBattle();
-    const code = await codeOf(anna);
-    const before = newId();
-    await guest('/api/guest/attempts', {
-      code,
-      id: before,
-      battleId: null,
-      partIndex: 0,
-      startedAt: Date.now() - 86_400_000,
-      description: 'yesterday',
-    });
-    const wrongTime = await as(anna, `/api/videos/inbox/${before}/assign`, {
-      battleId: id,
-      partIndex: 0,
-    });
-    expect(wrongTime.body.error).toBe('not_running_then');
-
-    const attemptId = newId();
     await guest('/api/guest/attempts', {
       code,
       id: attemptId,
-      battleId: null,
-      partIndex: 0,
-      startedAt: Date.now(),
-      description: 'today',
-    });
-    const assigned = await as(anna, `/api/videos/inbox/${attemptId}/assign`, {
       battleId: id,
       partIndex: 0,
-    });
-    expect(assigned.status, assigned.body.error).toBe(200);
-    const rejected = await as(ben, `/api/battles/${id}/assignments/${attemptId}`, {
-      action: 'reject',
-    });
-    expect(rejected.status).toBe(200);
-    const inbox = await json<{ inbox: { id: string }[] }>(
-      call('/api/videos/inbox', { session: anna.session }),
-    );
-    expect(inbox.body.inbox.map((i) => i.id).sort()).toEqual([before, attemptId].sort());
-
-    // Deleting from the inbox.
-    expect((await as(anna, `/api/videos/inbox/${before}/delete`)).status).toBe(200);
-    const after = await json<{ inbox: { id: string }[] }>(
-      call('/api/videos/inbox', { session: anna.session }),
-    );
-    expect(after.body.inbox.map((i) => i.id)).toEqual([attemptId]);
-  });
-
-  it('inbox videos nobody assigned are deleted after a while; the owner can change settings', async () => {
-    const code = await codeOf(anna);
-    const attemptId = newId();
-    await guest('/api/guest/attempts', {
-      code,
-      id: attemptId,
-      battleId: null,
-      partIndex: 0,
       startedAt: Date.now(),
-      description: 'training',
     });
     const videoId = await guestUpload(code, attemptId);
     const settings = await as<{ video: { visibility: string } }>(
@@ -324,9 +212,16 @@ describe('filming by friends, offline', () => {
       retention: 'keep',
     });
     expect(notMine.status).toBe(404);
+  });
 
-    const db = getDb(env.DB);
-    expect(await markOldInboxVideos(db)).toBe(0);
-    expect(await markOldInboxVideos(db, Date.now() + (INBOX_KEEP_DAYS + 1) * 86_400_000)).toBe(1);
+  it('without a battle there is nothing to film for', async () => {
+    const res = await guest('/api/guest/attempts', {
+      code: await codeOf(anna),
+      id: newId(),
+      battleId: null,
+      partIndex: 0,
+      startedAt: Date.now(),
+    });
+    expect(res.status).toBe(400);
   });
 });

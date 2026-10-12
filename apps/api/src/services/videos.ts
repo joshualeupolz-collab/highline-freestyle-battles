@@ -54,8 +54,6 @@ export async function battleVideosView(
         startedAt: attempts.startedAtClient,
         codeUsed: attempts.codeUsed,
         recorderName: attempts.recorderName,
-        description: attempts.description,
-        assignment: attempts.assignment,
       })
       .from(attempts)
       .where(eq(attempts.battleId, battle.id))
@@ -150,8 +148,8 @@ export async function battleVideosView(
           };
         })
     : [];
-  // Attempts friends filmed for the others (concept section 6): who filmed and when, and for
-  // later assignments the description to confirm. The code itself is not shown.
+  // Attempts friends filmed for the others (concept section 6): who filmed and when. The code
+  // itself is not shown (the opponent could use up the athlete's attempts with it).
   const byFriends = isParticipant
     ? attemptRows
         .filter((a) => a.userId !== viewerId && a.codeUsed !== null)
@@ -175,22 +173,8 @@ export async function battleVideosView(
 }
 
 /** Filming by friends: null for the athlete's own recordings. */
-function friendView(a: {
-  codeUsed: string | null;
-  recorderName: string | null;
-  description: string | null;
-  assignment: string | null;
-}) {
-  return a.codeUsed === null
-    ? { friend: null }
-    : {
-        friend: {
-          name: a.recorderName,
-          description: a.description,
-          /** direct | pending (waits for the opponent's confirmation) | confirmed */
-          assignment: a.assignment ?? 'direct',
-        },
-      };
+function friendView(a: { codeUsed: string | null; recorderName: string | null }) {
+  return { friend: a.codeUsed === null ? null : { name: a.recorderName } };
 }
 
 /**
