@@ -1,7 +1,7 @@
 import type { BattleSettings } from '@hfb/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { api, type Battle, type Proposal } from '../api';
 import { hasRole, useMe } from '../auth';
 import {
@@ -141,6 +141,11 @@ export function BattleDetailPage() {
         </p>
       )}
 
+      {battle.competitionId && (
+        <p className="battle-meta">
+          <Link to={`/competitions/${battle.competitionId}`}>{t('competitions.partOfLink')}</Link>
+        </p>
+      )}
       {battle.annulment?.state === 'annulled' && (
         <div className="card notice">
           <p style={{ margin: 0 }}>

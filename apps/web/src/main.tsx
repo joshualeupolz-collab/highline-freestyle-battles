@@ -7,6 +7,7 @@ import { AdminPage } from './pages/Admin';
 import { ApprovalsPage } from './pages/Approvals';
 import { BattleDetailPage } from './pages/BattleDetail';
 import { BattlesPage } from './pages/Battles';
+import { CompetitionPage, CompetitionsPage } from './pages/Competitions';
 import { DeletionRequestPage } from './pages/DeletionRequest';
 import { LegalPage } from './pages/Legal';
 import { LoginPage } from './pages/Login';
@@ -62,6 +63,8 @@ const router = createBrowserRouter([
       { path: '/onsite', element: <OnsiteResultPage /> },
       { path: '/formats/propose', element: <ProposeFormatPage /> },
       { path: '/rankings', element: <RankingsPage /> },
+      { path: '/competitions', element: <CompetitionsPage /> },
+      { path: '/competitions/:id', element: <CompetitionPage /> },
       { path: '/users/:id', element: <UserProfilePage /> },
       { path: '/battles/:id', element: <BattleDetailPage /> },
       { path: '/approvals', element: <ApprovalsPage /> },

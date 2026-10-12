@@ -80,3 +80,12 @@ export async function recordAttempt(phone: Page) {
   await expect(phone.getByRole('heading', { name: 'Cut and upload' })).toBeVisible();
   await phone.getByRole('button', { name: 'Upload', exact: true }).click();
 }
+
+/** Gives `user` a special role (as the admin, through the API). */
+export async function grantRole(user: TestUser, role: 'judge' | 'organizer' | 'federation') {
+  const admin = await request.newContext(API);
+  await admin.post('/api/auth/login', { data: { username: ADMIN, password: PASSWORD } });
+  const res = await admin.post(`/api/users/${user.id}/roles`, { data: { role } });
+  expect(res.ok(), await res.text()).toBe(true);
+  await admin.dispose();
+}

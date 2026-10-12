@@ -82,6 +82,14 @@ No Cloudflare account is needed for local development or tests.
 | POST | `/api/battles/:id/group-reject` | Reject it (someone enters a corrected one) |
 | POST | `/api/battles/:id/group-result` | Enter corrected placements |
 | POST | `/api/battles/:id/official-confirm` | Judge/organizer/federation confirms for everyone (audited) |
+| GET | `/api/competitions` | Competitions, newest first |
+| POST | `/api/competitions` | Create one (organizer/federation), weight 1–5 |
+| GET | `/api/competitions/:id` | Details, results and what the viewer may do |
+| POST | `/api/competitions/:id/battles` | Organizer: add a single battle |
+| POST | `/api/competitions/:id/placements` | Organizer: final placement of a format |
+| POST | `/api/competitions/:id/results/:battleId/remove` | Organizer: remove a result |
+| POST | `/api/competitions/:id/submit` / `reopen` / `cancel` | Organizer: ask for confirmation, edit again, call off |
+| POST | `/api/competitions/:id/confirm` | Judge/federation: confirm, all results count (audited) |
 | POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
 | POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
 | POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |

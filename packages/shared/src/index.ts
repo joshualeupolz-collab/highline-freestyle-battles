@@ -1,5 +1,6 @@
 export * from './auth';
 export * from './battles';
+export * from './competitions';
 export * from './deadline';
 export * from './estimates';
 export * from './formats';

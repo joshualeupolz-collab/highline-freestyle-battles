@@ -92,6 +92,13 @@
       "when": 1791812026136,
       "tag": "0012_review_levels",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791822052579,
+      "tag": "0013_competitions",
+      "breakpoints": true
     }
   ]
 }
