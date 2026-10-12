@@ -4,6 +4,7 @@
  */
 import type {
   BattleSettings,
+  CreateEstimate,
   CreateOnsiteBattle,
   CreateReport,
   CreateVideo,
@@ -360,6 +361,15 @@ export interface FederationApproval {
   canWithdraw: boolean;
 }
 
+export interface EstimateEntry {
+  id: string;
+  formatId: string;
+  kind: 'athlete' | 'federation' | 'admin';
+  value: number;
+  createdAt: number;
+  estimator?: UserHit;
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -426,6 +436,13 @@ export const api = {
   decideApproval: (id: string, decision: 'approve' | 'reject', note?: string) =>
     post(`/federation-approvals/${id}/decide`, { decision, note }),
   withdrawApproval: (id: string) => post(`/federation-approvals/${id}/withdraw`),
+  estimates: (subjectId: string) =>
+    get<{ mine: EstimateEntry[]; count: number; all: EstimateEntry[] | null }>(
+      `/estimates?subjectId=${encodeURIComponent(subjectId)}`,
+    ),
+  createEstimate: (body: CreateEstimate) =>
+    post<{ id: string; replay: boolean }>('/estimates', body),
+  withdrawEstimate: (id: string) => post(`/estimates/${id}/withdraw`),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

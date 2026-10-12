@@ -7,6 +7,7 @@ import { annulmentRoutes, approvalRoutes } from './routes/annulment';
 import { auditRoutes } from './routes/audit';
 import { authRoutes } from './routes/auth';
 import { battleRoutes } from './routes/battles';
+import { estimateRoutes } from './routes/estimates';
 import { formatRoutes } from './routes/formats';
 import { onsiteRoutes } from './routes/onsite';
 import { reportRoutes } from './routes/reports';
@@ -38,6 +39,7 @@ export function createApp() {
   app.route('/audit', auditRoutes);
   app.route('/reports', reportRoutes);
   app.route('/federation-approvals', approvalRoutes);
+  app.route('/estimates', estimateRoutes);
 
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
   app.onError((err, c) => {

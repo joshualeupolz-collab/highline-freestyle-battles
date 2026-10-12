@@ -70,6 +70,9 @@ No Cloudflare account is needed for local development or tests.
 | GET | `/api/federation-approvals` | Admin actions waiting for the federation |
 | POST | `/api/federation-approvals/:id/decide` | Approve (carries it out) or reject |
 | POST | `/api/federation-approvals/:id/withdraw` | The requester takes it back |
+| POST | `/api/estimates` | Initial rating estimate (athletes; `official` for federation/admin) |
+| GET | `/api/estimates?subjectId=` | My estimates of a person and the count (staff: all) |
+| POST | `/api/estimates/:id/withdraw` | Withdraw my estimate |
 | POST | `/api/auth/delete-account` | Delete one's own account (password, `keepVideos`); returns the deletion link token |
 | POST | `/api/auth/deletion-request` | With the deletion link: delete the videos a deleted account kept |
 | POST | `/api/rulesets/replay` | Request a full rating recalculation (federation/admin) |

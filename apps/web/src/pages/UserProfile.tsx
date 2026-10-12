@@ -1,9 +1,17 @@
-import { grantableRoles, type Role, SPECIAL_ROLES, type SpecialRole } from '@hfb/shared';
+import {
+  ESTIMATE_MAX,
+  ESTIMATE_MIN,
+  grantableRoles,
+  type Role,
+  SPECIAL_ROLES,
+  type SpecialRole,
+} from '@hfb/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api } from '../api';
-import { useMe } from '../auth';
-import { StatusBadge } from '../battleHelpers';
+import { hasRole, useMe } from '../auth';
+import { StatusBadge, useFormats } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
 import { ReportButton } from '../components/ReportButton';
 import { UserLink } from '../components/UserLink';
@@ -90,7 +98,12 @@ export function UserProfilePage() {
           </div>
         </Link>
       ))}
-      {me && me.id !== user.id && <ReportButton targetType="user" targetId={user.id} />}
+      {me && me.id !== user.id && (
+        <>
+          <EstimateCard userId={user.id} name={user.displayName} />
+          <ReportButton targetType="user" targetId={user.id} />
+        </>
+      )}
     </>
   );
 }
@@ -132,6 +145,139 @@ function RolesCard({ userId, roles }: { userId: string; roles: Role[] }) {
         })}
       </div>
       <ErrorText error={change.error} />
+    </details>
+  );
+}
+
+/**
+ * Initial rating estimate for someone I know (rating specification section 6.1). Shows where the
+ * value would be in the current ranking, as a help.
+ */
+function EstimateCard({ userId, name }: { userId: string; name: string }) {
+  const { data: me } = useMe();
+  const formats = useFormats();
+  const queryClient = useQueryClient();
+  const list = formats.data?.formats ?? [];
+  const [formatId, setFormatId] = useState('');
+  const [value, setValue] = useState(1500);
+  const [official, setOfficial] = useState(false);
+  const chosen = formatId || list[0]?.id || '';
+  const estimates = useQuery({
+    queryKey: ['estimates', userId],
+    queryFn: () => api.estimates(userId),
+  });
+  const ranking = useQuery({
+    queryKey: ['ranking', chosen],
+    queryFn: () => api.ranking(chosen),
+    enabled: !!chosen,
+  });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['estimates', userId] });
+  const save = useMutation({
+    mutationFn: () => api.createEstimate({ subjectId: userId, formatId: chosen, value, official }),
+    onSuccess: refresh,
+  });
+  const withdraw = useMutation({ mutationFn: api.withdrawEstimate, onSuccess: refresh });
+  const formatName = (id: string) => list.find((f) => f.id === id)?.name ?? '…';
+
+  const entries = (ranking.data?.ranking ?? [])
+    .filter((e) => e.userId !== userId)
+    .sort((a, b) => b.r - a.r);
+  const above = entries.filter((e) => e.r >= value).at(-1);
+  const below = entries.find((e) => e.r < value);
+  const where =
+    entries.length === 0
+      ? t('estimate.emptyRanking')
+      : !above
+        ? t('estimate.top')
+        : !below
+          ? t('estimate.bottom')
+          : t('estimate.around', {
+              above: `${above.displayName} (${above.r})`,
+              below: `${below.displayName} (${below.r})`,
+            });
+
+  return (
+    <details className="card more">
+      <summary>{t('estimate.title', { name })}</summary>
+      <p className="hint">{t('estimate.hint', { name })}</p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <label>
+          {t('estimate.format')}
+          <select value={chosen} onChange={(e) => setFormatId(e.target.value)}>
+            {list.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t('estimate.value')}
+          <input
+            type="number"
+            min={ESTIMATE_MIN}
+            max={ESTIMATE_MAX}
+            step={10}
+            value={value}
+            onChange={(e) => setValue(Number(e.target.value))}
+          />
+          <span className="hint">{where}</span>
+        </label>
+        {hasRole(me, 'federation', 'admin') && (
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={official}
+              onChange={(e) => setOfficial(e.target.checked)}
+            />
+            <span>{t('estimate.official')}</span>
+          </label>
+        )}
+        <ErrorText error={save.error ?? withdraw.error} />
+        {save.data && (
+          <p className="success">
+            {save.data.replay ? t('estimate.savedReplay') : t('estimate.saved')}
+          </p>
+        )}
+        <button type="submit" disabled={save.isPending || !chosen}>
+          {t('estimate.send')}
+        </button>
+      </form>
+      {(estimates.data?.mine.length ?? 0) > 0 && (
+        <>
+          <h3>{t('estimate.mine')}</h3>
+          {estimates.data?.mine.map((e) => (
+            <div key={e.id} className="row">
+              <span>
+                {formatName(e.formatId)}: <strong>{e.value}</strong>{' '}
+                <span className="muted">({t(`estimate.kind.${e.kind}` as MessageKey)})</span>
+              </span>
+              <button type="button" className="secondary" onClick={() => withdraw.mutate(e.id)}>
+                {t('estimate.withdraw')}
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+      {estimates.data && (
+        <p className="muted">{t('estimate.count', { n: estimates.data.count })}</p>
+      )}
+      {estimates.data?.all && estimates.data.all.length > 0 && (
+        <>
+          <h3>{t('estimate.all')}</h3>
+          {estimates.data.all.map((e) => (
+            <div key={e.id} className="muted">
+              {formatName(e.formatId)}: {e.value} – {e.estimator?.displayName} (
+              {t(`estimate.kind.${e.kind}` as MessageKey)}, {formatDate(e.createdAt)})
+            </div>
+          ))}
+        </>
+      )}
     </details>
   );
 }

@@ -290,7 +290,7 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
 
 ---
 
-## 4g. Roles, audit log and reports (stage 2, parts 2.1–2.2)
+## 4g. Roles, audit log, reports, annulment, estimates (stage 2, parts 2.1–2.4)
 
 - **Roles:** `grantableRoles` (`packages/shared/src/roles.ts`) is the one rule: admins hand out
   judge, organizer, federation and admin; the federation hands out judge, organizer and
@@ -316,6 +316,16 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
   then carried out in the admin's name, `audit_log.federation_approval_by` = the approver) or
   rejects it; the admin can withdraw it. `GET /api/federation-approvals` lists the waiting
   requests (admin page). The table is generic so later sport-related admin actions can use it.
+- **Initial estimates** (`apps/api/src/routes/estimates.ts`, part 2.4, rating spec §6.1):
+  `POST /api/estimates` (subject, format, value 500–3000, `official`), only while the person has
+  fewer than `MIN_BATTLES` battles in the (rating) format, never for oneself. A new estimate
+  withdraws the estimator's previous one. `official` (federation → kind `federation`, admin →
+  `admin`) overrides the athletes' median and is audited; athletes' estimates are not (they are
+  not special permissions). The Worker applies estimates at a person's first battle; an estimate
+  given or withdrawn after that adds a `replay_request` (the engine applies it retroactively).
+  `GET /api/estimates?subjectId=` returns my own estimates and the count; federation and admins
+  also see all of them with the estimators, except for themselves. The profile shows where the
+  value would be in the current ranking.
 
 ---
 
