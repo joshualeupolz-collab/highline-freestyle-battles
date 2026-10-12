@@ -113,8 +113,11 @@ Checked in desktop Chromium with a fake camera (`/lab/video`, Playwright):
 - **HD, 20 s landscape: 1920×1080 at 30 fps, 43.8 MB/min** (target 46) – Safari keeps the bit
   rate, unlike Chrome on Android (60.5 MB/min).
 - Cuts start 0.3–0.6 s before the chosen point (at the previous keyframe), 5–15 ms per cut.
-- Both reports were made in the browser (`installedApp: false`, `persisted: false`), so persistent
-  storage in the installed app is still unconfirmed.
+- Both reports were made in the browser (`installedApp: false`, `persisted: false`).
+- **Installed app (home screen): persistent storage granted** (`installedApp: true`,
+  `persisted: true`); HD 43.6 MB/min, keyframe every 1.02 s, same as in the browser.
+  → iPhone users should record in the installed app; in the browser Safari may delete stored
+  recordings after 7 days without use.
 - **Real battles work on the iPhone** (owner): recording, upload, choosing, unlocking, voting.
 
 Open, to be answered by the phone tests:
@@ -122,8 +125,8 @@ Open, to be answered by the phone tests:
 1. ~~Safari (iPhone): format and codec, keyframe interval, chunk every second, cut start~~ –
    answered above.
 2. ~~Real file sizes per quality level~~ – normal and HD measured on both platforms; saver open.
-3. Does IndexedDB keep large recordings (HD, 60 s ≈ 45 MB) on iPhones, and is persistent storage
-   granted in the installed app?
+3. ~~Is persistent storage granted in the installed app?~~ – yes (iPhone). Still open: does
+   IndexedDB keep many large recordings (several HD minutes) over days?
 4. Cutting time and memory for 60 s HD files on older phones.
 5. iPhone: does the recording end cleanly when the app is left, and do the events show up in the report?
 6. Android: behaviour with the screen rotation lock on (optional).
