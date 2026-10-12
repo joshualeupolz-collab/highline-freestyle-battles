@@ -9,6 +9,7 @@ import { authRoutes } from './routes/auth';
 import { battleRoutes } from './routes/battles';
 import { estimateRoutes } from './routes/estimates';
 import { formatRoutes } from './routes/formats';
+import { groupRoutes } from './routes/groups';
 import { onsiteRoutes } from './routes/onsite';
 import { reportRoutes } from './routes/reports';
 import { reviewBattleRoutes, reviewRoutes } from './routes/reviews';
@@ -35,6 +36,7 @@ export function createApp() {
   app.route('/battles', battleRoutes);
   app.route('/battles', battleVideoRoutes);
   app.route('/battles', onsiteRoutes);
+  app.route('/battles', groupRoutes);
   app.route('/battles', annulmentRoutes);
   app.route('/battles', reviewBattleRoutes);
   app.route('/videos', videoRoutes);

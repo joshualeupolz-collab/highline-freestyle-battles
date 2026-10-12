@@ -54,9 +54,16 @@ export function BattlesPage() {
               const opponent = b.participants.find((p) => p.userId !== me?.id);
               const step = me ? nextStep(b, b.todo, me.id) : null;
               const myScore = b.participants.find((p) => p.userId === me?.id)?.score;
+              // Group battles have placements, not scores: tint by the rating change.
+              const groupOutcome =
+                b.kind === 'group' && b.status === 'decided' && b.ratingChange !== null
+                  ? b.ratingChange >= 0
+                    ? 'won'
+                    : 'lost'
+                  : null;
               const outcome =
                 b.status !== 'decided' || myScore === null || myScore === undefined
-                  ? null
+                  ? groupOutcome
                   : myScore > 0.5
                     ? 'won'
                     : myScore < 0.5
@@ -90,7 +97,10 @@ export function BattlesPage() {
                   </div>
                   <div className="muted">
                     {opponent
-                      ? `${t('battles.vs')} ${opponent.displayName}`
+                      ? `${t('battles.vs')} ${b.participants
+                          .filter((p) => p.userId !== me?.id)
+                          .map((p) => p.displayName)
+                          .join(', ')}`
                       : t('battles.waitingForOpponent')}
                     {b.deadlineAt && b.status === 'active'
                       ? ` · ${t('battles.until', { date: formatShort(b.deadlineAt) })}`

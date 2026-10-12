@@ -20,7 +20,7 @@ Parts that need no answer from the owner come first, so work can go on in the me
 | 2.5 | **Weight 4–5** only in official competitions (part of 2.9) | 2.9 | decided (§3.4) |
 | 2.6 | **Review level 2** (athlete pool, "To review" list) | 2.1 | done (architecture §4h) |
 | 2.7 | **Review level 3** (judges) | 2.6 | done (architecture §4h) |
-| 2.8 | **Group battles** (n people online/on site, pairs weighted 1/(n−1)) | – | decided: on site first (§3.5) |
+| 2.8 | **Group battles** (n people online/on site, pairs weighted 1/(n−1)) | – | done: on site (architecture §4i); online later |
 | 2.9 | **Official competitions** (organizer, results or placements, confirmation) | 2.1, 2.8 | decided (§3.6) |
 | 2.10 | **Filming by friends** (athlete code, inbox) | – | decided (§3.7) |
 | 2.11 | **Combined rankings** (official + free) | – | decided (§3.8) |
@@ -115,6 +115,5 @@ These follow the concept; where it was silent, Claude picked the simplest fair o
 
 ## 4. Order after the decisions
 
-~~2.2 reports → 2.3 annulment → 2.4 initial estimates → 2.6/2.7 review levels 2–3~~ (done) → 2.8 on-site group
-battles → 2.9 competitions (with weight 4–5) → 2.11 combined rankings → 2.10 athlete code →
+~~2.2 reports → 2.3 annulment → 2.4 initial estimates → 2.6/2.7 review levels 2–3~~ (done) → ~~2.8 on-site group battles~~ (done) → 2.9 competitions (with weight 4–5) → 2.11 combined rankings → 2.10 athlete code →
 2.13 push notifications (once the VAPID key exists).

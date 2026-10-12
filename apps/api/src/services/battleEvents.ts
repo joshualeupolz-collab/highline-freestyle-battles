@@ -17,7 +17,9 @@ export type BattleEvent =
   | { type: 'unlocked' }
   | { type: 'voted' }
   | { type: 'deadline_decision'; choice: string }
-  | { type: 'onsite_withdrawn' };
+  | { type: 'onsite_withdrawn' }
+  | { type: 'group_result' | 'group_confirmed' | 'group_rejected' }
+  | { type: 'official_confirmed'; name: string };
 
 /** Statement for one chat entry; put it into the same batch as the change it documents. */
 export function eventStatement(

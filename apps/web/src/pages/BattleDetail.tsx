@@ -21,6 +21,7 @@ import {
 } from '../components/BattleVideos';
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
+import { GroupPending, GroupResultList } from '../components/GroupResult';
 import { ReportButton } from '../components/ReportButton';
 import { ReviewCard, ReviewerCard } from '../components/Review';
 import { RatingText, UserLink } from '../components/UserLink';
@@ -69,7 +70,11 @@ export function BattleDetailPage() {
     ? [
         t('meta.onsite', { date: formatShort(battle.playedAt ?? battle.createdAt) }),
         t('meta.weight', { n: battle.settings.level }),
-        battle.settings.scoring === 'scale' ? t('meta.margin') : t('meta.winLoss'),
+        battle.kind === 'group'
+          ? t('group.chip', { n: battle.participants.length })
+          : battle.settings.scoring === 'scale'
+            ? t('meta.margin')
+            : t('meta.winLoss'),
       ]
     : settingsChips(battle.settings);
 
@@ -121,7 +126,11 @@ export function BattleDetailPage() {
           </p>
         ))}
 
-      <Result battle={battle} name={name} />
+      {battle.kind === 'group' ? (
+        <GroupResultList battle={battle} />
+      ) : (
+        <Result battle={battle} name={name} />
+      )}
       {battle.status === 'cancelled' && (
         <p className="card">
           {battle.cancelReason === 'no_agreement'
@@ -182,7 +191,9 @@ export function BattleDetailPage() {
         </div>
       )}
 
-      {myProposalsOnly && (
+      <GroupPending battle={battle} />
+
+      {myProposalsOnly && battle.kind !== 'group' && (
         <section>
           {battle.proposals.map((p) => (
             <ProposalCard
@@ -204,7 +215,7 @@ export function BattleDetailPage() {
         </section>
       )}
 
-      {onsite && battle.status === 'negotiating' && mine && (
+      {onsite && battle.status === 'negotiating' && mine && battle.kind !== 'group' && (
         <div className="card">
           <p className="hint" style={{ marginTop: 0 }}>
             {t('onsite.pending', { date: formatDate(battle.deadlineAt ?? Date.now()) })}

@@ -32,8 +32,44 @@ export interface DecidedBattle {
   formatId: string;
   level: number;
   rulesetVersion: number;
-  /** Participants in seat order with their score s ∈ [0, 1] (two people, scores add up to 1). */
-  results: { userId: string; score: number }[];
+  /**
+   * Participants in seat order: a single battle gives each a score s ∈ [0, 1] (two people,
+   * scores add up to 1); a group battle gives each a placement (1 = best, ties allowed).
+   */
+  results: BattleResult[];
+}
+
+export type BattleResult = { userId: string } & (
+  | { score: number; placement?: undefined }
+  | { placement: number; score?: undefined }
+);
+
+/** The engine event for a decided battle (rating specification sections 3 and 5.1). */
+export function toRatingEvent(battle: DecidedBattle, eventAt: number): RatingEvent {
+  const base = {
+    id: battle.id,
+    formatId: battle.formatId,
+    timestamp: eventAt,
+    level: battle.level as WeightLevel,
+    rulesetVersion: battle.rulesetVersion,
+  };
+  if (battle.results.length >= 2 && battle.results.every((r) => r.placement !== undefined))
+    return {
+      ...base,
+      scoring: 'placement',
+      participants: battle.results.map((r) => ({ personId: r.userId, placement: r.placement })),
+    };
+  const [first, second] = battle.results;
+  if (!first || !second || battle.results.length !== 2 || first.score === undefined)
+    throw new Error('A single battle needs two people with a score');
+  return {
+    ...base,
+    scoring: 'score',
+    participants: [
+      { personId: first.userId, score: first.score },
+      { personId: second.userId, score: second.score },
+    ],
+  };
 }
 
 export async function ratingStatements(
@@ -100,21 +136,7 @@ export async function ratingStatements(
     ),
   });
 
-  const [first, second] = battle.results;
-  if (!first || !second || battle.results.length !== 2)
-    throw new Error('Only single battles are rated so far');
-  const event: RatingEvent = {
-    id: battle.id,
-    formatId: battle.formatId,
-    timestamp: eventAt,
-    level: battle.level as WeightLevel,
-    rulesetVersion: battle.rulesetVersion,
-    scoring: 'score',
-    participants: [
-      { personId: first.userId, score: first.score },
-      { personId: second.userId, score: second.score },
-    ],
-  };
+  const event = toRatingEvent(battle, eventAt);
 
   let history: ReturnType<RatingEngine['apply']>;
   try {

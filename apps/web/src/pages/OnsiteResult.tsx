@@ -6,6 +6,12 @@ import { api, type UserHit } from '../api';
 import { useMe } from '../auth';
 import { partsText, useFormats } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
+import {
+  type Placed,
+  PlacementEditor,
+  placementProblem,
+  placementsBody,
+} from '../components/GroupResult';
 import { UserPicker } from '../components/UserPicker';
 import { t } from '../i18n';
 
@@ -33,6 +39,18 @@ export function OnsiteResultPage() {
     mutationFn: api.createOnsiteBattle,
     onSuccess: (res) => navigate(`/battles/${res.battle.id}`),
   });
+  // Group battle (3+ people with placements) instead of two people.
+  const [group, setGroup] = useState(false);
+  const [placed, setPlaced] = useState<Placed[]>([]);
+  const createGroup = useMutation({
+    mutationFn: api.createGroupBattle,
+    onSuccess: (res) => navigate(`/battles/${res.battle.id}`),
+  });
+  const people: Placed[] =
+    placed.length > 0 || !me
+      ? placed
+      : [{ user: { id: me.id, username: me.username, displayName: me.displayName }, placement: 1 }];
+  const groupProblem = placementProblem(people);
 
   const other = opponent?.displayName ?? t('onsite.opponent');
   // Seen from me (seat 0): +2 I was clearly better … −2 the opponent was clearly better.
@@ -43,12 +61,24 @@ export function OnsiteResultPage() {
     { value: -2, label: t('review.clearly', { name: other }) },
   ];
   const playedAt = new Date(`${date}T12:00`).getTime();
-  const ready = formatId && opponent && value !== null && !Number.isNaN(playedAt);
+  const ready = group
+    ? !!formatId && !groupProblem && !Number.isNaN(playedAt)
+    : formatId && opponent && value !== null && !Number.isNaN(playedAt);
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        if (group) {
+          if (!ready) return;
+          createGroup.mutate({
+            formatId,
+            playedAt: date === today() ? Date.now() : playedAt,
+            level,
+            placements: placementsBody(people),
+          });
+          return;
+        }
         if (!ready || value === null || !opponent) return;
         create.mutate({
           formatId,
@@ -62,7 +92,17 @@ export function OnsiteResultPage() {
       }}
     >
       <h1>{t('onsite.title')}</h1>
-      <p className="hint">{t('onsite.intro', { days: ONSITE_CONFIRM_DAYS })}</p>
+      <fieldset className="segmented" aria-label={t('onsite.title')}>
+        <button type="button" className={group ? '' : 'on'} onClick={() => setGroup(false)}>
+          {t('group.mode.single')}
+        </button>
+        <button type="button" className={group ? 'on' : ''} onClick={() => setGroup(true)}>
+          {t('group.mode.group')}
+        </button>
+      </fieldset>
+      <p className="hint">
+        {group ? t('group.intro') : t('onsite.intro', { days: ONSITE_CONFIRM_DAYS })}
+      </p>
       <div className="card">
         <label>
           {t('new.format')}
@@ -75,10 +115,18 @@ export function OnsiteResultPage() {
             ))}
           </select>
         </label>
-        <div>
-          <strong>{t('onsite.opponent')}</strong>
-          <UserPicker value={opponent} onChange={setOpponent} excludeId={me?.id} />
-        </div>
+        {group ? (
+          <div>
+            <strong>{t('group.people')}</strong>
+            <PlacementEditor value={people} onChange={setPlaced} canAdd />
+            {groupProblem && <p className="hint">{groupProblem}</p>}
+          </div>
+        ) : (
+          <div>
+            <strong>{t('onsite.opponent')}</strong>
+            <UserPicker value={opponent} onChange={setOpponent} excludeId={me?.id} />
+          </div>
+        )}
         <label>
           {t('onsite.date')}
           <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} />
@@ -93,35 +141,39 @@ export function OnsiteResultPage() {
             ))}
           </select>
         </label>
-        <label>
-          {t('settings.scoring')}
-          <select
-            value={scoring}
-            onChange={(e) => setScoring(e.target.value as 'scale' | 'win_loss')}
-          >
-            <option value="scale">{t('settings.scale')}</option>
-            <option value="win_loss">{t('settings.win_loss')}</option>
-          </select>
-        </label>
-      </div>
-      <div className="card">
-        <strong>{t('onsite.result')}</strong>
-        <div className="vote-options">
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className={o.value === value ? '' : 'secondary'}
-              onClick={() => setValue(o.value)}
+        {!group && (
+          <label>
+            {t('settings.scoring')}
+            <select
+              value={scoring}
+              onChange={(e) => setScoring(e.target.value as 'scale' | 'win_loss')}
             >
-              {o.label}
-            </button>
-          ))}
-        </div>
+              <option value="scale">{t('settings.scale')}</option>
+              <option value="win_loss">{t('settings.win_loss')}</option>
+            </select>
+          </label>
+        )}
       </div>
-      <ErrorText error={create.error} />
-      <button type="submit" disabled={!ready || create.isPending}>
-        {t('onsite.submit', { name: other })}
+      {!group && (
+        <div className="card">
+          <strong>{t('onsite.result')}</strong>
+          <div className="vote-options">
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                className={o.value === value ? '' : 'secondary'}
+                onClick={() => setValue(o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <ErrorText error={group ? createGroup.error : create.error} />
+      <button type="submit" disabled={!ready || create.isPending || createGroup.isPending}>
+        {group ? t('group.submit') : t('onsite.submit', { name: other })}
       </button>
     </form>
   );

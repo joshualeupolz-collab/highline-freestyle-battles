@@ -818,3 +818,18 @@ button.link.report-link {
   font-size: 0.85rem;
   margin-top: 0.5rem;
 }
+
+/* Group battles: placements */
+.placements {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+.placement-list {
+  margin: 0.5rem 0;
+  padding-left: 0;
+  list-style: none;
+}
+.placement-list li {
+  padding: 0.2rem 0;
+}

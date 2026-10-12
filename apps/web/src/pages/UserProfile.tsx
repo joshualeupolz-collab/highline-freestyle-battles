@@ -13,6 +13,7 @@ import { api } from '../api';
 import { hasRole, useMe } from '../auth';
 import { StatusBadge, useFormats } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
+import { ordinal } from '../components/GroupResult';
 import { ReportButton } from '../components/ReportButton';
 import { UserLink } from '../components/UserLink';
 import { formatDate, type MessageKey, t } from '../i18n';
@@ -79,7 +80,12 @@ export function UserProfilePage() {
         <Link key={b.id} to={`/battles/${b.id}`} className="card">
           <div className="row">
             <strong>{b.formatName ?? '…'}</strong>
-            {b.status === 'decided' ? (
+            {b.status === 'decided' && b.placement !== null ? (
+              <span className={b.placement === 1 ? 'success' : 'muted'}>
+                {t('profile.place', { place: ordinal(b.placement) })}
+                {b.ratingChange !== null && ` (${b.ratingChange >= 0 ? '+' : ''}${b.ratingChange})`}
+              </span>
+            ) : b.status === 'decided' ? (
               <span className={b.score === 1 ? 'success' : b.score === 0 ? 'error' : 'muted'}>
                 {b.score === 1
                   ? t('profile.win')

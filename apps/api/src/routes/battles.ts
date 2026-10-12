@@ -81,6 +81,7 @@ export async function loadBattle(db: Database, id: string) {
       seat: battleParticipants.seat,
       extraAttempts: battleParticipants.extraAttempts,
       score: battleParticipants.score,
+      placement: battleParticipants.placement,
       username: users.username,
       displayName: users.displayName,
     })
@@ -452,6 +453,8 @@ battleRoutes.get('/mine', async (c) => {
               inArray(battleProposals.battleId, ids),
               eq(battleProposals.status, 'pending'),
               ne(battleProposals.proposedBy, user.id),
+              // Group results: not the ones I already confirmed.
+              sql`NOT EXISTS (SELECT 1 FROM proposal_responses r WHERE r.proposal_id = ${battleProposals.id} AND r.user_id = ${user.id})`,
             ),
           ),
         db
@@ -486,6 +489,7 @@ battleRoutes.get('/mine', async (c) => {
       },
       id: b.id,
       formatId: b.formatId,
+      kind: b.kind,
       mode: b.mode,
       status: b.status,
       settings: settingsOf(b),
@@ -597,7 +601,7 @@ battleRoutes.post('/:id/proposals', async (c) => {
   if (battle.status !== 'negotiating' && battle.status !== 'active')
     apiError(409, 'battle_not_running');
   // On-site battles only have a result to agree on; online battles get theirs from the review.
-  if ((battle.mode === 'onsite') !== (input.kind === 'result'))
+  if ((battle.mode === 'onsite') !== (input.kind === 'result') || battle.kind === 'group')
     apiError(400, 'unsupported_proposal');
 
   if (input.kind === 'settings') {
@@ -708,6 +712,8 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
   const now = Date.now();
   const { battle, participants } = await loadBattle(db, c.req.param('id'));
   requireParticipant(participants, user.id);
+  // Group results are confirmed by everyone (routes/groups.ts).
+  if (battle.kind === 'group') apiError(400, 'unsupported_proposal');
   const proposal = await db
     .select()
     .from(battleProposals)

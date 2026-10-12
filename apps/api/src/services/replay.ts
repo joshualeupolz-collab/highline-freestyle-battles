@@ -22,7 +22,7 @@ import { ruleSetParamsSchema } from '@hfb/shared';
 
 export const REPLAY_QUERIES = {
   openRequests: 'SELECT id FROM replay_requests WHERE done_at IS NULL',
-  battles: `SELECT b.id, b.format_id, b.level, b.ruleset_version, b.event_at, p.user_id, p.seat, p.score
+  battles: `SELECT b.id, b.format_id, b.level, b.ruleset_version, b.event_at, p.user_id, p.seat, p.score, p.placement
     FROM battles b JOIN battle_participants p ON p.battle_id = b.id
     WHERE b.status = 'decided' AND b.event_at IS NOT NULL
     ORDER BY b.event_at, b.id, p.seat`,
@@ -42,6 +42,7 @@ export interface ReplayRows {
     user_id: string;
     seat: number;
     score: number | null;
+    placement: number | null;
   }[];
   estimates: {
     subject_id: string;
@@ -73,17 +74,31 @@ export function computeReplay(rows: ReplayRows) {
   for (const [id, people] of byBattle) {
     const sorted = [...people].sort((a, b) => a.seat - b.seat);
     const [first] = sorted;
-    // Only single battles with a score are rated so far (same as services/rating.ts).
-    if (!first || sorted.length !== 2 || sorted.some((p) => p.score === null)) continue;
-    events.push({
+    if (!first) continue;
+    const base = {
       id,
       formatId: first.format_id,
       timestamp: first.event_at,
       level: first.level as WeightLevel,
       rulesetVersion: first.ruleset_version,
-      scoring: 'score',
-      participants: sorted.map((p) => ({ personId: p.user_id, score: p.score as number })),
-    });
+    };
+    // Group battles have a placement per person, single battles a score (services/rating.ts).
+    if (sorted.length >= 2 && sorted.every((p) => p.placement !== null)) {
+      events.push({
+        ...base,
+        scoring: 'placement',
+        participants: sorted.map((p) => ({
+          personId: p.user_id,
+          placement: p.placement as number,
+        })),
+      });
+    } else if (sorted.length === 2 && sorted.every((p) => p.score !== null)) {
+      events.push({
+        ...base,
+        scoring: 'score',
+        participants: sorted.map((p) => ({ personId: p.user_id, score: p.score as number })),
+      });
+    }
   }
   const formats: FormatInfo[] = rows.formats.map((f) => ({
     id: f.id,

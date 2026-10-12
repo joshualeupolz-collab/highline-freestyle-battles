@@ -358,6 +358,27 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
 
 ---
 
+## 4i. On-site group battles (stage 2, part 2.8)
+
+- `POST /battles/onsite-group` (`apps/api/src/routes/groups.ts`): format, date, weight 1–3 and
+  everyone's placement (3–20 people including the person entering it; 1 = best, equal places
+  allowed, not all on one place). The battle has `kind = group`, `mode = onsite`,
+  `scoring = placement`, status `negotiating`, seats in the order entered (seat 0 = the person
+  entering it), and expires after `ONSITE_CONFIRM_DAYS` like an on-site single battle.
+- The result is a `result` proposal `{ placements }`; the person entering it has accepted it
+  (`proposal_responses`). Others confirm (`/group-confirm`) or reject (`/group-reject`, the
+  battle stays open); anyone taking part can enter a corrected result (`/group-result`, replaces
+  the pending one). "Did not take place" is `/withdraw-onsite` as for single battles. The generic
+  proposal routes refuse group battles.
+- It counts when every participant confirmed – or when one judge, organizer or federation member
+  who does not take part confirms it for everyone (`/official-confirm`, audited as
+  `battle.official_confirm`; owner, 2026-10-12).
+- Rating: `battle_participants.placement` is stored; `toRatingEvent` (`services/rating.ts`) and
+  the replay build a `placement` event, which the engine splits into all pairs weighted
+  1/(n−1) (rating spec §5.1). It counts as one battle per person.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |
