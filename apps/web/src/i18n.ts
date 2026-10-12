@@ -201,7 +201,7 @@ const en = {
   'battle.takeBackAttempt': 'Ask to take back an extra attempt',
   'battle.proposal.takeBack': 'Wants to take back one extra attempt (given by mistake).',
   'battle.proposal.extraAttempt':
-    'Asks for one extra attempt (e.g. the recording was cut off). Accepting gives them one more attempt.',
+    'Asks for one extra attempt (e.g. the recording was cut off or the phone fell). Accepting gives them one more attempt.',
   'battle.extraAttempts': '+{n} extra attempt(s)',
   'battle.claimWin': 'Count as my win',
   'battle.cancelUnrated': 'Cancel without rating',
@@ -477,6 +477,9 @@ const en = {
   'videos.cutOffHint':
     'This recording was cut off because the app was left or the camera stopped. The attempt is used up.',
   'videos.askExtra': 'Ask {name} for an extra attempt and let them watch this video',
+  'videos.askExtraShort': 'Ask for an extra attempt',
+  'videos.askExtraConfirm':
+    'Send this video to {name} and ask for an extra attempt (e.g. the recording broke off, the lens was dirty, the phone fell)? {name} can watch only this video and grant or refuse.',
   'videos.opponent': 'your opponent',
   'videos.visibility': 'Who may watch this video later',
   'videos.visibility.public': 'Everyone (recommended, helps the community)',
