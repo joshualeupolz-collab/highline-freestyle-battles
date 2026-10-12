@@ -22,7 +22,13 @@ export interface NextStep {
 
 type Basics = Pick<
   BattleSummary,
-  'status' | 'mode' | 'createdBy' | 'invitedUserId' | 'deadlinePassed' | 'participants'
+  | 'status'
+  | 'mode'
+  | 'createdBy'
+  | 'invitedUserId'
+  | 'deadlinePassed'
+  | 'participants'
+  | 'competitionId'
 >;
 
 export function nextStep(battle: Basics, todo: Todo, myId: string): NextStep | null {
@@ -33,6 +39,7 @@ export function nextStep(battle: Basics, todo: Todo, myId: string): NextStep | n
       if (battle.invitedUserId === myId) return step('next.challenged', true);
       return battle.createdBy === myId ? step('next.waitingForOpponent', false) : null;
     case 'negotiating':
+      if (battle.competitionId) return step('next.competition', false);
       if (battle.mode === 'onsite')
         return todo.proposalForMe
           ? step('next.confirmResult', true)

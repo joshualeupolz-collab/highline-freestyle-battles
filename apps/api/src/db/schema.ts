@@ -301,8 +301,14 @@ export const competitions = sqliteTable(
     confirmedBy: text('confirmed_by').references(() => users.id),
     confirmedAt: integer('confirmed_at'),
     createdAt: integer('created_at').notNull(),
+    /** Weight 1–5 of all its battles, set by the organizer beforehand (validated by the app). */
+    level: integer('level').notNull().default(3),
+    description: text('description'),
   },
-  (t) => [oneOf('competitions_status_check', t.status, COMPETITION_STATUSES)],
+  (t) => [
+    oneOf('competitions_status_check', t.status, COMPETITION_STATUSES),
+    index('competitions_starts_idx').on(t.startsAt),
+  ],
 );
 
 // ---------------------------------------------------------------------------------------------

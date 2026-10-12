@@ -4,6 +4,7 @@
  */
 import type {
   BattleSettings,
+  CreateCompetition,
   CreateEstimate,
   CreateGroupBattle,
   CreateOnsiteBattle,
@@ -191,8 +192,10 @@ export interface Proposal {
 export interface Battle {
   id: string;
   formatId: string;
-  /** single = two people; group = 3+ people on site with placements. */
+  /** single = two people; group = 3+ people on site; placement = final placement of a competition. */
   kind: 'single' | 'group' | 'placement';
+  /** Result of an official competition (counts once the competition is confirmed). */
+  competitionId: string | null;
   mode: 'online' | 'onsite';
   status: BattleStatus;
   /** Online: when the videos unlocked; on-site: when the battle took place. */
@@ -401,6 +404,44 @@ export interface OpenReview {
   participants: { userId: string; displayName: string }[];
 }
 
+export type CompetitionStatus = 'planned' | 'running' | 'finished' | 'confirmed' | 'cancelled';
+
+export interface CompetitionSummary {
+  id: string;
+  name: string;
+  location: string | null;
+  startsAt: number | null;
+  level: number;
+  status: CompetitionStatus;
+  organizer: UserHit;
+}
+
+export interface CompetitionDetail {
+  competition: CompetitionSummary & {
+    description: string | null;
+    organizerId: string;
+    confirmedBy: UserHit | null;
+    confirmedAt: number | null;
+  };
+  results: {
+    battleId: string;
+    formatId: string;
+    kind: 'single' | 'placement';
+    scoring: string;
+    status: BattleStatus;
+    cancelReason: string | null;
+    participants: {
+      userId: string;
+      displayName: string;
+      seat: number;
+      score: number | null;
+      placement: number | null;
+    }[];
+  }[];
+  canEdit: boolean;
+  canConfirm: boolean;
+}
+
 export interface PendingUser extends UserHit {
   createdAt: number;
   questionnaire: { freestyleSince?: string; community?: string; note?: string } | null;
@@ -475,6 +516,11 @@ export const api = {
     post<{ id: string; replay: boolean }>('/estimates', body),
   withdrawEstimate: (id: string) => post(`/estimates/${id}/withdraw`),
   openReviews: () => get<{ reviews: OpenReview[] }>('/reviews/open'),
+  competitions: () => get<{ competitions: CompetitionSummary[] }>('/competitions'),
+  competition: (id: string) => get<CompetitionDetail>(`/competitions/${id}`),
+  createCompetition: (body: CreateCompetition) => post<{ id: string }>('/competitions', body),
+  competitionAction: (id: string, action: string, body?: unknown) =>
+    post(`/competitions/${id}/${action}`, body),
   createResetCode: (id: string) =>
     post<{ code: string; expiresAt: number }>(`/users/${id}/password-reset-code`),
 

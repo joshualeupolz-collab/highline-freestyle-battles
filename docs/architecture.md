@@ -379,6 +379,28 @@ routes in `apps/api/src/routes/reviews.ts`. `battles.review_level` (1–3) and
 
 ---
 
+## 4j. Official competitions (stage 2, parts 2.5 and 2.9)
+
+`apps/api/src/routes/competitions.ts`; `competitions.level` and `competitions.description`
+(migration 0013).
+
+- An organizer or the federation creates a competition with name, place, date and a weight
+  1–5 for all its battles (owner, 2026-10-12: levels 1 and 2 too; weight 4–5 exists only here).
+- The organizer enters results while the status is `planned`: single battles (A vs B, 5-point
+  value or win/loss) and final placements per format (one per format; a new one replaces it).
+  Each result is a battle with `competition_id`, `mode = onsite`, the competition's level and
+  its score/placement stored – but `negotiating`, so it does not count. Results can be removed
+  (`cancel_reason = removed`). `submit` → status `finished` (waiting for confirmation),
+  `reopen` → back to `planned`, `cancel` → all results cancelled.
+- A judge or the federation who neither organized it nor took part confirms (`confirm`,
+  audited): every result is decided (`decision_reason = competition`) and rated at the
+  confirmation time, one millisecond apart; `level_approved_by/at` is set (rating spec §4: levels
+  4–5 count from their approval). In a format with single battles its final placement is
+  cancelled (`superseded_by_battles`, spec §5.2).
+- Pages `/competitions` and `/competitions/:id`; battle pages link to their competition.
+
+---
+
 ## 5. Implementation order (stage 1)
 
 | # | Step | Status |

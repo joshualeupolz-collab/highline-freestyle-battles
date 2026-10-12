@@ -49,6 +49,7 @@ export function ProfilePage() {
           </Link>
         )}
         <Link to="/formats/propose">{t('new.proposeFormat')}</Link>
+        <Link to="/competitions">{t('competitions.title')}</Link>
         {hasRole(me, 'federation', 'admin') && <Link to="/admin">{t('nav.admin')}</Link>}
         <Link to="/reports">
           {t('reports.title')}

@@ -25,16 +25,20 @@ export function ordinal(n: number): string {
 
 /**
  * Everyone with a placement (1 = best, equal places allowed). With `canAdd`, people can be
- * added and removed (the first one, oneself, stays).
+ * added and removed – the first one (oneself) stays unless `removeFirst`.
  */
 export function PlacementEditor({
   value,
   onChange,
   canAdd,
+  removeFirst = false,
+  max = GROUP_MAX,
 }: {
   value: Placed[];
   onChange: (value: Placed[]) => void;
   canAdd: boolean;
+  removeFirst?: boolean;
+  max?: number;
 }) {
   const n = value.length;
   const set = (i: number, placement: number) =>
@@ -58,7 +62,7 @@ export function PlacementEditor({
                 </option>
               ))}
             </select>
-            {canAdd && i > 0 && (
+            {canAdd && (i > 0 || removeFirst) && (
               <button
                 type="button"
                 className="secondary"
@@ -70,7 +74,7 @@ export function PlacementEditor({
           </span>
         </div>
       ))}
-      {canAdd && n < GROUP_MAX && (
+      {canAdd && n < max && (
         <UserPicker
           value={null}
           onChange={(u) =>

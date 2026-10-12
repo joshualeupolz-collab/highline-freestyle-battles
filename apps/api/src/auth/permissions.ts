@@ -38,6 +38,12 @@ export const can = {
   /** See and close reports (concept section 11). Not for reports that concern oneself. */
   handleReports: (user: CurrentUser | null) => hasRole(user, 'federation', 'admin'),
 
+  /** Create competitions and enter their results (concept section 2). */
+  organizeCompetitions: (user: CurrentUser | null) => hasRole(user, 'organizer', 'federation'),
+
+  /** Confirm a competition's results (concept section 8). Not one's own competition. */
+  confirmCompetitions: (user: CurrentUser | null) => hasRole(user, 'judge', 'federation'),
+
   /** Read the audit log (concept section 2: the federation can view it). */
   viewAuditLog: (user: CurrentUser | null) => hasRole(user, 'federation', 'admin'),
 

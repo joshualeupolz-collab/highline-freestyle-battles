@@ -60,7 +60,8 @@ export function NewBattlePage() {
     <>
       <h1>{t('new.title')}</h1>
       <p className="muted">
-        <Link to="/onsite">{t('new.onsite')}</Link>
+        <Link to="/onsite">{t('new.onsite')}</Link> ·{' '}
+        <Link to="/competitions">{t('competitions.title')}</Link>
       </p>
       {formats.isLoading && <p className="muted">{t('common.loading')}</p>}
       {tiles(official)}
