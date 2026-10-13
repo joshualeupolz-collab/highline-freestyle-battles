@@ -156,22 +156,44 @@ describe('reserving attempts for offline recording', () => {
     ]);
   });
 
-  it('counts reservations never reported once the battle ended', async () => {
-    const id = await activeBattle();
-    await reserve(anna, id, 2);
-    await post(anna, `/api/battles/${id}/proposals`, { kind: 'cancel' });
-    const proposalId = (await view(ben, id)).proposals[0]?.id;
-    await post(ben, `/api/battles/${id}/proposals/${proposalId}/respond`, { decision: 'accept' });
+  it('counts reservations never reported only up to the extra attempts asked for', async () => {
+    const giveUp = async (id: string) => {
+      await post(anna, `/api/battles/${id}/proposals`, { kind: 'cancel' });
+      const proposalId = (await view(ben, id)).proposals.at(-1)?.id;
+      await post(ben, `/api/battles/${id}/proposals/${proposalId}/respond`, { decision: 'accept' });
+    };
+    const askExtra = async (id: string, decision: 'accept' | 'reject') => {
+      const res = await post(anna, `/api/battles/${id}/proposals`, {
+        kind: 'extra_attempt',
+        change: 1,
+      });
+      const proposalId = res.body.battle.proposals.at(-1)?.id;
+      await post(ben, `/api/battles/${id}/proposals/${proposalId}/respond`, { decision });
+    };
 
-    const next = await activeBattle();
-    const seen = await view(ben, next);
-    expect(seen.participants.find((p) => p.userId === anna.user.id)?.lostReservations).toBe(1);
+    // Lost device, but no extra attempt asked for: accepted the loss, not counted.
+    const quiet = await activeBattle();
+    await reserve(anna, quiet, 3);
+    await giveUp(quiet);
+    const lostOf = async (id: string) =>
+      (await view(ben, id)).participants.find((p) => p.userId === anna.user.id)?.lostReservations;
+    expect(await lostOf(await activeBattle())).toBe(0);
+
+    // 3 reserved, 1 recorded under it and registered, 2 never reported; 2 extra attempts asked.
+    const id = await activeBattle();
+    const r = (await reserve(anna, id, 3)).body.battle.videos.reservations[0] as Reservation;
+    await record(anna, id, Date.now(), { deviceCode: PHONE, reservationId: r.id });
+    await askExtra(id, 'reject');
+    await askExtra(id, 'accept');
+    await giveUp(id);
+    expect(await lostOf(await activeBattle())).toBe(2);
+
     // On the profile only for the federation and admins.
     const profile = (who: Person) =>
       json<{ user: { lostReservations: number | null } }>(
         call(`/api/users/${anna.user.id}`, { session: who.session }),
       );
-    expect((await profile(admin)).body.user.lostReservations).toBe(1);
+    expect((await profile(admin)).body.user.lostReservations).toBe(2);
     expect((await profile(ben)).body.user.lostReservations).toBeNull();
   });
 

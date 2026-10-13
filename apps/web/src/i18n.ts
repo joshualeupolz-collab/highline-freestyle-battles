@@ -484,7 +484,7 @@ const en = {
   'offline.handBack': 'Hand back unused',
   'offline.opponentReserved': 'Offline: {text}',
   'offline.lost':
-    'Reservations never reported back in earlier battles (lost device or deleted app): {n}',
+    'In earlier battles: {n} reserved attempt(s) never reported back (lost device or deleted app) while asking for extra attempts',
   'offline.prepareFilm': 'Prepare for offline filming',
   'offline.filmTitle': 'Prepared for offline filming',
   'offline.filmHint':
