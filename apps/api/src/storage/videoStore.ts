@@ -11,9 +11,13 @@
  *   bytes go through `/api/videos/:id/upload` and `/api/videos/:id/file` into the R2 binding.
  *   Workers Free accepts request bodies up to 100 MB, hence MAX_VIDEO_BYTES.
  *
+ * Big videos are sent in parts (R2 multipart upload). The Worker opens, completes and aborts the
+ * upload through the R2 binding (an upload opened there can be continued through the S3 API); the
+ * parts themselves go to signed URLs or through the Worker, like a single upload.
+ *
  * Later backends (Telegram archive, hard drive) implement the same interface.
  */
-import type { UploadTarget } from '@hfb/shared';
+import type { UploadedPart, UploadTarget } from '@hfb/shared';
 import { AwsClient } from 'aws4fetch';
 import type { Env } from '../env';
 
@@ -21,6 +25,19 @@ export interface VideoStore {
   readonly backend: 'r2';
   /** Where the phone sends the bytes of `key`. */
   uploadTarget(key: string, contentType: string, videoId: string): Promise<UploadTarget>;
+  /** Opens an upload in parts; returns its upload id. */
+  createMultipart(key: string, contentType: string): Promise<string>;
+  /** Where the phone sends part `partNumber` (1-based) of the upload in parts. */
+  partTarget(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    videoId: string,
+  ): Promise<UploadTarget>;
+  /** Puts the parts together into the file `key`. Throws if a part is missing or wrong. */
+  completeMultipart(key: string, uploadId: string, parts: UploadedPart[]): Promise<void>;
+  /** Drops an unfinished upload in parts and its parts (unknown ids are ignored). */
+  abortMultipart(key: string, uploadId: string): Promise<void>;
   /** Size of a stored file in bytes, or null if it does not exist. */
   size(key: string): Promise<number | null>;
   /** Answer to a request for the file: a redirect to a signed URL, or the bytes themselves. */
@@ -43,6 +60,24 @@ export function videoStore(env: Env): VideoStore {
     async delete(keys: string | string[]) {
       await bucket.delete(keys);
     },
+    async createMultipart(key: string, contentType: string) {
+      return (await bucket.createMultipartUpload(key, { httpMetadata: { contentType } })).uploadId;
+    },
+    async completeMultipart(key: string, uploadId: string, parts: UploadedPart[]) {
+      await bucket.resumeMultipartUpload(key, uploadId).complete(
+        [...parts]
+          .sort((a, b) => a.partNumber - b.partNumber)
+          // The S3 API sends the ETag in quotes, the binding wants it without.
+          .map((p) => ({ partNumber: p.partNumber, etag: p.etag.replace(/^(W\/)?"|"$/g, '') })),
+      );
+    },
+    async abortMultipart(key: string, uploadId: string) {
+      try {
+        await bucket.resumeMultipartUpload(key, uploadId).abort();
+      } catch {
+        // Already completed, aborted, or expired.
+      }
+    },
   };
 
   if (env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ACCOUNT_ID) {
@@ -53,8 +88,14 @@ export function videoStore(env: Env): VideoStore {
       region: 'auto',
     });
     const endpoint = `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${env.R2_BUCKET_NAME}`;
-    const presign = async (method: 'GET' | 'PUT', key: string, seconds: number) => {
+    const presign = async (
+      method: 'GET' | 'PUT',
+      key: string,
+      seconds: number,
+      query: Record<string, string> = {},
+    ) => {
       const url = new URL(`${endpoint}/${key}`);
+      for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
       url.searchParams.set('X-Amz-Expires', String(seconds));
       const signed = await client.sign(new Request(url, { method }), { aws: { signQuery: true } });
       return signed.url;
@@ -66,6 +107,14 @@ export function videoStore(env: Env): VideoStore {
           url: await presign('PUT', key, UPLOAD_URL_SECONDS),
           method: 'PUT',
           headers: { 'Content-Type': contentType },
+        };
+      },
+      async partTarget(key, uploadId, partNumber) {
+        const query = { partNumber: String(partNumber), uploadId };
+        return {
+          url: await presign('PUT', key, UPLOAD_URL_SECONDS, query),
+          method: 'PUT',
+          headers: {},
         };
       },
       async serve(key) {
@@ -88,6 +137,14 @@ export function videoStore(env: Env): VideoStore {
         url: `/api/videos/${videoId}/upload`,
         method: 'PUT',
         headers: { 'Content-Type': contentType },
+      };
+    },
+    async partTarget(_key, uploadId, partNumber, videoId) {
+      return {
+        url: `/api/videos/${videoId}/parts/${partNumber}`,
+        method: 'PUT',
+        // Name as UPLOAD_ID_HEADER in routes/videos.ts.
+        headers: { 'X-Upload-Id': uploadId },
       };
     },
     async serve(key, request) {

@@ -13,7 +13,11 @@ import {
   athleteCodeKey,
   attemptsLeft,
   type CreateVideo,
+  type MultipartUpload,
   slotKey,
+  UPLOAD_PART_BYTES,
+  type UploadTarget,
+  uploadPartCount,
 } from '@hfb/shared';
 import { and, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import type { Database } from '../db/client';
@@ -208,8 +212,10 @@ export async function checkAttemptAllowed(
 }
 
 /**
- * Announces the upload of an attempt's video and returns where to send the bytes. Repeating it
- * (e.g. after a failed upload) is fine. Used by the athlete and by friends with the code.
+ * Announces the upload of an attempt's video and returns where to send the bytes: one target, or
+ * an upload in parts for big videos. Repeating it (e.g. after a failed upload) is fine; an upload
+ * in parts of the same file continues with the same upload id, so parts already sent are kept.
+ * Used by the athlete and by friends with the code.
  */
 export async function announceVideo(
   db: Database,
@@ -217,7 +223,12 @@ export async function announceVideo(
   attempt: AttemptRow,
   input: CreateVideo,
   now: number,
-) {
+): Promise<{
+  videoId: string;
+  upload: UploadTarget;
+  multipart: MultipartUpload | null;
+  created: boolean;
+}> {
   if (attempt.battleId) {
     const battle = await db
       .select({ status: battles.status })
@@ -236,12 +247,33 @@ export async function announceVideo(
     trimEndMs: input.trimEndMs,
     endReason: input.endReason,
   };
+  const partCount = uploadPartCount(input.sizeBytes);
   const existing = await db.select().from(videos).where(eq(videos.attemptId, attempt.id)).get();
-  let videoId: string;
+  const videoId = existing?.id ?? newId(now);
+  const key = originalKey(videoId, input.contentType);
+
+  let uploadId: string | null = null;
   if (existing) {
     if (existing.status !== 'pending_upload') apiError(409, 'already_uploaded');
-    videoId = existing.id;
-    const key = originalKey(videoId, input.contentType);
+    const file = await db
+      .select()
+      .from(videoFiles)
+      .where(and(eq(videoFiles.videoId, videoId), eq(videoFiles.kind, 'original')))
+      .get();
+    if (file?.uploadId) {
+      const same =
+        file.deletedAt === null &&
+        file.locator === key &&
+        file.sizeBytes === input.sizeBytes &&
+        partCount > 1;
+      if (same) uploadId = file.uploadId;
+      else await store.abortMultipart(file.locator, file.uploadId);
+    }
+  }
+  if (partCount > 1 && uploadId === null)
+    uploadId = await store.createMultipart(key, input.contentType);
+
+  if (existing) {
     await db.batch([
       db.update(videos).set(fields).where(eq(videos.id, videoId)),
       db
@@ -250,13 +282,13 @@ export async function announceVideo(
           locator: key,
           sizeBytes: input.sizeBytes,
           contentType: input.contentType,
+          uploadId,
           createdAt: now,
           deletedAt: null,
         })
         .where(and(eq(videoFiles.videoId, videoId), eq(videoFiles.kind, 'original'))),
     ]);
   } else {
-    videoId = newId(now);
     await db.batch([
       db.insert(videos).values({
         id: videoId,
@@ -273,17 +305,17 @@ export async function announceVideo(
         videoId,
         kind: 'original',
         backend: store.backend,
-        locator: originalKey(videoId, input.contentType),
+        locator: key,
         sizeBytes: input.sizeBytes,
         contentType: input.contentType,
+        uploadId,
         createdAt: now,
       }),
     ]);
   }
-  const upload = await store.uploadTarget(
-    originalKey(videoId, input.contentType),
-    input.contentType,
-    videoId,
-  );
-  return { videoId, upload, created: !existing };
+  // The single target stays in the answer for app versions from before uploads in parts.
+  const upload = await store.uploadTarget(key, input.contentType, videoId);
+  const multipart =
+    uploadId === null ? null : { uploadId, partBytes: UPLOAD_PART_BYTES, partCount };
+  return { videoId, upload, multipart, created: !existing };
 }

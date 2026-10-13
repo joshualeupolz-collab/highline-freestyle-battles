@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { newId } from '@hfb/shared';
+import { newId, UPLOAD_PART_BYTES } from '@hfb/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { call, registerAdmin, registerAthlete } from './helpers';
@@ -189,6 +189,68 @@ describe('filming by friends, online', () => {
       startedAt: Date.now(),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('filming by friends, upload in parts', () => {
+  it('sends a big video in parts with the code', async () => {
+    const id = await activeBattle();
+    const code = await codeOf(anna);
+    const attemptId = newId();
+    await guest('/api/guest/attempts', {
+      code,
+      id: attemptId,
+      battleId: id,
+      partIndex: 0,
+      startedAt: Date.now(),
+    });
+    const size = UPLOAD_PART_BYTES + 3;
+    const created = await guest<{
+      video: { id: string };
+      multipart: { uploadId: string; partCount: number };
+    }>('/api/guest/videos', { code, attemptId, contentType: 'video/mp4', sizeBytes: size });
+    const { uploadId, partCount } = created.body.multipart;
+    expect(partCount).toBe(2);
+    const videoId = created.body.video.id;
+    const targets = await guest<{
+      parts: {
+        partNumber: number;
+        size: number;
+        target: { url: string; headers: Record<string, string> };
+      }[];
+    }>(`/api/guest/videos/${videoId}/parts`, { code, uploadId, partNumbers: [1, 2] });
+    const parts = [];
+    for (const p of targets.body.parts) {
+      expect(p.target.url).toBe(`/api/guest/videos/${videoId}/parts/${p.partNumber}`);
+      const res = await app.request(
+        p.target.url,
+        {
+          method: 'PUT',
+          headers: {
+            ...p.target.headers,
+            'Content-Length': String(p.size),
+            Origin: 'http://localhost',
+          },
+          body: new Uint8Array(p.size),
+        },
+        env,
+      );
+      expect(res.status).toBe(200);
+      parts.push({ partNumber: p.partNumber, etag: res.headers.get('ETag') as string });
+    }
+    // Another code cannot finish it.
+    const foreign = await guest(`/api/guest/videos/${videoId}/complete`, {
+      code: await codeOf(ben),
+      uploadId,
+      parts,
+    });
+    expect(foreign.status).toBe(404);
+    const done = await guest<{ video: { status: string } }>(
+      `/api/guest/videos/${videoId}/complete`,
+      { code, uploadId, parts },
+    );
+    expect(done.body.video.status).toBe('uploaded');
+    expect((await env.VIDEOS.head(`videos/${videoId}/original.mp4`))?.size).toBe(size);
   });
 });
 

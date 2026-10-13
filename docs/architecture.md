@@ -188,6 +188,7 @@ open ──accept──▶ active ─────────────▶ rev
 ```
 Start pressed ──▶ attempt (id from the phone, IndexedDB) ──▶ POST /battles/:id/attempts (valid / provisional)
 Stop ──▶ cut + visibility ──▶ upload queue: POST /videos ─▶ PUT bytes ─▶ POST /videos/:id/complete
+                                         (big videos: POST /videos/:id/parts ─▶ PUT each missing part)
 Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶ everyone chose ─▶ reviewing
 ```
 
@@ -228,6 +229,21 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
   Worker (`PUT /videos/:id/upload`, `GET /videos/:id/file` with byte ranges), limited to 95 MB.
   `POST /videos/:id/complete` checks that the stored size matches. The hourly job removes files
   of uploads never completed after 2 days.
+- **Upload in parts (session 8):** videos larger than one part (`UPLOAD_PART_BYTES` = 6 MiB,
+  `@hfb/shared`) are sent as an R2 multipart upload, so a weak connection only repeats the part
+  that broke off. `POST /videos` opens the upload through the R2 binding and answers with
+  `multipart: { uploadId, partBytes, partCount }` (the single target stays in the answer for app
+  versions from before); the upload id is stored in `video_files.upload_id` (migration 0020).
+  The phone asks for targets of the missing parts (`POST /videos/:id/parts`: signed S3 URLs with
+  `partNumber` + `uploadId`, or `PUT /videos/:id/parts/:n` through the Worker with the upload id
+  in `X-Upload-Id`, size checked), keeps every part's ETag in IndexedDB
+  (`upload.multipart` of the recording) and finishes with `POST /videos/:id/complete`
+  `{ uploadId, parts }`. Announcing the same file again keeps the upload id, so after a break
+  only the missing parts are sent (the cut is deterministic: the same bytes). A different file
+  size, a part R2 does not know (`upload_restarted`) or the hourly job (aborts uploads older
+  than 2 days, and the open upload of a deleted video) start it over. Friends use the same under
+  `/guest/videos/...` with the code. R2 needs parts of at least 5 MiB and of equal size except
+  the last; the CORS rules expose `ETag`.
 - **Choosing and unlocking:** the athlete picks one uploaded attempt per part; the choice can be
   changed until everyone has chosen. Then the battle moves to `reviewing` and the chosen videos
   unlock. Who may watch what is decided in one place, `canViewVideo` (`auth/permissions.ts`):

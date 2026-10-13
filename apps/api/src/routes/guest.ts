@@ -13,10 +13,13 @@ import {
   createVideoSchema,
   guestAttemptSchema,
   guestCodeSchema,
+  guestCompleteVideoSchema,
   guestLookupSchema,
   guestReportSchema,
   guestReserveSchema,
+  guestUploadPartsSchema,
   guestVideoSchema,
+  type UploadTarget,
 } from '@hfb/shared';
 import { eq } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
@@ -41,7 +44,7 @@ import {
   runningBattles,
 } from '../services/friendVideos';
 import { uploadsThroughWorker } from '../storage/videoStore';
-import { completeUpload, originalOf, storeUploadBody } from './videos';
+import { completeUpload, originalOf, partTargets, storePartBody, storeUploadBody } from './videos';
 
 /** Header that carries the code on uploads through the Worker (PUT has a video as body). */
 const CODE_HEADER = 'X-Athlete-Code';
@@ -190,20 +193,32 @@ guestRoutes.post('/videos', async (c) => {
   const input = await parseJson(c, guestVideoSchema);
   const db = getDb(c.env.DB);
   const attempt = await codeAttempt(db, input.attemptId, input.code);
-  const { videoId, upload, created } = await announceVideo(
+  const { videoId, upload, multipart, created } = await announceVideo(
     db,
     c.env,
     attempt,
     createVideoSchema.parse(input),
     Date.now(),
   );
-  // Uploads through the Worker go to the guest route, with the code in a header.
-  if (upload.url.startsWith('/api/videos/')) {
-    upload.url = upload.url.replace('/api/videos/', '/api/guest/videos/');
-    upload.headers[CODE_HEADER] = input.code;
-  }
-  return c.json({ video: { id: videoId, status: 'pending_upload' }, upload }, created ? 201 : 200);
+  return c.json(
+    {
+      video: { id: videoId, status: 'pending_upload' },
+      upload: guestTarget(upload, input.code),
+      multipart,
+    },
+    created ? 201 : 200,
+  );
 });
+
+/** Uploads through the Worker go to the guest route, with the code in a header. */
+function guestTarget(target: UploadTarget, code: string): UploadTarget {
+  if (!target.url.startsWith('/api/videos/')) return target;
+  return {
+    ...target,
+    url: target.url.replace('/api/videos/', '/api/guest/videos/'),
+    headers: { ...target.headers, [CODE_HEADER]: code },
+  };
+}
 
 async function codeVideo(c: Context<AppEnv>, code: string) {
   const db = getDb(c.env.DB);
@@ -224,10 +239,23 @@ guestRoutes.put('/videos/:id/upload', async (c) => {
   return c.json({ ok: true });
 });
 
+guestRoutes.post('/videos/:id/parts', async (c) => {
+  const { code, ...input } = await parseJson(c, guestUploadPartsSchema);
+  const { video, file } = await codeVideo(c, code);
+  const parts = await partTargets(c.env, video, file, input);
+  return c.json({ parts: parts.map((p) => ({ ...p, target: guestTarget(p.target, code) })) });
+});
+
+guestRoutes.put('/videos/:id/parts/:n', async (c) => {
+  if (!uploadsThroughWorker(c.env)) apiError(404, 'not_found');
+  const { video, file } = await codeVideo(c, athleteCodeKey(c.req.header(CODE_HEADER) ?? ''));
+  return c.json(await storePartBody(c, video, file));
+});
+
 guestRoutes.post('/videos/:id/complete', async (c) => {
-  const { code } = await parseJson(c, guestCodeSchema);
+  const { code, ...input } = await parseJson(c, guestCompleteVideoSchema);
   const { db, video, file } = await codeVideo(c, code);
-  return c.json({ video: await completeUpload(db, c.env, video, file) });
+  return c.json({ video: await completeUpload(db, c.env, video, file, input) });
 });
 
 /** Mounted at /api/athlete-code: my own code, to give to friends who film me. */

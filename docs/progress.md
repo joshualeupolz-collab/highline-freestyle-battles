@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-13 (end of the seventh session: the three recording features – sharing any attempt with an extra-attempt request, provisional attempts, offline reservations – and the 7-day grace period).
+Last updated: 2026-10-13 (eighth session: upload in parts – big videos survive a weak connection and continue where they stopped).
 
 ---
 
@@ -25,16 +25,16 @@ number), #27 (athlete code), #28 (feedback round), #29 (friends' videos public) 
 recording rules for the next session were decided and written down (docs-only PR).
 Session 7 = branch `claude/hopeful-fermat-3qyweu` (worked alone while the owner slept): PRs #31
 (share any attempt), #32 (provisional attempts) and the offline-reservations PR. **The owner allows Claude to merge its
-own PRs once CI is green** (session 6); if the session's safety check blocks it, Claude says
+own PRs once CI is green** (session 6); session 8 = branch `claude/stoic-hopper-n54975` (upload in parts); if the session's safety check blocks it, Claude says
 so and the owner merges. A new session starts a fresh branch from `main`.
 
-**Tests:** 22 video cutting tests (`apps/web/test`), 169 API tests, 44 rating tests
+**Tests:** 22 video cutting tests (`apps/web/test`), 175 API tests, 44 rating tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
 which play for the opponent; both vote and the ratings change. These flows are now committed as
 browser tests (`e2e/`, `pnpm e2e`, CI job `e2e`; video battle, on-site result, sign-up + approval,
-reports, initial estimates, handing a dispute to the pool, on-site group battle, competition, combined ranking).
+reports, initial estimates, handing a dispute to the pool, on-site group battle, competition, combined ranking, upload in parts).
 Steps 8 and 9 were also tested by the owner on Android phones with direct R2 uploads: work.
 Step 11 was checked the same way in Chromium (enter, confirm, rating change).
 
@@ -137,6 +137,23 @@ the new camera, a failed start leaves nothing, and recordings under 3 seconds do
 (owner's rule) and are deleted. Decided and built the same day (owner): without a reservation, Start waits for the server's
 confirmation (8 s timeout) before recording begins.
 
+### Session 8 (branch `claude/stoic-hopper-n54975`)
+
+**Upload in parts** (next step 1 of session 7, plan as written there): videos over 6 MiB go up as
+an R2 multipart upload in parts of 6 MiB (a 50 MB HD video = 8 parts). The phone notes every
+part sent in IndexedDB; after a break (connection lost, app closed) the next run only sends the
+missing parts. The battle page shows "Waiting for a connection to upload the rest (x % sent)".
+Smaller videos stay a single PUT. The hourly job aborts unfinished uploads after 2 days.
+Works for friends filming with the code too. Migration 0020 (`video_files.upload_id`).
+Details: `docs/architecture.md` §4b. Tests: 6 new API tests, browser test
+`e2e/tests/upload-in-parts.spec.ts` (a part breaks off, only that one is sent again).
+Not checked against real R2 yet (tests use the local R2 binding): the upload is opened and
+completed through the R2 binding and the parts go to signed S3 URLs – Cloudflare documents
+that both APIs work on the same multipart upload.
+**Owner to test on a phone:** record a long HD attempt (≥ 15 s), start the upload, switch to
+flight mode in the middle → "… the rest (x % sent)" → back online → the upload continues and
+ends with "Uploaded"; the video plays.
+
 ### Not started yet
 
 All stage 1 features exist. iPhone tests of step 7 passed on two iPhones (Safari and Brave: H.264 MP4,
@@ -206,6 +223,7 @@ profile button for members waiting for approval, confirmation before approving.
 | Session 7 (owner): 7 days after the deadline to upload and choose; the delivering side waits while the other side may still deliver | Days without a connection must not cost the battle |
 | Session 7 (owner, 2026-10-13): unreported reservations count only up to the extra attempts asked for in that battle | Accepting a lost device without asking for more is not suspicious |
 | Session 7 (Claude, confirmed by the owner): reservations per part, kept until handed back or the deadline, "never reported" = open when the battle stopped running | Flaky connections at the line must not release reserved attempts |
+| Session 8 (Claude, by the plan of session 7): upload in parts of 6 MiB for videos over 6 MiB; opened, completed and aborted through the R2 binding, parts to signed URLs; announcing the same file again continues the upload | R2 needs ≥ 5 MiB, equal-sized parts; one Worker request per run for the targets instead of one per part |
 | Session 6 (owner): offline recording only with actively reserved attempts (device code, take-over, provisional attempts, never-reported reservations counted per athlete); any uploaded attempt can be shared with an extra-attempt request; recording beyond the limit is provisional | A web app cannot report anything when it is deleted; reserving while online makes hiding a bad attempt pointless |
 
 ---
@@ -241,16 +259,7 @@ profile button for members waiting for approval, confirmation before approving.
 Stage 1 and stage 2 are complete except 2.12 (over-rating warning, needs data) and online group
 battles (later). The owner's decisions of 2026-10-13 on what comes next:
 
-1. **Multipart upload (next session, recommended first).** Big HD uploads should survive a weak
-   connection: send the video in parts, show the progress, continue with the missing parts later.
-   Plan: R2 multipart upload (S3 API: create, upload part, complete). Parts must be at least
-   5 MiB (except the last), so not one part per second of video but ~5–8 MB parts; for a 50 MB
-   HD video about 7–10 parts. The phone keeps the upload id and the finished parts in IndexedDB
-   and resumes after a break; the Worker signs each part (direct to R2), or receives the parts
-   itself when there is no R2 access key (R2 binding `createMultipartUpload`). The cut before the
-   upload is deterministic, so a resumed upload sends the same bytes. Small videos stay a single
-   PUT. Unfinished multipart uploads are aborted by the hourly job after 2 days. Estimate: one
-   session.
+1. ~~Multipart upload~~ – done in session 8; owner to test on a phone (see above).
 2. **Video analysis as a separate project** (cut points at the bottom of each bounce, auto-cut,
    body pose): brief in [`docs/video-analysis-project.md`](video-analysis-project.md). The owner
    creates a new repository, copies the brief as its `CLAUDE.md` and starts a new session there

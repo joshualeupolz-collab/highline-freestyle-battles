@@ -1,5 +1,11 @@
 import { env } from 'cloudflare:workers';
-import { attemptsLeft, newId, type SettleAttempt, settleAttempts } from '@hfb/shared';
+import {
+  attemptsLeft,
+  newId,
+  type SettleAttempt,
+  settleAttempts,
+  UPLOAD_PART_BYTES,
+} from '@hfb/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { canViewVideo } from '../src/auth/permissions';
@@ -428,6 +434,185 @@ describe('extra attempt request with a video', () => {
       accepted.body.battle.participants.find((p) => p.userId === anna.user.id)?.extraAttempts,
     ).toBe(1);
     expect((await attempt(anna, id)).status).toBe(201);
+  });
+});
+
+describe('upload in parts', () => {
+  const size = UPLOAD_PART_BYTES + 5;
+  const bytes = new Uint8Array(size).map((_, i) => i % 251);
+
+  interface Announced {
+    video: { id: string };
+    multipart: { uploadId: string; partBytes: number; partCount: number } | null;
+    error?: string;
+  }
+  interface Targets {
+    parts: {
+      partNumber: number;
+      size: number;
+      target: { url: string; headers: Record<string, string> };
+    }[];
+    error?: string;
+  }
+
+  async function announce(attemptId: string, sizeBytes = size) {
+    const res = await post<Announced>(anna, '/api/videos', {
+      attemptId,
+      contentType: 'video/mp4',
+      sizeBytes,
+    });
+    expect(res.status, res.body.error).toBeLessThan(300);
+    return res.body;
+  }
+
+  async function sendPart(
+    target: Targets['parts'][number]['target'],
+    body: Uint8Array,
+  ): Promise<Response> {
+    return app.request(
+      target.url,
+      {
+        method: 'PUT',
+        headers: {
+          ...target.headers,
+          'Content-Length': String(body.length),
+          Cookie: `hfb_session=${anna.session}`,
+          Origin: 'http://localhost',
+        },
+        body,
+      },
+      env,
+    );
+  }
+
+  async function newAttempt() {
+    const id = await activeBattle();
+    const res = await attempt(anna, id);
+    return { battleId: id, attemptId: res.body.battle.videos.mine[0]?.id as string };
+  }
+
+  it('sends big videos in parts and continues where it stopped', async () => {
+    const { attemptId } = await newAttempt();
+    const first = await announce(attemptId);
+    expect(first.multipart).toEqual({
+      uploadId: expect.any(String),
+      partBytes: UPLOAD_PART_BYTES,
+      partCount: 2,
+    });
+    const uploadId = first.multipart?.uploadId as string;
+    const videoId = first.video.id;
+    const targets = await post<Targets>(anna, `/api/videos/${videoId}/parts`, {
+      uploadId,
+      partNumbers: [2, 1],
+    });
+    expect(targets.body.parts.map((p) => [p.partNumber, p.size])).toEqual([
+      [1, UPLOAD_PART_BYTES],
+      [2, 5],
+    ]);
+    const [one, two] = targets.body.parts;
+    if (!one || !two) throw new Error('missing targets');
+    expect(one.target.url).toBe(`/api/videos/${videoId}/parts/1`);
+
+    // A part of the wrong size is refused.
+    const wrong = await sendPart(two.target, new Uint8Array(4));
+    expect(wrong.status).toBe(400);
+    const sent1 = await sendPart(one.target, bytes.subarray(0, UPLOAD_PART_BYTES));
+    expect(sent1.status).toBe(200);
+    const etag1 = sent1.headers.get('ETag') as string;
+    expect(etag1).toMatch(/^".+"$/);
+
+    // Connection lost; announcing the same file again keeps the upload and its parts.
+    const again = await announce(attemptId);
+    expect(again.multipart?.uploadId).toBe(uploadId);
+    const missing = await post<Targets>(anna, `/api/videos/${videoId}/parts`, {
+      uploadId,
+      partNumbers: [2],
+    });
+    const sent2 = await sendPart(
+      missing.body.parts[0]?.target as Targets['parts'][number]['target'],
+      bytes.subarray(UPLOAD_PART_BYTES),
+    );
+    const etag2 = ((await sent2.json()) as { etag: string }).etag;
+
+    const complete = `/api/videos/${videoId}/complete`;
+    const incomplete = await post(anna, complete, {
+      uploadId,
+      parts: [{ partNumber: 1, etag: etag1 }],
+    });
+    expect(incomplete.body.error).toBe('upload_parts_missing');
+    const done = await post<{ video: { status: string } }>(anna, complete, {
+      uploadId,
+      parts: [
+        { partNumber: 2, etag: etag2 },
+        { partNumber: 1, etag: etag1 },
+      ],
+    });
+    expect(done.body.video.status).toBe('uploaded');
+    const stored = await env.VIDEOS.get(`videos/${videoId}/original.mp4`);
+    const back = new Uint8Array(await (stored as R2ObjectBody).arrayBuffer());
+    // Comparing 6 MB with toEqual takes too long; the length and the bytes at the seam do.
+    expect(back.length).toBe(size);
+    expect([...back.subarray(UPLOAD_PART_BYTES - 3, UPLOAD_PART_BYTES + 3)]).toEqual([
+      ...bytes.subarray(UPLOAD_PART_BYTES - 3, UPLOAD_PART_BYTES + 3),
+    ]);
+    expect(stored?.httpMetadata?.contentType).toBe('video/mp4');
+  });
+
+  it('starts over when the file changed or a part is unknown', async () => {
+    const { attemptId } = await newAttempt();
+    const first = await announce(attemptId);
+    const changed = await announce(attemptId, size + 1);
+    expect(changed.multipart?.uploadId).not.toBe(first.multipart?.uploadId);
+    // The old upload id is no longer valid.
+    const old = await post(anna, `/api/videos/${first.video.id}/parts`, {
+      uploadId: first.multipart?.uploadId,
+      partNumbers: [1],
+    });
+    expect(old.body.error).toBe('upload_restarted');
+    // ETags R2 does not know: the upload is dropped and must be announced again.
+    const bad = await post(anna, `/api/videos/${first.video.id}/complete`, {
+      uploadId: changed.multipart?.uploadId,
+      parts: [
+        { partNumber: 1, etag: 'nope' },
+        { partNumber: 2, etag: 'nope' },
+      ],
+    });
+    expect(bad.body.error).toBe('upload_restarted');
+    const renewed = await announce(attemptId, size + 1);
+    expect(renewed.multipart?.uploadId).toBeTruthy();
+    expect(renewed.multipart?.uploadId).not.toBe(changed.multipart?.uploadId);
+  });
+
+  it('keeps small videos a single upload', async () => {
+    const { attemptId } = await newAttempt();
+    expect((await announce(attemptId, UPLOAD_PART_BYTES)).multipart).toBeNull();
+  });
+
+  it('signs direct part URLs when an access key is configured', async () => {
+    const store = videoStore({
+      ...env,
+      R2_ACCESS_KEY_ID: 'key-id',
+      R2_SECRET_ACCESS_KEY: 'secret',
+      R2_ACCOUNT_ID: 'account',
+    });
+    const target = await store.partTarget('videos/x/original.mp4', 'abc', 3, 'x');
+    const url = new URL(target.url);
+    expect(url.pathname).toBe('/hfb-videos/videos/x/original.mp4');
+    expect(url.searchParams.get('partNumber')).toBe('3');
+    expect(url.searchParams.get('uploadId')).toBe('abc');
+    expect(url.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('aborts unfinished uploads in parts after two days', async () => {
+    const { attemptId } = await newAttempt();
+    const first = await announce(attemptId);
+    const db = getDb(env.DB);
+    expect(await removeStaleUploads(db, videoStore(env), Date.now() + STALE_UPLOAD_MS + 1)).toBe(1);
+    const parts = await post(anna, `/api/videos/${first.video.id}/parts`, {
+      uploadId: first.multipart?.uploadId,
+      partNumbers: [1],
+    });
+    expect(parts.body.error).toBe('upload_restarted');
   });
 });
 
