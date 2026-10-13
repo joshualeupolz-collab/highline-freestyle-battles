@@ -33,6 +33,7 @@ import {
 } from '../battles/rules';
 import { type Database, getDb, runBatch } from '../db/client';
 import {
+  attempts,
   battleMessages,
   battleParticipants,
   battleProposals,
@@ -665,6 +666,13 @@ battleRoutes.post('/:id/proposals', async (c) => {
           apiError(404, 'video_not_found');
         if (video.status !== 'uploaded' && video.status !== 'ready')
           apiError(409, 'not_uploaded_yet');
+        // Only an attempt that would count: a provisional one was beyond the attempts anyway.
+        const attempt = await db
+          .select({ provisional: attempts.provisional })
+          .from(attempts)
+          .where(eq(attempts.id, video.attemptId))
+          .get();
+        if (attempt?.provisional) apiError(409, 'attempt_provisional');
       }
       payload = { change: 1, userId: user.id, videoId: input.videoId };
     }
@@ -874,6 +882,11 @@ battleRoutes.post('/:id/proposals/:proposalId/respond', async (c) => {
   await runBatch(db, statements);
   if (proposal.kind === 'extra_attempt')
     await settleUserAttempts(db, battle, payload.userId as string);
+  // The number of attempts may have changed: re-check everyone's attempts with the new value.
+  if (proposal.kind === 'settings' && battle.status === 'active') {
+    const changed = { ...battle, ...(payload.changes as Partial<BattleSettings>) };
+    for (const p of participants) await settleUserAttempts(db, changed, p.userId);
+  }
   return c.json(await battleResponse(db, battle.id, user?.id ?? null, now));
 });
 

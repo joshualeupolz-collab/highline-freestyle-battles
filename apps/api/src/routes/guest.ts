@@ -26,7 +26,12 @@ import { attemptReservations, attempts, battleParticipants, battles, videos } fr
 import type { AppEnv } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
-import { insertAttempt, reportReservation, reserveAttempts } from '../services/attempts';
+import {
+  discardAttempt,
+  insertAttempt,
+  reportReservation,
+  reserveAttempts,
+} from '../services/attempts';
 import {
   announceVideo,
   athleteByCode,
@@ -163,6 +168,15 @@ function reservationView(r: typeof attemptReservations.$inferSelect) {
     closedAt: r.closedAt,
   };
 }
+
+/** A recording shorter than 3 seconds does not count: the friend's phone removes it again. */
+guestRoutes.post('/attempts/:id/discard', async (c) => {
+  const { code } = await parseJson(c, guestCodeSchema);
+  const db = getDb(c.env.DB);
+  const attempt = await codeAttempt(db, c.req.param('id'), code);
+  await discardAttempt(db, attempt, Date.now());
+  return c.json({ ok: true });
+});
 
 /** An attempt this code started (the code it was started with, even if renewed since). */
 async function codeAttempt(db: Database, attemptId: string, code: string) {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import { NumberInput } from '../components/NumberInput';
 import { formatDate, t } from '../i18n';
 import { expectedMbPerMinute, QUALITIES, QUALITY_PRESETS, type Quality } from '../video/quality';
 import {
@@ -282,13 +283,7 @@ export function VideoLabPage() {
         </label>
         <label>
           {t('lab.attempts')}
-          <input
-            type="number"
-            min={1}
-            max={99}
-            value={attemptsAllowed}
-            onChange={(e) => setAttemptsAllowed(Math.max(1, Number(e.target.value) || 1))}
-          />
+          <NumberInput min={1} max={99} value={attemptsAllowed} onChange={setAttemptsAllowed} />
         </label>
         <p className="hint">{t('lab.applyHint')}</p>
       </div>

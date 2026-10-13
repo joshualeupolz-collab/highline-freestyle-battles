@@ -28,7 +28,7 @@ Session 7 = branch `claude/hopeful-fermat-3qyweu` (worked alone while the owner 
 own PRs once CI is green** (session 6); if the session's safety check blocks it, Claude says
 so and the owner merges. A new session starts a fresh branch from `main`.
 
-**Tests:** 22 video cutting tests (`apps/web/test`), 166 API tests, 44 rating tests
+**Tests:** 22 video cutting tests (`apps/web/test`), 169 API tests, 44 rating tests
 (Workers runtime + local D1 + local R2), lint, typecheck and build all pass in CI. The step 8 flow
 was checked with Playwright/Chromium (fake camera) against a local Worker: two athletes record,
 one of them offline; the upload starts by itself when back online; choosing unlocks both videos,
@@ -116,7 +116,7 @@ c. **Offline reservations** with a device code, take-over, reporting back, hand-
 Plus the owner's answer from the start of the session: **7-day grace period** after the
 deadline to upload and choose; the delivering side can only decide early when the other side
 has nothing left that could count. Privacy policy (EN/DE) mentions the device code.
-Tests: 166 API tests, 11 browser tests (new: `offline-reservation.spec.ts`, offline part in
+Tests: 169 API tests, 11 browser tests (new: `offline-reservation.spec.ts`, offline part in
 `film-for-friend.spec.ts`; `video-battle.spec.ts` now reserves before recording offline).
 **Confirmed by the owner (2026-10-13)** – all details Claude decided (concept section 6,
 "Details decided by Claude while building"). One change by the owner, built the same day:
@@ -124,6 +124,19 @@ reservations never reported back only count as far as the athlete asked for extr
 that battle (per battle min(unreported reserved attempts, extra attempts requested)).
 **Owner to test on phones:** battle → "Prepare for offline recording" → flight mode → record →
 back online → "Hand back unused"; a second phone taking over; a friend preparing on `/film`.
+
+### Session 7, owner's test round (2026-10-13)
+
+Fixed: number fields can be emptied while typing (`components/NumberInput.tsx`, invalid until
+filled); provisional attempts cannot be sent with an extra-attempt request; "attempts left" now
+comes from the server, which also settles provisional attempts that could already be valid
+(the owner saw 2 left next to provisional attempts; a settings change of the number of
+attempts did not re-check them – fixed); after changing the quality offline, Start could hit the
+old, already stopped camera and register a 0-second attempt – the record button now waits for
+the new camera, a failed start leaves nothing, and recordings under 3 seconds do not count
+(owner's rule) and are deleted. **Owner to decide:** whether Start should wait for the server's
+confirmation when recording online without a reservation (closes the gap of a recording whose
+registration never arrived; see the answer in the chat of session 7).
 
 ### Not started yet
 

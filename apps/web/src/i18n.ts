@@ -489,6 +489,10 @@ const en = {
   'offline.filmTitle': 'Prepared for offline filming',
   'offline.filmHint':
     'These work without a connection. Come back online afterwards so the videos are uploaded and the rest is handed back.',
+  'error.recording_too_short':
+    'The recording was shorter than 3 seconds: it does not count as an attempt and was deleted.',
+  'camera.notReady': 'The camera is not ready yet. Wait a moment and try again.',
+  'event.attempt_discarded': '{who}: a recording shorter than 3 seconds did not count',
   'error.offline_needs_reservation':
     'You are offline. Recording offline needs attempts reserved beforehand while online ("Prepare for offline recording").',
   'error.reservation_mismatch': 'This recording does not belong to a reservation of this device.',

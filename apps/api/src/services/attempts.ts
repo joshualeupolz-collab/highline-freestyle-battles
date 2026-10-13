@@ -15,6 +15,7 @@
  */
 import { attemptsLeft, type ReserveAttempts, settleAttempts, slotKey } from '@hfb/shared';
 import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import type { Database } from '../db/client';
 import {
   attemptReservations,
@@ -23,6 +24,7 @@ import {
   battleProposals,
   battles,
   submissions,
+  videoFiles,
   videos,
 } from '../db/schema';
 import { apiError } from '../lib/errors';
@@ -130,6 +132,40 @@ export async function settleUserAttempts(
   return changes.size;
 }
 
+/**
+ * Attempts still free per part for `userId` (null = unlimited), as the server counts them:
+ * reserved units and valid attempts outside reservations use up the allowance. If a provisional
+ * attempt could already be valid (room appeared without a re-check), it is settled first, so the
+ * battle page never shows free attempts next to provisional ones.
+ */
+export async function freeAttempts(
+  db: Database,
+  battle: Pick<BattleRow, 'id' | 'attemptsPerVideo' | 'rounds'>,
+  userId: string,
+  parts: number,
+): Promise<(number | null)[]> {
+  const compute = (usage: Awaited<ReturnType<typeof loadUsage>>) => {
+    const used = usedBySlot(usage);
+    return Array.from({ length: parts }, (_, i) =>
+      attemptsLeft(battle.attemptsPerVideo, usage.extraAttempts, used, slotKey(i, 1)),
+    );
+  };
+  let usage = await loadUsage(db, battle.id, userId);
+  let free = compute(usage);
+  const stuck = usage.rows.some(
+    (a) =>
+      a.provisional &&
+      a.reservationId === null &&
+      (free[a.partIndex] === null || (free[a.partIndex] ?? 0) > 0),
+  );
+  if (stuck) {
+    await settleUserAttempts(db, battle, userId);
+    usage = await loadUsage(db, battle.id, userId);
+    free = compute(usage);
+  }
+  return free;
+}
+
 /** Who records: the athlete's own device, or a friend with the athlete code. */
 export interface Recorder {
   deviceCode: string | null;
@@ -202,6 +238,47 @@ export async function insertAttempt(
     provisional: coveredBy === null,
   });
   await settleUserAttempts(db, battle, userId);
+}
+
+/**
+ * A recording shorter than MIN_ATTEMPT_MS does not count (owner, 2026-10-13): the phone removes
+ * the attempt again. Only before its video was uploaded; the opponent sees it in the chat.
+ */
+export async function discardAttempt(
+  db: Database,
+  attempt: typeof attempts.$inferSelect,
+  now: number,
+) {
+  const video = await db.select().from(videos).where(eq(videos.attemptId, attempt.id)).get();
+  if (video && video.status !== 'pending_upload') apiError(409, 'already_uploaded');
+  if (attempt.battleId) {
+    const battle = await db.select().from(battles).where(eq(battles.id, attempt.battleId)).get();
+    if (battle?.status !== 'active') apiError(409, 'battle_not_running');
+  }
+  const statements: BatchItem<'sqlite'>[] = [];
+  if (video)
+    statements.push(
+      db.delete(videoFiles).where(eq(videoFiles.videoId, video.id)),
+      db.delete(videos).where(eq(videos.id, video.id)),
+    );
+  // The video rows first: they point to the attempt.
+  statements.push(db.delete(attempts).where(eq(attempts.id, attempt.id)));
+  if (attempt.battleId)
+    statements.push(
+      eventStatement(
+        db,
+        attempt.battleId,
+        attempt.userId,
+        { type: 'attempt_discarded', partIndex: attempt.partIndex },
+        now,
+      ),
+    );
+  const [first, ...rest] = statements;
+  if (first) await db.batch([first, ...rest]);
+  if (attempt.battleId) {
+    const battle = await db.select().from(battles).where(eq(battles.id, attempt.battleId)).get();
+    if (battle) await settleUserAttempts(db, battle, attempt.userId);
+  }
 }
 
 /**

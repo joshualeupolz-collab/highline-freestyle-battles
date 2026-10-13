@@ -20,6 +20,8 @@ export type BattleEvent =
   | { type: 'onsite_withdrawn' }
   | { type: 'group_result' | 'group_confirmed' | 'group_rejected' }
   | { type: 'official_confirmed'; name: string }
+  // A recording shorter than MIN_ATTEMPT_MS did not count (owner, 2026-10-13).
+  | { type: 'attempt_discarded'; partIndex: number }
   // Offline recording (concept section 6): reserved attempts and the device's report.
   | {
       type: 'reserved';

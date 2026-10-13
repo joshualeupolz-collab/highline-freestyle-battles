@@ -74,7 +74,7 @@ export async function recordAttempt(phone: Page) {
   const record = phone.locator('.camera-full').getByRole('button', { name: 'Record attempt' });
   await expect(record).toBeEnabled();
   await record.click();
-  await expect(phone.locator('.camera-full').getByText(/● [2-9]\.\d s/)).toBeVisible();
+  await expect(phone.locator('.camera-full').getByText(/● [4-9]\.\d s/)).toBeVisible();
   await phone.getByRole('button', { name: 'Stop' }).click();
   // Cut and upload: the whole recording, default visibility.
   await expect(phone.getByRole('heading', { name: 'Cut and upload' })).toBeVisible();

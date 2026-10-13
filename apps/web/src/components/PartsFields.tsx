@@ -1,5 +1,6 @@
 import { type FormatPart, SELECTABLE_PART_KINDS } from '@hfb/shared';
 import { type MessageKey, t } from '../i18n';
+import { NumberInput } from './NumberInput';
 
 type Kind = (typeof SELECTABLE_PART_KINDS)[number];
 
@@ -77,15 +78,11 @@ export function PartsFields({
             ) : (
               <label>
                 {t(kind === 'trick_combo' ? 'formats.countTricks' : 'formats.countBounces')}
-                <input
-                  type="number"
-                  inputMode="numeric"
+                <NumberInput
                   min={1}
                   max={100}
                   value={part.count ?? 1}
-                  onChange={(e) =>
-                    set(i, { kind, count: Math.max(1, Number(e.target.value) || 1) })
-                  }
+                  onChange={(count) => set(i, { kind, count })}
                 />
               </label>
             )}
