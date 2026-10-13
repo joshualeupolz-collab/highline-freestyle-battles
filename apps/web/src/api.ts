@@ -4,6 +4,7 @@
  */
 import type {
   BattleSettings,
+  CompleteVideo,
   CreateCompetition,
   CreateEstimate,
   CreateGroupBattle,
@@ -13,6 +14,7 @@ import type {
   CurrentUser,
   GuestAttempt,
   GuestVideo,
+  MultipartUpload,
   NotificationSettings,
   ReportCategory,
   ReportTarget,
@@ -93,6 +95,19 @@ const put = <T>(path: string, body?: unknown) => request<T>('PUT', path, body);
 // ---------------------------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------------------------
+
+/** Answer to announcing a video: one target, or an upload in parts for big videos. */
+export interface AnnouncedVideo {
+  video: { id: string; status: string };
+  upload: UploadTarget;
+  multipart: MultipartUpload | null;
+}
+
+export interface PartTarget {
+  partNumber: number;
+  size: number;
+  target: UploadTarget;
+}
 
 export interface Format {
   id: string;
@@ -683,10 +698,11 @@ export const api = {
     id: string,
     body: { deviceCode: string; handBack: boolean },
   ) => post<BattleResponse>(`/battles/${battleId}/reservations/${id}/report`, body),
-  createVideo: (body: CreateVideo) =>
-    post<{ video: { id: string; status: string }; upload: UploadTarget }>('/videos', body),
-  completeVideo: (id: string) =>
-    post<{ video: { id: string; status: string } }>(`/videos/${id}/complete`),
+  createVideo: (body: CreateVideo) => post<AnnouncedVideo>('/videos', body),
+  uploadParts: (id: string, body: { uploadId: string; partNumbers: number[] }) =>
+    post<{ parts: PartTarget[] }>(`/videos/${id}/parts`, body),
+  completeVideo: (id: string, body: CompleteVideo = {}) =>
+    post<{ video: { id: string; status: string } }>(`/videos/${id}/complete`, body),
   videoSettings: (id: string, body: { visibility: string; retention: string }) =>
     post(`/videos/${id}/settings`, body),
 
@@ -706,10 +722,11 @@ export const api = {
     post<{ ok: boolean }>(`/guest/attempts/${attemptId}/discard`, { code }),
   guestReport: (id: string, body: { code: string; deviceCode: string; handBack: boolean }) =>
     post<{ reservation: GuestReservation }>(`/guest/reservations/${id}/report`, body),
-  guestVideo: (body: GuestVideo) =>
-    post<{ video: { id: string; status: string }; upload: UploadTarget }>('/guest/videos', body),
-  guestCompleteVideo: (id: string, code: string) =>
-    post<{ video: { id: string; status: string } }>(`/guest/videos/${id}/complete`, { code }),
+  guestVideo: (body: GuestVideo) => post<AnnouncedVideo>('/guest/videos', body),
+  guestUploadParts: (id: string, body: { code: string; uploadId: string; partNumbers: number[] }) =>
+    post<{ parts: PartTarget[] }>(`/guest/videos/${id}/parts`, body),
+  guestCompleteVideo: (id: string, body: CompleteVideo & { code: string }) =>
+    post<{ video: { id: string; status: string } }>(`/guest/videos/${id}/complete`, body),
 };
 
 /** Address of a video for <video src>; the server checks who may watch it. */

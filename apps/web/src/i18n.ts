@@ -523,6 +523,7 @@ const en = {
   'videos.uploading': 'Uploading… {p} %',
   'videos.recording': 'Recording…',
   'videos.queued': 'Waiting for a connection to upload',
+  'videos.queuedPartly': 'Waiting for a connection to upload the rest ({p} % sent)',
   'videos.failed': 'Not uploaded: {error}',
   'videos.notUploaded': 'On this phone, not uploaded yet',
   'videos.elsewhere': 'Not uploaded (recorded on another device?)',

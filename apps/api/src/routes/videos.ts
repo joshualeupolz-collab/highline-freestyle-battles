@@ -4,20 +4,28 @@
  * 1. Pressing Start creates an attempt on the phone (`POST /battles/:id/attempts`, sent as soon
  *    as there is a connection). Attempts beyond the limit are kept as provisional.
  * 2. The phone announces the video (`POST /videos`) and gets an upload target: a signed R2 URL,
- *    or `PUT /videos/:id/upload` through the Worker (see storage/videoStore.ts).
- * 3. After sending the bytes, `POST /videos/:id/complete` checks the stored file.
+ *    or `PUT /videos/:id/upload` through the Worker (see storage/videoStore.ts). Big videos are
+ *    sent in parts instead: the answer carries an upload id, the phone asks for the targets of
+ *    the missing parts (`POST /videos/:id/parts`) and keeps the ETag of every part it sent.
+ * 3. After sending the bytes, `POST /videos/:id/complete` (with the parts' ETags) checks the
+ *    stored file.
  *    Offline recording needs attempts reserved while online (`POST /battles/:id/reservations`);
  *    the device reports back (`.../reservations/:rid/report`) once online again.
  * 4. The athlete chooses the attempt that counts per part (`POST /battles/:id/submissions`).
  *    Once everyone has chosen, the videos unlock and the battle moves on to the review.
  */
 import {
+  type CompleteVideo,
+  completeVideoSchema,
   createVideoSchema,
   MAX_VIDEO_BYTES,
   registerAttemptSchema,
   reportReservationSchema,
   reserveAttemptsSchema,
   submitVideoSchema,
+  uploadPartCount,
+  uploadPartSize,
+  uploadPartsSchema,
   videoSettingsSchema,
 } from '@hfb/shared';
 import { and, eq } from 'drizzle-orm';
@@ -222,8 +230,17 @@ videoRoutes.post('/', async (c) => {
   const now = Date.now();
   const attempt = await db.select().from(attempts).where(eq(attempts.id, input.attemptId)).get();
   if (!attempt || attempt.userId !== user.id) apiError(404, 'attempt_not_found');
-  const { videoId, upload, created } = await announceVideo(db, c.env, attempt, input, now);
-  return c.json({ video: { id: videoId, status: 'pending_upload' }, upload }, created ? 201 : 200);
+  const { videoId, upload, multipart, created } = await announceVideo(
+    db,
+    c.env,
+    attempt,
+    input,
+    now,
+  );
+  return c.json(
+    { video: { id: videoId, status: 'pending_upload' }, upload, multipart },
+    created ? 201 : 200,
+  );
 });
 
 async function ownOriginal(c: Context<AppEnv>, videoId: string) {
@@ -263,15 +280,104 @@ export async function storeUploadBody(
   });
 }
 
+/** The upload in parts of this video, checked against the upload id the phone has. */
+function openMultipart(
+  video: typeof videos.$inferSelect,
+  file: typeof videoFiles.$inferSelect,
+  uploadId: string,
+) {
+  if (video.status !== 'pending_upload') apiError(409, 'already_uploaded');
+  // Announced again since (a different file) or removed as stale: the phone announces anew.
+  if (file.uploadId === null || file.uploadId !== uploadId || file.sizeBytes === null)
+    apiError(409, 'upload_restarted');
+  return { uploadId: file.uploadId, sizeBytes: file.sizeBytes };
+}
+
+/** Upload targets for some parts of an upload in parts. */
+export async function partTargets(
+  env: Env,
+  video: typeof videos.$inferSelect,
+  file: typeof videoFiles.$inferSelect,
+  input: { uploadId: string; partNumbers: number[] },
+) {
+  const { uploadId, sizeBytes } = openMultipart(video, file, input.uploadId);
+  const count = uploadPartCount(sizeBytes);
+  const store = videoStore(env);
+  const numbers = [...new Set(input.partNumbers)].sort((a, b) => a - b);
+  if (numbers.some((n) => n > count)) apiError(400, 'no_such_part');
+  return Promise.all(
+    numbers.map(async (partNumber) => ({
+      partNumber,
+      size: uploadPartSize(sizeBytes, partNumber),
+      target: await store.partTarget(file.locator, uploadId, partNumber, video.id),
+    })),
+  );
+}
+
+/** Stores the request body as one part of an upload in parts (uploads through the Worker). */
+export async function storePartBody(
+  c: Context<AppEnv>,
+  video: typeof videos.$inferSelect,
+  file: typeof videoFiles.$inferSelect,
+) {
+  const { uploadId, sizeBytes } = openMultipart(video, file, c.req.header(UPLOAD_ID_HEADER) ?? '');
+  const partNumber = Number(c.req.param('n'));
+  if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > uploadPartCount(sizeBytes))
+    apiError(400, 'no_such_part');
+  const length = Number(c.req.header('Content-Length'));
+  if (length !== uploadPartSize(sizeBytes, partNumber)) apiError(400, 'wrong_part_size');
+  const body = c.req.raw.body;
+  if (!body) apiError(400, 'empty_body');
+  const part = await c.env.VIDEOS.resumeMultipartUpload(file.locator, uploadId).uploadPart(
+    partNumber,
+    body,
+  );
+  // Like R2's own answer to a part sent with a signed URL: the ETag in a header.
+  c.header('ETag', `"${part.etag}"`);
+  return { partNumber, etag: part.etag };
+}
+
+/** Uploads in parts through the Worker carry the upload id in this header. */
+export const UPLOAD_ID_HEADER = 'X-Upload-Id';
+
+/** The optional body of `.../complete` (older app versions send none). */
+export async function completeBody(c: Context<AppEnv>, schema = completeVideoSchema) {
+  if (!c.req.header('Content-Type')?.toLowerCase().startsWith('application/json')) return {};
+  return parseJson(c, schema);
+}
+
 /** The bytes have been sent: check the stored file and mark the video as uploaded. */
 export async function completeUpload(
   db: Database,
   env: Env,
   video: typeof videos.$inferSelect,
   file: typeof videoFiles.$inferSelect,
+  input: CompleteVideo = {},
 ) {
   if (video.status !== 'pending_upload') return { id: video.id, status: video.status };
   const store = videoStore(env);
+  if (file.uploadId !== null && input.uploadId === undefined) {
+    // Sent with a single PUT after all (an app version from before uploads in parts).
+    await store.abortMultipart(file.locator, file.uploadId);
+    await db.update(videoFiles).set({ uploadId: null }).where(eq(videoFiles.id, file.id));
+  } else if (file.uploadId !== null) {
+    // An upload in parts: put the parts together first.
+    const { uploadId, sizeBytes } = openMultipart(video, file, input.uploadId ?? '');
+    const parts = input.parts ?? [];
+    const numbers = new Set(parts.map((p) => p.partNumber));
+    const count = uploadPartCount(sizeBytes);
+    if (numbers.size !== count || parts.some((p) => p.partNumber > count))
+      apiError(409, 'upload_parts_missing');
+    try {
+      await store.completeMultipart(file.locator, uploadId, parts);
+    } catch {
+      // A part R2 does not know (or a wrong ETag): start the upload over.
+      await store.abortMultipart(file.locator, uploadId);
+      await db.update(videoFiles).set({ uploadId: null }).where(eq(videoFiles.id, file.id));
+      apiError(409, 'upload_restarted');
+    }
+    await db.update(videoFiles).set({ uploadId: null }).where(eq(videoFiles.id, file.id));
+  }
   const size = await store.size(file.locator);
   if (size === null) apiError(409, 'upload_missing');
   if (size > MAX_VIDEO_BYTES) {
@@ -295,9 +401,24 @@ videoRoutes.put('/:id/upload', async (c) => {
   return c.json({ ok: true });
 });
 
+/** Upload targets for the missing parts of an upload in parts. */
+videoRoutes.post('/:id/parts', async (c) => {
+  const input = await parseJson(c, uploadPartsSchema);
+  const { video, file } = await ownOriginal(c, c.req.param('id'));
+  return c.json({ parts: await partTargets(c.env, video, file, input) });
+});
+
+/** One part through the Worker; only used while there is no R2 access key. */
+videoRoutes.put('/:id/parts/:n', async (c) => {
+  if (!uploadsThroughWorker(c.env)) apiError(404, 'not_found');
+  const { video, file } = await ownOriginal(c, c.req.param('id'));
+  return c.json(await storePartBody(c, video, file));
+});
+
 videoRoutes.post('/:id/complete', async (c) => {
+  const input = await completeBody(c);
   const { db, video, file } = await ownOriginal(c, c.req.param('id'));
-  return c.json({ video: await completeUpload(db, c.env, video, file) });
+  return c.json({ video: await completeUpload(db, c.env, video, file, input) });
 });
 
 /** The owner changes who may watch the video and whether it is kept after the battle. */

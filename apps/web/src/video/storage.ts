@@ -3,6 +3,7 @@
  * it arrives, so a recording survives a crash or a closed tab up to the last chunk.
  * Chunks are stored as ArrayBuffers: older Safari versions cannot store Blobs in IndexedDB.
  */
+import type { UploadedPart } from '@hfb/shared';
 
 export type RecordingStatus = 'recording' | 'done' | 'interrupted';
 
@@ -83,6 +84,11 @@ export interface UploadState {
   askExtraAttempt?: boolean;
   videoId?: string;
   error?: string;
+  /**
+   * A big video sent in parts: the server's upload id and the parts already sent, so a broken
+   * connection only repeats the missing parts (see uploadQueue.ts).
+   */
+  multipart?: { uploadId: string; sizeBytes: number; parts: UploadedPart[] };
   /** 0–1 while bytes are being sent. */
   progress?: number;
 }

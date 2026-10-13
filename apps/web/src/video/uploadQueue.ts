@@ -6,12 +6,14 @@
  * For every battle recording in IndexedDB:
  * 1. the attempt is registered with the server (right after Start, or later when back online);
  * 2. once the athlete has chosen the cut ("queued"), the video is cut without re-encoding, sent to
- *    the upload target the server hands out (signed R2 URL or the Worker) and confirmed;
+ *    the upload target the server hands out (signed R2 URL or the Worker) and confirmed. Big
+ *    videos go in parts of 6 MiB; every part sent is noted in IndexedDB, so after a break only
+ *    the missing parts are sent (the cut is deterministic: the same bytes again);
  * 3. the local copy is deleted.
  * Network errors leave everything queued for the next run; refusals by the server are shown.
  */
-import { MAX_VIDEO_BYTES, MIN_ATTEMPT_MS } from '@hfb/shared';
-import { ApiError, api } from '../api';
+import { MAX_VIDEO_BYTES, MIN_ATTEMPT_MS, type UploadedPart, uploadPartSize } from '@hfb/shared';
+import { type AnnouncedVideo, ApiError, api, type PartTarget } from '../api';
 import {
   deviceCode,
   localReservations,
@@ -22,6 +24,7 @@ import {
 import {
   deleteRecording,
   type GuestAttempt,
+  getRecording,
   listRecordings,
   loadRecordingBytes,
   type StoredRecording,
@@ -44,6 +47,15 @@ export function onServerChanged(listener: Listener): () => void {
 /** Upload progress 0–1 of a recording while its bytes are being sent. */
 export function uploadProgress(recordingId: string): number | undefined {
   return progress.get(recordingId);
+}
+
+/** Share 0–1 of a video sent in parts that is already on the server (0 if none). */
+export function sentShare(recording: StoredRecording): number {
+  const multipart = recording.upload?.multipart;
+  if (!multipart) return 0;
+  let sent = 0;
+  for (const p of multipart.parts) sent += uploadPartSize(multipart.sizeBytes, p.partNumber);
+  return sent / multipart.sizeBytes;
 }
 
 export function onProgress(listener: () => void): () => void {
@@ -374,15 +386,35 @@ async function upload(recording: StoredRecording, battleId: string, guestCode?: 
     retention: settings.keep ? 'keep' : 'delete_after_battle',
     endReason: recording.endReason ?? 'stopped',
   } as const;
-  const { video, upload: target } = guestCode
+  const announced = guestCode
     ? await api.guestVideo({ ...announce, code: guestCode })
     : await api.createVideo(announce);
+  const { video } = announced;
   setProgress(recording.id, 0);
-  await send(target, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: contentType }), (p) =>
-    setProgress(recording.id, p),
-  );
-  if (guestCode) await api.guestCompleteVideo(video.id, guestCode);
-  else await api.completeVideo(video.id);
+  try {
+    if (announced.multipart) {
+      const parts = await sendParts(recording.id, announced, bytes, guestCode);
+      const body = { uploadId: announced.multipart.uploadId, parts };
+      if (guestCode) await api.guestCompleteVideo(video.id, { ...body, code: guestCode });
+      else await api.completeVideo(video.id, body);
+    } else {
+      const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: contentType });
+      await send(announced.upload, blob, (p) => setProgress(recording.id, p));
+      if (guestCode) await api.guestCompleteVideo(video.id, { code: guestCode });
+      else await api.completeVideo(video.id);
+    }
+  } catch (error) {
+    // The server dropped the upload in parts (a part it does not know, or removed after two
+    // days): forget the parts sent and start over at the next run.
+    if (
+      error instanceof ApiError &&
+      (error.code === 'upload_restarted' || error.code === 'upload_parts_missing')
+    ) {
+      await setMultipart(recording.id, undefined);
+      throw new ApiError(503, 'upload_restarted');
+    }
+    throw error;
+  }
   setProgress(recording.id, undefined);
 
   if (settings.askExtraAttempt && !guestCode) {
@@ -401,12 +433,81 @@ async function upload(recording: StoredRecording, battleId: string, guestCode?: 
   for (const listener of serverListeners) listener(battleId);
 }
 
+async function setMultipart(
+  id: string,
+  multipart: NonNullable<StoredRecording['upload']>['multipart'],
+) {
+  await updateRecording(id, (r) => (r.upload ? { ...r, upload: { ...r.upload, multipart } } : r));
+}
+
+/**
+ * Sends the parts the server does not have yet, one after the other, and notes each one sent.
+ * Returns all parts with their ETags, for putting them together.
+ */
+async function sendParts(
+  recordingId: string,
+  announced: AnnouncedVideo,
+  bytes: Uint8Array,
+  guestCode: string | undefined,
+): Promise<UploadedPart[]> {
+  const multipart = announced.multipart;
+  if (!multipart) return [];
+  const stored = (await getRecording(recordingId))?.upload?.multipart;
+  // A new upload id (or a different file) means the server starts over: nothing is kept.
+  const parts =
+    stored?.uploadId === multipart.uploadId && stored.sizeBytes === bytes.length
+      ? [...stored.parts]
+      : [];
+  await setMultipart(recordingId, { uploadId: multipart.uploadId, sizeBytes: bytes.length, parts });
+
+  const done = new Set(parts.map((p) => p.partNumber));
+  const missing: number[] = [];
+  for (let n = 1; n <= multipart.partCount; n++) if (!done.has(n)) missing.push(n);
+  let sent = 0;
+  for (const p of parts) sent += uploadPartSize(bytes.length, p.partNumber);
+  setProgress(recordingId, sent / bytes.length);
+  if (missing.length === 0) return parts;
+
+  // Signed URLs expire after an hour, so the targets are fetched for each run.
+  const request = { uploadId: multipart.uploadId, partNumbers: missing };
+  const { parts: targets } = guestCode
+    ? await api.guestUploadParts(announced.video.id, { ...request, code: guestCode })
+    : await api.uploadParts(announced.video.id, request);
+  for (const part of targets) {
+    const start = (part.partNumber - 1) * multipart.partBytes;
+    const body = new Blob([bytes.subarray(start, start + part.size) as Uint8Array<ArrayBuffer>]);
+    const etag = await sendPart(part, body, (p) =>
+      setProgress(recordingId, (sent + p * part.size) / bytes.length),
+    );
+    sent += part.size;
+    parts.push({ partNumber: part.partNumber, etag });
+    await setMultipart(recordingId, {
+      uploadId: multipart.uploadId,
+      sizeBytes: bytes.length,
+      parts: [...parts],
+    });
+  }
+  return parts;
+}
+
+/** Sends one part and returns its ETag (R2's answer header; the Worker sends the same). */
+async function sendPart(
+  part: PartTarget,
+  body: Blob,
+  onProgress: (p: number) => void,
+): Promise<string> {
+  const xhr = await send(part.target, body, onProgress);
+  const etag = xhr.getResponseHeader('ETag');
+  if (!etag) throw new ApiError(503, 'upload_failed');
+  return etag;
+}
+
 /** PUT with progress (fetch cannot report upload progress). */
 function send(
   target: { url: string; method: string; headers: Record<string, string> },
   body: Blob,
   onProgress: (p: number) => void,
-): Promise<void> {
+): Promise<XMLHttpRequest> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(target.method, target.url);
@@ -416,7 +517,7 @@ function send(
     };
     xhr.onload = () =>
       xhr.status < 300
-        ? resolve()
+        ? resolve(xhr)
         : // The signed URL may have expired: a server error, so the next run asks for a new one.
           reject(
             new ApiError(

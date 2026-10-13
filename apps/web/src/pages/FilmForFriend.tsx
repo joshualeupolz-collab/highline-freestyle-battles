@@ -30,7 +30,7 @@ import {
   onRecordingsChanged,
   type StoredRecording,
 } from '../video/storage';
-import { kickUploads, onProgress, uploadProgress } from '../video/uploadQueue';
+import { kickUploads, onProgress, sentShare, uploadProgress } from '../video/uploadQueue';
 
 const CODE_KEY = 'hfb-guest-code';
 const NAME_KEY = 'hfb-guest-name';
@@ -330,7 +330,10 @@ function GuestRecordings({
         if (progress !== undefined)
           state = t('videos.uploading', { p: Math.round(progress * 100) });
         else if (r.status === 'recording') state = t('videos.recording');
-        else if (r.upload?.state === 'queued') state = t('videos.queued');
+        else if (r.upload?.state === 'queued')
+          state = r.upload.multipart?.parts.length
+            ? t('videos.queuedPartly', { p: Math.round(sentShare(r) * 100) })
+            : t('videos.queued');
         else if (r.upload?.state === 'failed')
           state = t('videos.failed', { error: errorText(r.upload.error ?? 'unknown_error') });
         else state = t('videos.notUploaded');

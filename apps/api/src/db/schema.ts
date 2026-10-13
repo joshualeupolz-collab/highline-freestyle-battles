@@ -653,6 +653,8 @@ export const videoFiles = sqliteTable(
     sizeBytes: integer('size_bytes'),
     /** MIME type of the stored file, e.g. video/mp4. */
     contentType: text('content_type'),
+    /** R2 multipart upload still open (video sent in parts); null once completed or aborted. */
+    uploadId: text('upload_id'),
     createdAt: integer('created_at').notNull(),
     deletedAt: integer('deleted_at'),
   },

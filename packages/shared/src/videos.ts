@@ -98,6 +98,52 @@ export const createVideoSchema = z.object({
 });
 export type CreateVideo = z.infer<typeof createVideoSchema>;
 
+/**
+ * Upload in parts (R2 multipart upload): big videos are sent in parts so a weak connection only
+ * repeats the part that broke off, and an upload continues later where it stopped. R2 needs
+ * parts of at least 5 MiB and of equal size (except the last one).
+ */
+export const UPLOAD_PART_BYTES = 6 * 1024 * 1024;
+
+/** Videos larger than one part are sent in parts; smaller ones with a single PUT. */
+export function uploadPartCount(sizeBytes: number): number {
+  return sizeBytes > UPLOAD_PART_BYTES ? Math.ceil(sizeBytes / UPLOAD_PART_BYTES) : 1;
+}
+
+/** Size of part `partNumber` (1-based) of a video of `sizeBytes`. */
+export function uploadPartSize(sizeBytes: number, partNumber: number): number {
+  const count = uploadPartCount(sizeBytes);
+  if (partNumber < count) return UPLOAD_PART_BYTES;
+  return sizeBytes - (count - 1) * UPLOAD_PART_BYTES;
+}
+
+/** Answer to announcing a video sent in parts: the phone asks for a target per missing part. */
+export interface MultipartUpload {
+  uploadId: string;
+  partBytes: number;
+  partCount: number;
+}
+
+/** Ask for the upload targets of some parts (signed URLs expire, so only for the missing ones). */
+export const uploadPartsSchema = z.object({
+  uploadId: z.string().min(1).max(1024),
+  partNumbers: z.array(z.number().int().min(1).max(100)).min(1).max(100),
+});
+
+/** One part sent: R2's ETag of it, needed to put the parts together. */
+export const uploadedPartSchema = z.object({
+  partNumber: z.number().int().min(1).max(100),
+  etag: z.string().min(1).max(200),
+});
+export type UploadedPart = z.infer<typeof uploadedPartSchema>;
+
+/** `POST /videos/:id/complete`: the parts of an upload in parts (nothing for a single PUT). */
+export const completeVideoSchema = z.object({
+  uploadId: z.string().min(1).max(1024).optional(),
+  parts: z.array(uploadedPartSchema).max(100).optional(),
+});
+export type CompleteVideo = z.infer<typeof completeVideoSchema>;
+
 /** Choose the attempt that counts for its part (best of N). Possible until the videos unlock. */
 export const submitVideoSchema = z.object({ videoId: z.uuid() });
 

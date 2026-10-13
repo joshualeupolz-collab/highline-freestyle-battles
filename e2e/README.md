@@ -11,6 +11,7 @@ all local, nothing from Cloudflare is needed.
 | `tests/signup.spec.ts` | sign-up in the app → waiting for approval → an athlete approves → the app opens |
 | `tests/offline-reservation.spec.ts` | offline without reservation refused → reserve → record offline → a second device takes over (provisional) → the first device reports and hands back → the take-over attempt becomes valid |
 | `tests/film-for-friend.spec.ts` | a friend films with the chosen athlete code, online and offline after preparing |
+| `tests/upload-in-parts.spec.ts` | a 15 MB video goes up in three parts; the third breaks off, the next run only sends that one |
 
 ## Run
 

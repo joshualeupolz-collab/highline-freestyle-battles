@@ -48,6 +48,7 @@ import {
   kickUploads,
   onProgress,
   onServerChanged,
+  sentShare,
   uploadProgress,
 } from '../video/uploadQueue';
 import { useCameraZoom } from '../video/zoom';
@@ -364,7 +365,10 @@ function AttemptLine({
   if (uploaded) state = video.counts ? t('videos.counts') : t('videos.uploaded');
   else if (progress !== undefined) state = t('videos.uploading', { p: Math.round(progress * 100) });
   else if (local?.status === 'recording') state = t('videos.recording');
-  else if (local?.upload?.state === 'queued') state = t('videos.queued');
+  else if (local?.upload?.state === 'queued')
+    state = local.upload.multipart?.parts.length
+      ? t('videos.queuedPartly', { p: Math.round(sentShare(local) * 100) })
+      : t('videos.queued');
   else if (local?.upload?.state === 'failed')
     state = t('videos.failed', { error: errorText(local.upload.error ?? 'unknown_error') });
   else if (local) state = t('videos.notUploaded');

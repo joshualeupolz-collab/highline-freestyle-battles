@@ -294,7 +294,8 @@ export const STALE_UPLOAD_MS = 2 * 86_400_000;
 
 /**
  * Scheduled job: delete the files of uploads that were announced but never completed (e.g. an
- * upload URL used for something else, or a phone that never came back). The video row stays;
+ * upload URL used for something else, or a phone that never came back), and the parts of
+ * unfinished uploads in parts. The video row stays;
  * the phone can announce the upload again. Returns how many files were removed.
  */
 export async function removeStaleUploads(
@@ -303,7 +304,7 @@ export async function removeStaleUploads(
   now = Date.now(),
 ): Promise<number> {
   const stale = await db
-    .select({ fileId: videoFiles.id, locator: videoFiles.locator })
+    .select({ fileId: videoFiles.id, locator: videoFiles.locator, uploadId: videoFiles.uploadId })
     .from(videoFiles)
     .innerJoin(videos, eq(videos.id, videoFiles.videoId))
     .where(
@@ -315,10 +316,11 @@ export async function removeStaleUploads(
     )
     .limit(50);
   if (stale.length === 0) return 0;
+  for (const f of stale) if (f.uploadId) await store.abortMultipart(f.locator, f.uploadId);
   await store.delete(stale.map((f) => f.locator));
   await db
     .update(videoFiles)
-    .set({ deletedAt: now })
+    .set({ deletedAt: now, uploadId: null })
     .where(
       inArray(
         videoFiles.id,
@@ -381,17 +383,24 @@ export async function deleteFilesOfDeletedVideos(
   now = Date.now(),
 ): Promise<number> {
   const files = await db
-    .select({ id: videoFiles.id, locator: videoFiles.locator, backend: videoFiles.backend })
+    .select({
+      id: videoFiles.id,
+      locator: videoFiles.locator,
+      backend: videoFiles.backend,
+      uploadId: videoFiles.uploadId,
+    })
     .from(videoFiles)
     .innerJoin(videos, eq(videos.id, videoFiles.videoId))
     .where(and(eq(videos.status, 'deleted'), isNull(videoFiles.deletedAt)))
     .limit(90);
   const r2 = files.filter((f) => f.backend === store.backend);
   if (r2.length === 0) return 0;
+  // Parts of an unfinished upload in parts are stored apart from the file.
+  for (const f of r2) if (f.uploadId) await store.abortMultipart(f.locator, f.uploadId);
   await store.delete(r2.map((f) => f.locator));
   await db
     .update(videoFiles)
-    .set({ deletedAt: now })
+    .set({ deletedAt: now, uploadId: null })
     .where(
       inArray(
         videoFiles.id,

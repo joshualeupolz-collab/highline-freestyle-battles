@@ -6,10 +6,12 @@
  */
 import { z } from 'zod';
 import {
+  completeVideoSchema,
   createVideoSchema,
   registerAttemptSchema,
   reportReservationSchema,
   reserveAttemptsSchema,
+  uploadPartsSchema,
   VIDEO_RETENTION_VALUES,
   VIDEO_VISIBILITY_VALUES,
 } from './videos';
@@ -60,6 +62,9 @@ export const guestVideoSchema = createVideoSchema.extend({ code: athleteCodeSche
 export type GuestVideo = z.infer<typeof guestVideoSchema>;
 
 export const guestCodeSchema = z.object({ code: athleteCodeSchema });
+
+export const guestUploadPartsSchema = uploadPartsSchema.extend({ code: athleteCodeSchema });
+export const guestCompleteVideoSchema = completeVideoSchema.extend({ code: athleteCodeSchema });
 
 /** POST /api/guest/reservations: a friend prepares for filming offline. */
 export const guestReserveSchema = reserveAttemptsSchema.extend({
