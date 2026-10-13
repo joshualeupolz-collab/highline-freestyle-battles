@@ -163,6 +163,7 @@ const en = {
 
   'battle.deadline': 'Deadline',
   'battle.deadlinePassed': 'The deadline has passed.',
+  'battle.graceUntil': 'Attempts started before it can still be uploaded and chosen until {date}.',
   'review.title': 'Who was better?',
   'review.intro':
     'Watch both videos above and vote honestly. Your vote stays hidden until your opponent has voted too. If you both pick the same side, the battle is decided and the ratings change.',

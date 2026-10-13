@@ -268,7 +268,12 @@ export function BattleDetailPage() {
 
       {battle.status === 'active' && mine && battle.deadlinePassed && (
         <div className="card">
-          <p style={{ marginTop: 0 }}>{t('battle.deadlinePassed')}</p>
+          <p style={{ marginTop: 0 }}>
+            {t('battle.deadlinePassed')}
+            {battle.graceUntil != null && battle.graceUntil > Date.now() && (
+              <> {t('battle.graceUntil', { date: formatDate(battle.graceUntil) })}</>
+            )}
+          </p>
           <div className="actions">
             <button type="button" onClick={() => run('deadline-decision', { choice: 'claim_win' })}>
               {t('battle.claimWin')}
