@@ -42,6 +42,8 @@ import {
 } from '../video/storage';
 import { trimVideo } from '../video/trim';
 import {
+  confirmStart,
+  discardOnServer,
   discardRecording,
   kickUploads,
   onProgress,
@@ -536,6 +538,7 @@ export function RecordScreen({
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [starting, setStarting] = useState(false);
   const zoom = useCameraZoom(stream);
   const finished = useRef(false);
 
@@ -605,6 +608,23 @@ export function RecordScreen({
       setError(t('error.offline_needs_reservation'));
       return;
     }
+    // Without a reservation, the server must confirm Start before recording begins.
+    const attemptId = newId();
+    const target = guest
+      ? { guest: { ...guest, ...(reservationId && { reservationId }) } }
+      : { battle: { battleId, partIndex, round: ROUND } };
+    const confirm = needsConnection && !reservationId;
+    if (confirm) {
+      setStarting(true);
+      try {
+        await confirmStart(attemptId, Date.now(), target);
+      } catch (e) {
+        setError(errorText(e instanceof ApiError ? e.code : 'start_not_confirmed'));
+        return;
+      } finally {
+        setStarting(false);
+      }
+    }
     try {
       await requestPersistentStorage();
       const recording = await startRecording(
@@ -616,9 +636,10 @@ export function RecordScreen({
           keyFrameIntervalMs: 1000,
           timesliceMs: 1000,
           attempt: 0,
+          registered: confirm,
           ...(guest
-            ? { guest: { attemptId: newId(), ...guest, reservationId } }
-            : { battle: { attemptId: newId(), battleId, partIndex, round: ROUND, reservationId } }),
+            ? { guest: { attemptId, ...guest, reservationId } }
+            : { battle: { attemptId, battleId, partIndex, round: ROUND, reservationId } }),
         },
         () => {},
         // Leaving the app ended the attempt.
@@ -629,6 +650,8 @@ export function RecordScreen({
       if (reservationId) countRecording(reservationId, offline);
       kickUploads(); // registers the attempt right away if there is a connection
     } catch (e) {
+      // The server knows the attempt but nothing was recorded: remove it there again.
+      if (confirm) void discardOnServer(attemptId, Date.now(), target);
       setError(t('lab.recordError', { error: String(e) }));
     }
   }
@@ -689,7 +712,7 @@ export function RecordScreen({
         <button
           type="button"
           className={`record-button${active ? ' recording' : ''}`}
-          disabled={!stream}
+          disabled={!stream || starting}
           aria-label={active ? t('lab.stop') : t('videos.record')}
           onClick={active ? stop : start}
         />

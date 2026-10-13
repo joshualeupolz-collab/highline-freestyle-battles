@@ -46,6 +46,15 @@ test('offline recording: reserve, take over on a second device, report back', as
   await expect(phone.getByText('Attempts left: 3')).toBeVisible();
   await expect(phone.getByText('Attempt 1', { exact: true })).toHaveCount(0);
 
+  // Without a reservation, Start waits for the server: no answer, no recording, no attempt.
+  await phone.route('**/api/battles/*/attempts', (route) => route.abort());
+  await phone.getByRole('button', { name: 'Record attempt' }).first().click();
+  await camera.click();
+  await expect(phone.getByText(/The server did not confirm the start/)).toBeVisible();
+  await phone.unroute('**/api/battles/*/attempts');
+  await phone.getByRole('button', { name: 'Close camera' }).click();
+  await expect(phone.getByText('Attempts left: 3')).toBeVisible();
+
   // Offline without a reservation: recording is refused.
   await phone.context().setOffline(true);
   await phone.getByRole('button', { name: 'Record attempt' }).first().click();

@@ -74,6 +74,8 @@ export interface RecordOptions {
   battle?: { attemptId: string } & Omit<BattleAttempt, 'synced'>;
   /** Filming for a friend: the attempt (its id becomes the recording id) and whose it is. */
   guest?: { attemptId: string } & Omit<GuestAttempt, 'synced'>;
+  /** The server already confirmed the start (registered before recording began). */
+  registered?: boolean;
 }
 
 export interface RecordProgress {
@@ -131,12 +133,14 @@ export async function startRecording(
         partIndex: options.battle.partIndex,
         round: options.battle.round,
         ...(options.battle.reservationId && { reservationId: options.battle.reservationId }),
-        synced: false,
+        synced: options.registered ?? false,
       },
       upload: { state: 'waiting', visibility: 'public', keep: false },
     }),
     ...(options.guest && {
-      guest: (({ attemptId: _, ...g }) => ({ ...g, synced: false }))(options.guest),
+      guest: (({ attemptId: _, ...g }) => ({ ...g, synced: options.registered ?? false }))(
+        options.guest,
+      ),
       // Filmed by a friend: public like the athlete's own default (owner, 2026-10-12); the
       // athlete can change it per video.
       upload: { state: 'waiting', visibility: 'public', keep: false },

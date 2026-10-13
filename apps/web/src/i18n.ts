@@ -491,6 +491,9 @@ const en = {
     'These work without a connection. Come back online afterwards so the videos are uploaded and the rest is handed back.',
   'error.recording_too_short':
     'The recording was shorter than 3 seconds: it does not count as an attempt and was deleted.',
+  'camera.starting': 'Starting… (waiting for the server)',
+  'error.start_not_confirmed':
+    'The server did not confirm the start (weak connection?). Nothing was recorded and the attempt is not used. Try again, or prepare for offline recording.',
   'camera.notReady': 'The camera is not ready yet. Wait a moment and try again.',
   'event.attempt_discarded': '{who}: a recording shorter than 3 seconds did not count',
   'error.offline_needs_reservation':

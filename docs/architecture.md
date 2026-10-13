@@ -519,7 +519,10 @@ Rules: `docs/concept.md` section 6. Code: `apps/api/src/services/attempts.ts`,
   go into the chat (`reserved`, `reservation_reported`).
 - **Phone:** the reservations of this device are also kept in `localStorage`
   (`hfb-reservations`, with battle info for `/film`), so recording works offline. Without a
-  reservation, Start is refused offline (`offline_needs_reservation`). The upload queue registers
+  reservation, Start is refused offline (`offline_needs_reservation`), and online it waits for
+  the server to register the attempt (`confirmStart` in `uploadQueue.ts`, 8 s timeout). If the
+  answer does not come, or the recorder then fails, a placeholder makes the queue remove the
+  attempt on the server again (`discardOnServer`). The upload queue registers
   the recordings and then reports reservations that recorded offline; after the deadline it hands
   them back. The battle page drops reservations the server closed.
 - **Never reported:** open reservations of battles that no longer run; per battle at most as

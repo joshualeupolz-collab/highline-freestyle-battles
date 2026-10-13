@@ -21,6 +21,7 @@ import {
 } from './device';
 import {
   deleteRecording,
+  type GuestAttempt,
   listRecordings,
   loadRecordingBytes,
   type StoredRecording,
@@ -113,6 +114,84 @@ async function markInterruptedBattleRecordings() {
  */
 export async function discardRecording(id: string) {
   await updateRecording(id, (r) => ({ ...r, discard: true }));
+  kickUploads();
+}
+
+/** How long Start waits for the server's confirmation. */
+const START_TIMEOUT_MS = 8000;
+
+/**
+ * Without a reservation, recording needs the server's confirmation of Start before it begins
+ * (owner, 2026-10-13): otherwise a recording whose registration never arrived could later be
+ * deleted unnoticed. If the answer does not come in time, a placeholder makes the queue remove
+ * the attempt again, in case the request still arrives.
+ */
+export async function confirmStart(
+  id: string,
+  startedAt: number,
+  target: StartTarget,
+): Promise<void> {
+  const request =
+    'battle' in target
+      ? api.registerAttempt(target.battle.battleId, {
+          id,
+          partIndex: target.battle.partIndex,
+          round: target.battle.round,
+          startedAt,
+          deviceCode: deviceCode(),
+        })
+      : api.guestAttempt({
+          code: target.guest.code,
+          id,
+          battleId: target.guest.battleId,
+          partIndex: target.guest.partIndex,
+          round: target.guest.round,
+          startedAt,
+          recorderName: target.guest.recorderName,
+          deviceCode: deviceCode(),
+        });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      request,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new ApiError(0, 'start_not_confirmed')), START_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (error) {
+    if (isRefusal(error)) throw error;
+    await discardOnServer(id, startedAt, target);
+    throw new ApiError(0, 'start_not_confirmed');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+type StartTarget =
+  | { battle: { battleId: string; partIndex: number; round: number } }
+  | { guest: Omit<GuestAttempt, 'synced'> };
+
+/**
+ * The server may know an attempt that has no recording (Start confirmed, then the recorder
+ * failed; or the confirmation timed out): a placeholder makes the queue remove it there.
+ */
+export async function discardOnServer(id: string, startedAt: number, target: StartTarget) {
+  await saveRecording({
+    id,
+    createdAt: startedAt,
+    status: 'done',
+    attempt: 0,
+    quality: '',
+    mimeType: '',
+    chunkCount: 0,
+    bytes: 0,
+    durationMs: 0,
+    diagnostics: {},
+    discard: true,
+    ...('battle' in target
+      ? { battle: { ...target.battle, synced: true } }
+      : { guest: { ...target.guest, synced: true } }),
+  });
   kickUploads();
 }
 

@@ -134,9 +134,8 @@ comes from the server, which also settles provisional attempts that could alread
 attempts did not re-check them – fixed); after changing the quality offline, Start could hit the
 old, already stopped camera and register a 0-second attempt – the record button now waits for
 the new camera, a failed start leaves nothing, and recordings under 3 seconds do not count
-(owner's rule) and are deleted. **Owner to decide:** whether Start should wait for the server's
-confirmation when recording online without a reservation (closes the gap of a recording whose
-registration never arrived; see the answer in the chat of session 7).
+(owner's rule) and are deleted. Decided and built the same day (owner): without a reservation, Start waits for the server's
+confirmation (8 s timeout) before recording begins.
 
 ### Not started yet
 
