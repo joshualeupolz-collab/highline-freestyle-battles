@@ -285,6 +285,7 @@ Current progress and next steps: [`docs/progress.md`](progress.md).
 4. Video prototype: recording and trimming are tested on Android and iPhones (`docs/video-prototype.md` §3); splitting into clips is still to be tested (stage 3).
 5. Exchange format for trick list / scoring formula with the other developer.
 6. Type and scope of federation penalties – not needed for now (owner, 2026-10-12). Suggestion for later: warning, suspension for N days (account status `suspended` exists), annulment of the battles concerned; no rating deductions (ratings stay reproducible from results).
+7. Multi-round and back-and-forth formats (stage 3): how a round works (e.g. both athletes do one trick per round, or one athlete sets a trick the other must repeat), how rounds are scored and how many attempts each round has – to be defined with the owner before building.
 
 ---
 

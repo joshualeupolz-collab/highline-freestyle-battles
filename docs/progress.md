@@ -229,7 +229,7 @@ profile button for members waiting for approval, confirmation before approving.
    needed before prototyping it.
 3. Optional housekeeping: mark the GitGuardian finding on PR #1 (`PASSWORD_ITERATIONS = 50_000`)
    as a false positive in the GitGuardian dashboard.
-4. Google login is postponed: it needs a Google Cloud OAuth client created by the owner. Still wanted?
+4. Google login is postponed (owner, 2026-10-13: later; adding it later is not harder).
 5. Further open questions of the concept are listed in `docs/concept.md` §15.
 6. ~~Offline recording without cheating~~ – decided in session 6, built and confirmed in
    session 7.
@@ -239,22 +239,40 @@ profile button for members waiting for approval, confirmation before approving.
 ## 4. Next steps
 
 Stage 1 and stage 2 are complete except 2.12 (over-rating warning, needs data) and online group
-battles (later). What is left, roughly in order:
+battles (later). The owner's decisions of 2026-10-13 on what comes next:
 
-1. **Owner tests on phones** (no code needed): offline reservations (section 1, "Session 7"),
-   the notification tap on Android, push on the iPhone (installed app only).
-2. **Owner decisions still open:** the five review defaults (stage 2 plan §3.2: ≥ 5 battles to
-   review, anonymous and final, 14 days until the judge, judge sees earlier votes, voluntary);
-   Google login still wanted? (needs a Google Cloud OAuth client); a separate contact e-mail for
-   the legal texts (open question 00).
-3. **First real replay:** *Actions → Rating replay → Run workflow* with "force" – annulments and
-   late estimates only take effect through it.
-4. **Small improvements (optional):** push to the opponent when attempts are reserved; show the
-   end of the grace period on the battle page; multipart upload if big HD uploads fail on mobile
-   connections; measure PBKDF2 CPU time and raise `PASSWORD_ITERATIONS` if possible.
-5. **Stage 3 (next big block, concept §14):** trick list import and tagging (needs the exchange
-   format with the other developer, concept §15.5), cut points and clips, Telegram archive
-   (needs the archiving period, §15.3), public pages for public videos, polls, multi-round and
-   back-and-forth formats. Auto-cut needs 10–20 real test videos first (open question 2).
-6. **Later in stage 2:** 2.12 over-rating warning (needs ≥ 10 battles per estimated person),
-   online group battles.
+1. **Multipart upload (next session, recommended first).** Big HD uploads should survive a weak
+   connection: send the video in parts, show the progress, continue with the missing parts later.
+   Plan: R2 multipart upload (S3 API: create, upload part, complete). Parts must be at least
+   5 MiB (except the last), so not one part per second of video but ~5–8 MB parts; for a 50 MB
+   HD video about 7–10 parts. The phone keeps the upload id and the finished parts in IndexedDB
+   and resumes after a break; the Worker signs each part (direct to R2), or receives the parts
+   itself when there is no R2 access key (R2 binding `createMultipartUpload`). The cut before the
+   upload is deterministic, so a resumed upload sends the same bytes. Small videos stay a single
+   PUT. Unfinished multipart uploads are aborted by the hourly job after 2 days. Estimate: one
+   session.
+2. **Video analysis as a separate project** (cut points at the bottom of each bounce, auto-cut,
+   body pose): brief in [`docs/video-analysis-project.md`](video-analysis-project.md). The owner
+   creates a new repository, copies the brief as its `CLAUDE.md` and starts a new session there
+   (Claude cannot create repositories from here). Test videos from the owner (e.g. Instagram).
+3. **Trick list:** the owner prepares a preliminary list; then stage 3 trick list import and
+   tagging (needs the exchange format, concept §15.5).
+4. **Owner tests further** (offline reservations, attempts counter, short recordings, Start
+   confirmation) when there is time.
+5. **Telegram archive** (concept §10) – not urgent: R2 has 10 GB free, the hourly job already
+   deletes unneeded videos. Start it when storage passes ~7 GB (or for the clips of stage 3).
+   Assessment: a bot uploads clips (< 20 MB, the Bot API's download limit; upload limit 50 MB)
+   to a private channel from a GitHub Actions job and stores the message id; fetching back runs
+   the other way. Fits this repository (storage layer, background job), one session; needs a
+   bot token from the owner as a GitHub secret.
+6. **Later, low priority:** a video library inside the app for logged-in users (e.g. "show ten
+   360s from different angles"; needs the trick tags), public pages only after that; polls
+   (simple); multi-round and back-and-forth formats – rules still to be defined with the owner
+   (concept §15); Google login (adding it later is not harder: one more login method on the
+   existing accounts); 2.12 over-rating warning; online group battles.
+7. **Not needed (owner):** a push notification when the opponent reserves attempts.
+8. **Rating replay:** not urgent. Requested in the app, it runs with the daily job; a manual run
+   (*Actions → Rating replay*) is only needed to see the result at once. Fine to check during the
+   final tests.
+9. **Owner, any time:** a separate contact e-mail for the legal texts (open question 00); the five
+   review defaults (stage 2 plan §3.2).
