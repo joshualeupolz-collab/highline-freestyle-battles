@@ -160,9 +160,10 @@ export function PrivacyEn() {
         device code on every phone or browser (deleting the app or its data creates a new one).
         Every attempt and every reservation of attempts for recording offline is stored with this
         code and its time. The athletes of the battle see reservations (number, time, the first four
-        characters of the device code) in the battle and its chat. How many reservations an athlete
-        never reported back is shown to their opponents and to the federation and admins. Legal
-        basis: Art. 6(1)(b) GDPR, and Art. 6(1)(f) GDPR (fair competition).
+        characters of the device code) in the battle and its chat. If an athlete never reports a
+        reservation back and asks for extra attempts in that battle, the number is shown to their
+        opponents and to the federation and admins. Legal basis: Art. 6(1)(b) GDPR, and Art. 6(1)(f)
+        GDPR (fair competition).
       </p>
       <p>
         Please only film other people if they agree (see the terms of use). Legal basis: Art.
@@ -446,9 +447,10 @@ export function PrivacyDe() {
         ihre Daten gelöscht, entsteht ein neuer). Jeder Versuch und jede Reservierung von Versuchen
         für Offline-Aufnahmen wird mit diesem Code und der Uhrzeit gespeichert. Die Beteiligten des
         Battles sehen Reservierungen (Anzahl, Zeit, die ersten vier Zeichen des Gerätecodes) im
-        Battle und im Chat. Wie viele Reservierungen jemand nie zurückgemeldet hat, sehen die
-        jeweiligen Gegner sowie Verband und Admins. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO und
-        Art. 6 Abs. 1 lit. f DSGVO (fairer Wettkampf).
+        Battle und im Chat. Meldet jemand eine Reservierung nie zurück und fordert in diesem Battle
+        Extra-Versuche an, sehen die jeweiligen Gegner sowie Verband und Admins diese Zahl.
+        Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO und Art. 6 Abs. 1 lit. f DSGVO (fairer
+        Wettkampf).
       </p>
       <p>
         Bitte filme andere Personen nur mit deren Einverständnis (siehe Nutzungsbedingungen).

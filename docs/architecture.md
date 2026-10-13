@@ -512,7 +512,9 @@ Rules: `docs/concept.md` section 6. Code: `apps/api/src/services/attempts.ts`,
   reservation, Start is refused offline (`offline_needs_reservation`). The upload queue registers
   the recordings and then reports reservations that recorded offline; after the deadline it hands
   them back. The battle page drops reservations the server closed.
-- **Never reported:** open reservations of battles that no longer run, counted per athlete
+- **Never reported:** open reservations of battles that no longer run; per battle at most as
+  many units (reserved − recorded) as extra attempts the athlete requested there (owner,
+  2026-10-13; replaced requests not counted twice), summed per athlete
   (`lostReservations`): in the battle response per participant (shown next to the opponent's
   progress and extra-attempt requests) and on the profile for the federation and admins.
 - **Grace period:** `graceUntil` = deadline + `UPLOAD_GRACE_DAYS` (7). During it,

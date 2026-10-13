@@ -2,7 +2,7 @@
 
 Read this at the start of every session; update it at the end (see `CLAUDE.md`).
 
-Last updated: 2026-10-12 (end of the seventh session: the three recording features – sharing any attempt with an extra-attempt request, provisional attempts, offline reservations – and the 7-day grace period).
+Last updated: 2026-10-13 (end of the seventh session: the three recording features – sharing any attempt with an extra-attempt request, provisional attempts, offline reservations – and the 7-day grace period).
 
 ---
 
@@ -118,11 +118,10 @@ deadline to upload and choose; the delivering side can only decide early when th
 has nothing left that could count. Privacy policy (EN/DE) mentions the device code.
 Tests: 166 API tests, 11 browser tests (new: `offline-reservation.spec.ts`, offline part in
 `film-for-friend.spec.ts`; `video-battle.spec.ts` now reserves before recording offline).
-**Owner to confirm** the details Claude decided (concept section 6, bullet "Details decided by
-Claude while building"): reservations per part, default all free; reservations stay until
-"Hand back unused" or the deadline (coming online only reports); "never reported" = open when
-the battle stopped running; no push for reservations. Also: taking back an extra attempt turns
-the latest valid, not chosen attempt provisional again.
+**Confirmed by the owner (2026-10-13)** – all details Claude decided (concept section 6,
+"Details decided by Claude while building"). One change by the owner, built the same day:
+reservations never reported back only count as far as the athlete asked for extra attempts in
+that battle (per battle min(unreported reserved attempts, extra attempts requested)).
 **Owner to test on phones:** battle → "Prepare for offline recording" → flight mode → record →
 back online → "Hand back unused"; a second phone taking over; a friend preparing on `/film`.
 
@@ -193,7 +192,8 @@ profile button for members waiting for approval, confirmation before approving.
 | Session 6 (owner): push uses `Urgency: high`; per-kind notification settings; app icon number via the Badging API | Notifications arrived late on Android; the owner wanted to choose and to see a number on the icon |
 | Session 6 (owner): athlete code chosen freely, secret (the opponent never sees it); filming by friends online only; friends' videos public by default | Offline filming with description/inbox had too many open problems |
 | Session 7 (owner): 7 days after the deadline to upload and choose; the delivering side waits while the other side may still deliver | Days without a connection must not cost the battle |
-| Session 7 (Claude, to confirm): reservations per part, kept until handed back or the deadline, "never reported" = open when the battle stopped running | Flaky connections at the line must not release reserved attempts |
+| Session 7 (owner, 2026-10-13): unreported reservations count only up to the extra attempts asked for in that battle | Accepting a lost device without asking for more is not suspicious |
+| Session 7 (Claude, confirmed by the owner): reservations per part, kept until handed back or the deadline, "never reported" = open when the battle stopped running | Flaky connections at the line must not release reserved attempts |
 | Session 6 (owner): offline recording only with actively reserved attempts (device code, take-over, provisional attempts, never-reported reservations counted per athlete); any uploaded attempt can be shared with an extra-attempt request; recording beyond the limit is provisional | A web app cannot report anything when it is deleted; reserving while online makes hiding a bad attempt pointless |
 
 ---
@@ -219,27 +219,30 @@ profile button for members waiting for approval, confirmation before approving.
    as a false positive in the GitGuardian dashboard.
 4. Google login is postponed: it needs a Google Cloud OAuth client created by the owner. Still wanted?
 5. Further open questions of the concept are listed in `docs/concept.md` §15.
-6. ~~Offline recording without cheating~~ – decided in session 6, **built in session 7**. Please
-   confirm Claude's detail decisions (section 1, "Session 7").
+6. ~~Offline recording without cheating~~ – decided in session 6, built and confirmed in
+   session 7.
 
 ---
 
 ## 4. Next steps
 
-1. **Owner:** test the offline reservations on real phones (section 1, "Session 7") and confirm
-   the detail decisions. Ideas if wanted: a push notification to the opponent when attempts are
-   reserved; showing the grace period end on the battle page more prominently.
-2. **More UI feedback** from the owner.
-2. **Legal texts:** done except the operator data (open question 00). Keep the privacy policy in
-   line with new features (push, public video pages, Telegram archive, Google login, e-mails).
-3. **Stage 2, rest:** 2.12 over-rating warning later (needs ≥ 10 battles per estimated
-   person). Online group battles later. Athlete-code defaults decided (owner): friends' videos
-   start as *public*; the code stays secret (the opponent does not see it).
-   **Owner to test** the notification tap on Android after PR #28.
-4. **Owner to confirm** the five review defaults (plan §3.2: ≥ 5 battles to review, anonymous and
-   final, 14 days until the judge, judge sees earlier votes, voluntary) and test push on phones
-   (Profile → Notifications; iPhone only in the installed app).
-5. **First real replay:** *Actions → Rating replay → Run workflow* with "force" – annulments and
+Stage 1 and stage 2 are complete except 2.12 (over-rating warning, needs data) and online group
+battles (later). What is left, roughly in order:
+
+1. **Owner tests on phones** (no code needed): offline reservations (section 1, "Session 7"),
+   the notification tap on Android, push on the iPhone (installed app only).
+2. **Owner decisions still open:** the five review defaults (stage 2 plan §3.2: ≥ 5 battles to
+   review, anonymous and final, 14 days until the judge, judge sees earlier votes, voluntary);
+   Google login still wanted? (needs a Google Cloud OAuth client); a separate contact e-mail for
+   the legal texts (open question 00).
+3. **First real replay:** *Actions → Rating replay → Run workflow* with "force" – annulments and
    late estimates only take effect through it.
-6. Multipart upload if large HD uploads fail on mobile connections; measure PBKDF2 CPU time on
-   Cloudflare and raise `PASSWORD_ITERATIONS` if there is headroom.
+4. **Small improvements (optional):** push to the opponent when attempts are reserved; show the
+   end of the grace period on the battle page; multipart upload if big HD uploads fail on mobile
+   connections; measure PBKDF2 CPU time and raise `PASSWORD_ITERATIONS` if possible.
+5. **Stage 3 (next big block, concept §14):** trick list import and tagging (needs the exchange
+   format with the other developer, concept §15.5), cut points and clips, Telegram archive
+   (needs the archiving period, §15.3), public pages for public videos, polls, multi-round and
+   back-and-forth formats. Auto-cut needs 10–20 real test videos first (open question 2).
+6. **Later in stage 2:** 2.12 over-rating warning (needs ≥ 10 battles per estimated person),
+   online group battles.

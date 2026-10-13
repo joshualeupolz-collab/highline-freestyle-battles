@@ -20,6 +20,7 @@ import {
   attemptReservations,
   attempts,
   battleParticipants,
+  battleProposals,
   battles,
   submissions,
   videos,
@@ -359,8 +360,11 @@ export function battleReservations(db: Database, battleId: string) {
 
 /**
  * Reservations never reported back (concept section 6: a lost device, e.g. the app deleted):
- * still open when the battle no longer ran. Counted per athlete, shown to opponents next to
- * extra-attempt requests and to the federation and admins.
+ * still open when the battle no longer ran. They only count where the athlete then asked for
+ * extra attempts in the same battle (owner, 2026-10-13): whoever accepts the loss is not
+ * suspicious. Per battle: min(reserved attempts never reported, extra attempts requested).
+ * Summed per athlete, shown to opponents next to extra-attempt requests and to the federation
+ * and admins.
  */
 export async function lostReservations(
   db: Database,
@@ -368,8 +372,13 @@ export async function lostReservations(
 ): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (userIds.length === 0) return result;
-  const rows = await db
-    .select({ userId: attemptReservations.userId, n: count() })
+  const open = await db
+    .select({
+      id: attemptReservations.id,
+      battleId: attemptReservations.battleId,
+      userId: attemptReservations.userId,
+      count: attemptReservations.count,
+    })
     .from(attemptReservations)
     .innerJoin(battles, eq(battles.id, attemptReservations.battleId))
     .where(
@@ -379,8 +388,56 @@ export async function lostReservations(
         ne(battles.status, 'active'),
       ),
     )
-    .groupBy(attemptReservations.userId);
-  for (const r of rows) result.set(r.userId, r.n);
+    // D1 allows at most 100 bound parameters per query (the ids below).
+    .limit(40);
+  if (open.length === 0) return result;
+  const battleIds = [...new Set(open.map((r) => r.battleId))];
+  const [covered, requests] = await Promise.all([
+    db
+      .select({ reservationId: attempts.reservationId, n: count() })
+      .from(attempts)
+      .where(
+        inArray(
+          attempts.reservationId,
+          open.map((r) => r.id),
+        ),
+      )
+      .groupBy(attempts.reservationId),
+    db
+      .select({
+        battleId: battleProposals.battleId,
+        proposedBy: battleProposals.proposedBy,
+        payloadJson: battleProposals.payloadJson,
+      })
+      .from(battleProposals)
+      .where(
+        and(
+          inArray(battleProposals.battleId, battleIds),
+          eq(battleProposals.kind, 'extra_attempt'),
+          // A request replaced by a new one is not counted twice.
+          ne(battleProposals.status, 'withdrawn'),
+        ),
+      ),
+  ]);
+  const key = (userId: string, battleId: string) => `${userId}:${battleId}`;
+  const unreported = new Map<string, number>();
+  for (const r of open) {
+    const used = covered.find((c) => c.reservationId === r.id)?.n ?? 0;
+    const k = key(r.userId, r.battleId);
+    unreported.set(k, (unreported.get(k) ?? 0) + Math.max(0, r.count - used));
+  }
+  const asked = new Map<string, number>();
+  for (const p of requests) {
+    if ((JSON.parse(p.payloadJson) as { change?: number }).change !== 1) continue;
+    const k = key(p.proposedBy, p.battleId);
+    asked.set(k, (asked.get(k) ?? 0) + 1);
+  }
+  for (const [k, n] of unreported) {
+    const lost = Math.min(n, asked.get(k) ?? 0);
+    if (lost === 0) continue;
+    const userId = k.slice(0, k.indexOf(':'));
+    result.set(userId, (result.get(userId) ?? 0) + lost);
+  }
   return result;
 }
 
