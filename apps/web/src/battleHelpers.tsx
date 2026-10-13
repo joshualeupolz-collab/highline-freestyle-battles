@@ -8,6 +8,7 @@ import {
 } from '@hfb/shared';
 import { useQuery } from '@tanstack/react-query';
 import { api, type BattleStatus, type Format } from './api';
+import { NumberInput } from './components/NumberInput';
 import { formatDate, formatShort, t } from './i18n';
 
 /** The RuleSet that applies now (e.g. the weight factors shown next to weight 1–3). */
@@ -114,19 +115,12 @@ export function SettingsFields({
       <fieldset className="field">
         <legend>{t('settings.attempts')}</legend>
         <div className="inline">
-          <input
-            type="number"
-            inputMode="numeric"
+          <NumberInput
             min={1}
             max={MAX_ATTEMPTS}
-            value={value.attemptsPerVideo ?? ''}
+            value={value.attemptsPerVideo}
             disabled={unlimited}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                attemptsPerVideo: Math.min(MAX_ATTEMPTS, Math.max(1, Number(e.target.value) || 1)),
-              })
-            }
+            onChange={(n) => onChange({ ...value, attemptsPerVideo: n })}
             aria-label={t('settings.attempts')}
           />
           <label className="check">

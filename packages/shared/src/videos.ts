@@ -73,6 +73,12 @@ export const reportReservationSchema = z.object({
   handBack: z.boolean().default(false),
 });
 
+/**
+ * Recordings shorter than this do not count as an attempt and are deleted (owner, 2026-10-13):
+ * a start that failed or was tapped by mistake. Nobody can do a highline attempt in 3 seconds.
+ */
+export const MIN_ATTEMPT_MS = 3000;
+
 /** How many days after the deadline the athletes still have to upload and choose (owner, 2026-10-12). */
 export const UPLOAD_GRACE_DAYS = 7;
 

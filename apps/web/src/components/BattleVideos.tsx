@@ -2,7 +2,7 @@
  * Recording, upload and choosing the attempt that counts, on the battle page (concept sections
  * 5.3–5.4 and 6). Recordings live in IndexedDB until the upload queue has sent them.
  */
-import { attemptsLeft, newId, slotKey, type VideoVisibility } from '@hfb/shared';
+import { attemptsLeft, MIN_ATTEMPT_MS, newId, slotKey, type VideoVisibility } from '@hfb/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -41,7 +41,13 @@ import {
   updateRecording,
 } from '../video/storage';
 import { trimVideo } from '../video/trim';
-import { kickUploads, onProgress, onServerChanged, uploadProgress } from '../video/uploadQueue';
+import {
+  discardRecording,
+  kickUploads,
+  onProgress,
+  onServerChanged,
+  uploadProgress,
+} from '../video/uploadQueue';
 import { useCameraZoom } from '../video/zoom';
 import { ErrorText } from './ErrorText';
 import { MyReservations, OpponentReservations, PrepareOffline } from './OfflineReservations';
@@ -144,20 +150,33 @@ export function BattleVideos({
     for (const l of local) if (l.battle?.reservationId === r.id) ids.add(l.id);
     return Math.max(0, r.count - Math.max(ids.size, r.recorded ?? 0));
   };
-  // Reserved units use up the allowance; so do valid attempts outside reservations. Provisional
-  // attempts do not; recordings the server does not know yet probably will.
+  // Free attempts per part: the server's count (reserved units and valid attempts outside
+  // reservations use up the allowance), minus recordings on this phone the server does not know
+  // yet (they will probably use one up too, unless they belong to this device's reservation).
+  // Without the server's count (an old offline copy) it is computed here the same way.
+  const pending = (i: number) =>
+    rows(i).filter((r) => !r.server && !r.local?.battle?.reservationId).length;
   const used = new Map<string, number>();
   for (let i = 0; i < format.parts.length; i++) {
     const reserved = myReservations
       .filter((r) => r.partIndex === i)
       .reduce((sum, r) => sum + r.count, 0);
-    const outside = rows(i).filter(
-      (r) => !r.server?.provisional && !r.server?.reservationId && !r.local?.battle?.reservationId,
+    const outside = rows(i).filter((r) =>
+      r.server ? !r.server.provisional && !r.server.reservationId : !r.local?.battle?.reservationId,
     ).length;
     used.set(slotKey(i, ROUND), reserved + outside);
   }
-  const left = (i: number) =>
-    attemptsLeft(battle.settings.attemptsPerVideo, me?.extraAttempts ?? 0, used, slotKey(i, ROUND));
+  const left = (i: number): number | null => {
+    const server = battle.videos.free?.[i];
+    if (server === null) return null;
+    if (server !== undefined) return Math.max(0, server - pending(i));
+    return attemptsLeft(
+      battle.settings.attemptsPerVideo,
+      me?.extraAttempts ?? 0,
+      used,
+      slotKey(i, ROUND),
+    );
+  };
   // What the camera shows: free attempts plus the ones reserved on this device.
   const leftHere = (i: number) => {
     const n = left(i);
@@ -295,9 +314,10 @@ export function BattleVideos({
           attemptsLeft={leftHere(recordPart)}
           reservationId={onDevice(recordPart)?.id}
           needsConnection={limited}
-          onDone={(recordingId) => {
+          onDone={(recordingId, tooShort) => {
             setRecordPart(null);
             if (recordingId) setPrepareId(recordingId);
+            if (tooShort) setError(new ApiError(0, 'recording_too_short'));
           }}
         />
       )}
@@ -378,7 +398,7 @@ function AttemptLine({
             {t('videos.choose')}
           </button>
         )}
-        {uploaded && onAskExtra && !video.counts && (
+        {uploaded && onAskExtra && !video.counts && !provisional && (
           <button type="button" className="link" onClick={() => onAskExtra(video.id)}>
             {t('videos.askExtraShort')}
           </button>
@@ -507,7 +527,8 @@ export function RecordScreen({
   reservationId?: string | undefined;
   /** Without a reservation, Start must be registered at once (no offline recording). */
   needsConnection?: boolean;
-  onDone: (recordingId: string | null) => void;
+  /** `tooShort`: shorter than MIN_ATTEMPT_MS, did not count and is being deleted. */
+  onDone: (recordingId: string | null, tooShort?: boolean) => void;
 }) {
   const preview = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -519,16 +540,24 @@ export function RecordScreen({
   const finished = useRef(false);
 
   const finish = useCallback(
-    (recordingId: string | null) => {
+    (recording: StoredRecording | null) => {
       if (finished.current) return;
       finished.current = true;
-      onDone(recordingId);
+      // Shorter than 3 s (a failed start, a mis-tap): does not count (owner, 2026-10-13).
+      if (recording && recording.durationMs < MIN_ATTEMPT_MS) {
+        void discardRecording(recording.id);
+        onDone(null, true);
+        return;
+      }
+      onDone(recording?.id ?? null);
     },
     [onDone],
   );
 
   useEffect(() => {
     let current: MediaStream | null = null;
+    // The old camera stops below: no recording until the new one delivers pictures.
+    setStream(null);
     openCamera(QUALITY_PRESETS[quality], 'environment')
       .then((result) => {
         current = result.stream;
@@ -566,7 +595,10 @@ export function RecordScreen({
   }, [active]);
 
   async function start() {
-    if (!stream) return;
+    if (!stream?.getVideoTracks().some((track) => track.readyState === 'live')) {
+      setError(t('camera.notReady'));
+      return;
+    }
     setError(null);
     const offline = !navigator.onLine;
     if (offline && needsConnection && !reservationId) {
@@ -590,7 +622,7 @@ export function RecordScreen({
         },
         () => {},
         // Leaving the app ended the attempt.
-        (stopped) => finish(stopped.id),
+        (stopped) => finish(stopped),
       );
       setActive(recording);
       // Recorded offline under a reservation: report back once online (uploadQueue.ts).
@@ -604,7 +636,7 @@ export function RecordScreen({
   async function stop() {
     if (!active) return;
     const recording = await active.stop();
-    finish(recording.id);
+    finish(recording);
   }
 
   return (

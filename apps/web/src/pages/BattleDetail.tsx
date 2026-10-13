@@ -22,6 +22,7 @@ import {
 import { Chat } from '../components/Chat';
 import { ErrorText } from '../components/ErrorText';
 import { GroupPending, GroupResultList } from '../components/GroupResult';
+import { NumberInput } from '../components/NumberInput';
 import { LostHint } from '../components/OfflineReservations';
 import { ReportButton } from '../components/ReportButton';
 import { ReviewCard, ReviewerCard } from '../components/Review';
@@ -571,13 +572,7 @@ function ExtensionProposal({
     >
       <label>
         {t('battle.extensionDays')}
-        <input
-          type="number"
-          min={1}
-          max={60}
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-        />
+        <NumberInput min={1} max={60} value={days} onChange={setDays} />
       </label>
       <p className="muted">
         {t('battle.deadline')}: {formatDate(base + days * DAY)}

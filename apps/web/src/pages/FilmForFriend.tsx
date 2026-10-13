@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { api, type GuestBattle } from '../api';
+import { ApiError, api, type GuestBattle } from '../api';
 import { partText } from '../battleHelpers';
 import { LeftText, PrepareUpload, RecordScreen } from '../components/BattleVideos';
 import { ErrorText } from '../components/ErrorText';
@@ -267,9 +267,10 @@ export function FilmForFriendPage() {
             write(QUALITY_KEY, q);
           }}
           attemptsLeft={target.attemptsLeft}
-          onDone={(recordingId) => {
+          onDone={(recordingId, tooShort) => {
             setTarget(null);
             if (recordingId) setPrepareId(recordingId);
+            if (tooShort) setError(new ApiError(0, 'recording_too_short'));
             if (athlete) void lookup(); // attempts left changed
           }}
         />

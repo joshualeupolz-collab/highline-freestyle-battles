@@ -53,7 +53,7 @@ test('a friend films with the athlete code the athlete chose', async ({ browser 
   await prepared.getByRole('button', { name: 'Record attempt' }).click();
   const button = friend.locator('.camera-full').getByRole('button', { name: 'Record attempt' });
   await button.click();
-  await expect(friend.locator('.camera-full').getByText(/● [2-9]\.\d s/)).toBeVisible();
+  await expect(friend.locator('.camera-full').getByText(/● [4-9]\.\d s/)).toBeVisible();
   await friend.getByRole('button', { name: 'Stop' }).click();
   await friend.getByRole('button', { name: 'Upload', exact: true }).click();
   await expect(prepared.getByText('Attempts left: 1')).toBeVisible();

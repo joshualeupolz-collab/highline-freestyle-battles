@@ -307,6 +307,8 @@ export interface BattleVideos {
   }[];
   /** Attempts reserved for offline recording (concept section 6), oldest first. */
   reservations: BattleReservation[];
+  /** My free attempts per part (null = unlimited), as the server counts them. */
+  free?: (number | null)[];
 }
 
 export interface BattleReservation {
@@ -672,6 +674,8 @@ export const api = {
       reservationId?: string;
     },
   ) => post<BattleResponse>(`/battles/${battleId}/attempts`, body),
+  discardAttempt: (battleId: string, attemptId: string) =>
+    post<BattleResponse>(`/battles/${battleId}/attempts/${attemptId}/discard`),
   reserveAttempts: (battleId: string, body: ReserveAttempts) =>
     post<BattleResponse>(`/battles/${battleId}/reservations`, body),
   reportReservation: (
@@ -698,6 +702,8 @@ export const api = {
   guestReserve: (
     body: ReserveAttempts & { code: string; battleId: string; recorderName?: string },
   ) => post<{ reservations: GuestReservation[] }>('/guest/reservations', body),
+  guestDiscard: (attemptId: string, code: string) =>
+    post<{ ok: boolean }>(`/guest/attempts/${attemptId}/discard`, { code }),
   guestReport: (id: string, body: { code: string; deviceCode: string; handBack: boolean }) =>
     post<{ reservation: GuestReservation }>(`/guest/reservations/${id}/report`, body),
   guestVideo: (body: GuestVideo) =>

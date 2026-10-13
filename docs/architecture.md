@@ -208,7 +208,17 @@ Choose the attempt that counts ──▶ POST /battles/:id/submissions ──▶
   It runs after a new attempt and after extra attempts change. Provisional attempts cannot be
   chosen (`attempt_provisional`); the opponent sees their number per part.
 - **Request with any video:** every uploaded attempt can be attached to an `extra_attempt`
-  request (not only cut-off ones); the server only accepts uploaded videos of the requester.
+  request (not only cut-off ones); the server only accepts uploaded, not provisional videos of
+  the requester.
+- **Free attempts** are counted by the server (`videos.free` in the battle response,
+  `freeAttempts`); the phone only subtracts recordings the server does not know yet. If room
+  appeared without a re-check, showing the battle settles the attempts first; a settings change
+  of the number of attempts re-checks everyone.
+- **Too short:** recordings under `MIN_ATTEMPT_MS` (3 s) are discarded by the phone; a registered
+  attempt is removed with `POST /battles/:id/attempts/:aid/discard` (friends:
+  `/guest/attempts/:id/discard`), only before its video was uploaded, with a chat entry. The
+  camera's record button waits until a new camera stream delivers pictures (after a quality
+  change), and a recorder that fails to start leaves nothing behind.
 - **Cut** without re-encoding before the upload (also makes the file seekable). If the phone
   cannot cut a file, it uploads the whole recording with the cut points (`trim_start_ms`,
   `trim_end_ms`) for the server to cut later.

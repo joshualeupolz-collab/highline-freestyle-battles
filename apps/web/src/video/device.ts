@@ -116,6 +116,15 @@ export function countRecording(id: string, offline: boolean) {
   );
 }
 
+/** A recording under this reservation was discarded (too short): its unit is free again. */
+export function uncountRecording(id: string) {
+  save(
+    localReservations().map((r) =>
+      r.id === id ? { ...r, recorded: Math.max(0, (r.recorded ?? 0) - 1) } : r,
+    ),
+  );
+}
+
 export function removeLocalReservation(id: string) {
   save(localReservations().filter((r) => r.id !== id));
 }

@@ -9,6 +9,7 @@ import type { QualityPreset } from './quality';
 import {
   addChunk,
   type BattleAttempt,
+  deleteRecording,
   type EndReason,
   type GuestAttempt,
   type StoredRecording,
@@ -201,7 +202,13 @@ export async function startRecording(
   recorder.onerror = (e) => {
     events.push(`${at()}: recorder error: ${String((e as ErrorEvent).error ?? e.type)}`);
   };
-  recorder.start(options.timesliceMs);
+  try {
+    recorder.start(options.timesliceMs);
+  } catch (error) {
+    // Nothing was recorded (e.g. the camera had just stopped): no attempt.
+    await deleteRecording(id);
+    throw error;
+  }
   recording.mimeType = recorder.mimeType || recording.mimeType;
 
   let stopping: Promise<StoredRecording> | undefined;

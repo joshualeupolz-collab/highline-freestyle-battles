@@ -35,6 +35,11 @@ export interface StoredRecording {
   guest?: GuestAttempt;
   /** Upload state of a battle or guest recording (see uploadQueue.ts). */
   upload?: UploadState;
+  /**
+   * Shorter than MIN_ATTEMPT_MS: does not count (owner, 2026-10-13). The upload queue removes
+   * the attempt on the server (if it was registered) and then deletes the recording.
+   */
+  discard?: boolean;
 }
 
 /** Filming for a friend: the attempt belongs to the athlete whose code was entered. */

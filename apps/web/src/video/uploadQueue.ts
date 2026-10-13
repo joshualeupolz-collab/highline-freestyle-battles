@@ -10,12 +10,13 @@
  * 3. the local copy is deleted.
  * Network errors leave everything queued for the next run; refusals by the server are shown.
  */
-import { MAX_VIDEO_BYTES } from '@hfb/shared';
+import { MAX_VIDEO_BYTES, MIN_ATTEMPT_MS } from '@hfb/shared';
 import { ApiError, api } from '../api';
 import {
   deviceCode,
   localReservations,
   removeLocalReservation,
+  uncountRecording,
   updateLocalReservation,
 } from './device';
 import {
@@ -91,12 +92,44 @@ export function startUploadQueue(): void {
   setInterval(kickUploads, 60_000);
 }
 
-/** Battle recordings still marked "recording" at start-up were cut off by a crash. */
+/**
+ * Battle recordings still marked "recording" at start-up were cut off by a crash. With less than
+ * MIN_ATTEMPT_MS of video (about one chunk per second) they do not count.
+ */
 async function markInterruptedBattleRecordings() {
   for (const r of await listRecordings()) {
     if ((r.battle || r.guest) && r.status === 'recording')
-      await saveRecording({ ...r, status: 'interrupted' });
+      await saveRecording({
+        ...r,
+        status: 'interrupted',
+        ...(r.chunkCount * 1000 < MIN_ATTEMPT_MS && { discard: true }),
+      });
   }
+}
+
+/**
+ * A recording shorter than MIN_ATTEMPT_MS does not count (owner, 2026-10-13): the attempt is
+ * removed on the server (once there is a connection) and the recording deleted.
+ */
+export async function discardRecording(id: string) {
+  await updateRecording(id, (r) => ({ ...r, discard: true }));
+  kickUploads();
+}
+
+async function processDiscard(recording: StoredRecording) {
+  const battle = recording.battle;
+  const guest = recording.guest;
+  try {
+    if (battle?.synced) await api.discardAttempt(battle.battleId, recording.id);
+    if (guest?.synced) await api.guestDiscard(recording.id, guest.code);
+  } catch (error) {
+    // Not refused by the server (no connection): try again later.
+    if (!isRefusal(error)) throw error;
+  }
+  const reservationId = battle?.reservationId ?? guest?.reservationId;
+  if (reservationId) uncountRecording(reservationId);
+  await deleteRecording(recording.id);
+  for (const listener of serverListeners) listener(battle?.battleId ?? guest?.battleId ?? '');
 }
 
 /** A refusal by the server (not a missing connection or a server hiccup). */
@@ -108,7 +141,8 @@ function isRefusal(error: unknown): error is ApiError {
 
 async function runOnce() {
   for (const recording of await listRecordings()) {
-    if ((!recording.battle && !recording.guest) || recording.upload?.state === 'failed') continue;
+    if (!recording.battle && !recording.guest) continue;
+    if (recording.upload?.state === 'failed' && !recording.discard) continue;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     try {
       await process(recording);
@@ -170,6 +204,10 @@ async function reportReservations() {
 }
 
 async function process(recording: StoredRecording) {
+  if (recording.discard) {
+    if (recording.status !== 'recording') await processDiscard(recording);
+    return;
+  }
   if (recording.guest) return processGuest(recording);
   const battle = recording.battle;
   if (!battle) return;

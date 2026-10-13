@@ -7,7 +7,7 @@ async function record(phone: import('@playwright/test').Page) {
   const button = phone.locator('.camera-full').getByRole('button', { name: 'Record attempt' });
   await expect(button).toBeEnabled();
   await button.click();
-  await expect(phone.locator('.camera-full').getByText(/● [2-9]\.\d s/)).toBeVisible();
+  await expect(phone.locator('.camera-full').getByText(/● [4-9]\.\d s/)).toBeVisible();
   await phone.getByRole('button', { name: 'Stop' }).click();
   await phone.getByRole('button', { name: 'Upload', exact: true }).click();
 }
@@ -34,6 +34,17 @@ test('offline recording: reserve, take over on a second device, report back', as
     .getByRole('button', { name: 'Accept', exact: true })
     .click();
   await expect(phone).toHaveURL(battlePath);
+
+  // A recording shorter than 3 seconds does not count and is deleted.
+  await phone.getByRole('button', { name: 'Record attempt' }).first().click();
+  const camera = phone.locator('.camera-full').getByRole('button', { name: 'Record attempt' });
+  await expect(camera).toBeEnabled();
+  await camera.click();
+  await expect(phone.locator('.camera-full').getByText(/● 0\.\d s/)).toBeVisible();
+  await phone.getByRole('button', { name: 'Stop' }).click();
+  await expect(phone.getByText(/shorter than 3 seconds: it does not count/)).toBeVisible();
+  await expect(phone.getByText('Attempts left: 3')).toBeVisible();
+  await expect(phone.getByText('Attempt 1', { exact: true })).toHaveCount(0);
 
   // Offline without a reservation: recording is refused.
   await phone.context().setOffline(true);
@@ -69,7 +80,7 @@ test('offline recording: reserve, take over on a second device, report back', as
   // The phone comes back: uploads, reports, and hands back the two unused attempts, so the
   // tablet's attempt becomes valid.
   await phone.context().setOffline(false);
-  await expect(phone.getByText('Uploaded', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(phone.getByText('Uploaded', { exact: true })).toHaveCount(2, { timeout: 30_000 });
   await phone.reload();
   await phone.getByRole('button', { name: 'Hand back unused' }).click();
   await expect(phone.getByText(/done, 1 recorded/)).toBeVisible();

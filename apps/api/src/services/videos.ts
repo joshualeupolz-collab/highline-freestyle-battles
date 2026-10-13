@@ -8,7 +8,7 @@ import { deliveryStatus } from '../battles/rules';
 import type { Database } from '../db/client';
 import { attempts, battleProposals, battles, submissions, videoFiles, videos } from '../db/schema';
 import type { VideoStore } from '../storage/videoStore';
-import { battleReservations } from './attempts';
+import { battleReservations, freeAttempts } from './attempts';
 import { cancelPendingProposalsStatement, requiredSubmissionsPerPerson } from './battles';
 import { reviewerRole } from './review';
 
@@ -45,6 +45,17 @@ export async function battleVideosView(
   viewerId: string | null,
   isReviewer = false,
 ) {
+  const isViewerParticipant = viewerId !== null && participantIds.includes(viewerId);
+  // Free attempts per part for the viewer (settles stuck provisional attempts first).
+  const free =
+    isViewerParticipant && battle.status === 'active'
+      ? await freeAttempts(
+          db,
+          battle,
+          viewerId,
+          (await requiredSubmissionsPerPerson(db, battle)) / battle.rounds,
+        )
+      : [];
   const [attemptRows, videoRows, submissionRows, shared, reservationRows] = await Promise.all([
     db
       .select({
@@ -200,7 +211,16 @@ export async function battleVideosView(
       }))
     : [];
 
-  return { unlocked, slots: [...slots.values()], mine, sharedWithMe, byFriends, reservations };
+  return {
+    unlocked,
+    slots: [...slots.values()],
+    mine,
+    sharedWithMe,
+    byFriends,
+    reservations,
+    /** The viewer's free attempts per part (null = unlimited), as the server counts them. */
+    free,
+  };
 }
 
 /** Filming by friends: null for the athlete's own recordings. */

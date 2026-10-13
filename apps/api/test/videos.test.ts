@@ -180,6 +180,81 @@ describe('attempts', () => {
     expect(benView.body.battle.videos.mine).toEqual([]);
   });
 
+  it('re-checks provisional attempts when the number of attempts changes', async () => {
+    const id = await activeBattle({ attemptsPerVideo: 1 });
+    const t0 = Date.now();
+    for (const n of [1, 2, 3])
+      await post(anna, `/api/battles/${id}/attempts`, {
+        id: newId(),
+        partIndex: 0,
+        startedAt: t0 + n,
+      });
+    const view = async () =>
+      (
+        await json<{ battle: Battle & { videos: { free: (number | null)[] } } }>(
+          call(`/api/battles/${id}`, { session: anna.session }),
+        )
+      ).body.battle.videos;
+    expect((await view()).free).toEqual([0]);
+
+    const proposed = await post(anna, `/api/battles/${id}/proposals`, {
+      kind: 'settings',
+      changes: { attemptsPerVideo: 4 },
+    });
+    const proposalId = proposed.body.battle.proposals[0]?.id as string;
+    await post(ben, `/api/battles/${id}/proposals/${proposalId}/respond`, { decision: 'accept' });
+    const after = await view();
+    expect(after.mine.map((m) => m.provisional)).toEqual([false, false, false]);
+    expect(after.free).toEqual([1]);
+
+    // Room that appeared without a re-check (e.g. changed directly in the database) is noticed
+    // when the battle is shown.
+    await env.DB.prepare('UPDATE battles SET attempts_per_video = 5 WHERE id = ?').bind(id).run();
+    await post(anna, `/api/battles/${id}/attempts`, {
+      id: newId(),
+      partIndex: 0,
+      startedAt: t0 + 4,
+    });
+    await post(anna, `/api/battles/${id}/attempts`, {
+      id: newId(),
+      partIndex: 0,
+      startedAt: t0 + 5,
+    });
+    await env.DB.prepare('UPDATE battles SET attempts_per_video = 6 WHERE id = ?').bind(id).run();
+    const healed = await view();
+    expect(healed.mine.every((m) => !m.provisional)).toBe(true);
+    expect(healed.free).toEqual([1]);
+  });
+
+  it('removes a recording shorter than 3 seconds, not an uploaded one', async () => {
+    const id = await activeBattle({ attemptsPerVideo: 1 });
+    const t0 = Date.now();
+    const first = newId();
+    const second = newId();
+    await post(anna, `/api/battles/${id}/attempts`, { id: first, partIndex: 0, startedAt: t0 });
+    await post(anna, `/api/battles/${id}/attempts`, {
+      id: second,
+      partIndex: 0,
+      startedAt: t0 + 1,
+    });
+    // A pending upload of the short one is removed with it; the provisional one moves up.
+    await post(anna, '/api/videos', { attemptId: first, contentType: 'video/mp4', sizeBytes: 5 });
+    expect((await post(ben, `/api/battles/${id}/attempts/${first}/discard`)).status).toBe(404);
+    const res = await post(anna, `/api/battles/${id}/attempts/${first}/discard`);
+    expect(res.status, res.body.error).toBe(200);
+    expect(res.body.battle.videos.mine.map((m) => [m.id, m.provisional])).toEqual([
+      [second, false],
+    ]);
+    const chat = await json<{ messages: { event: { type: string } | null }[] }>(
+      call(`/api/battles/${id}/messages`, { session: ben.session }),
+    );
+    expect(chat.body.messages.some((m) => m.event?.type === 'attempt_discarded')).toBe(true);
+
+    await upload(anna, second);
+    const refused = await post(anna, `/api/battles/${id}/attempts/${second}/discard`);
+    expect(refused.body.error).toBe('already_uploaded');
+  });
+
   it('accepts the same attempt twice without counting it twice', async () => {
     const id = await activeBattle({ attemptsPerVideo: 1 });
     const body = { id: newId(), partIndex: 0, startedAt: Date.now() };
@@ -286,6 +361,27 @@ describe('upload, choosing and unlocking', () => {
 });
 
 describe('extra attempt request with a video', () => {
+  it('refuses a provisional attempt (it would not have counted anyway)', async () => {
+    const id = await activeBattle({ attemptsPerVideo: 1 });
+    const t0 = Date.now();
+    for (const n of [1, 2])
+      await post(anna, `/api/battles/${id}/attempts`, {
+        id: newId(),
+        partIndex: 0,
+        startedAt: t0 + n,
+      });
+    const mine = (
+      await json<{ battle: Battle }>(call(`/api/battles/${id}`, { session: anna.session }))
+    ).body.battle.videos.mine;
+    const videoId = await upload(anna, mine[1]?.id as string);
+    const res = await post(anna, `/api/battles/${id}/proposals`, {
+      kind: 'extra_attempt',
+      change: 1,
+      videoId,
+    });
+    expect(res.body.error).toBe('attempt_provisional');
+  });
+
   it('only accepts an uploaded video of my own', async () => {
     const id = await activeBattle({ attemptsPerVideo: 1 });
     const res = await attempt(anna, id);

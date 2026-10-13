@@ -36,6 +36,7 @@ import type { AppEnv, Env } from '../env';
 import { apiError } from '../lib/errors';
 import { parseJson } from '../lib/validate';
 import {
+  discardAttempt,
   insertAttempt,
   ownReservation,
   reportReservation,
@@ -86,6 +87,22 @@ battleVideoRoutes.post('/:id/attempts', async (c) => {
     now,
   );
   return c.json(await battleResponse(db, battle.id, user.id, now), 201);
+});
+
+/** A recording shorter than 3 seconds does not count: the phone removes the attempt again. */
+battleVideoRoutes.post('/:id/attempts/:attemptId/discard', async (c) => {
+  const user = c.get('user');
+  if (!user) apiError(401, 'not_logged_in');
+  const db = getDb(c.env.DB);
+  const attempt = await db
+    .select()
+    .from(attempts)
+    .where(eq(attempts.id, c.req.param('attemptId')))
+    .get();
+  if (!attempt || attempt.userId !== user.id || attempt.battleId !== c.req.param('id'))
+    apiError(404, 'not_found');
+  await discardAttempt(db, attempt, Date.now());
+  return c.json(await battleResponse(db, c.req.param('id'), user.id));
 });
 
 /**

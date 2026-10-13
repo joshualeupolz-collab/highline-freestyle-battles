@@ -14,6 +14,7 @@ import { hasRole, useMe } from '../auth';
 import { StatusBadge, useFormats } from '../battleHelpers';
 import { ErrorText } from '../components/ErrorText';
 import { ordinal } from '../components/GroupResult';
+import { NumberInput } from '../components/NumberInput';
 import { LostHint } from '../components/OfflineReservations';
 import { ReportButton } from '../components/ReportButton';
 import { UserLink } from '../components/UserLink';
@@ -226,13 +227,12 @@ function EstimateCard({ userId, name }: { userId: string; name: string }) {
         </label>
         <label>
           {t('estimate.value')}
-          <input
-            type="number"
+          <NumberInput
             min={ESTIMATE_MIN}
             max={ESTIMATE_MAX}
             step={10}
             value={value}
-            onChange={(e) => setValue(Number(e.target.value))}
+            onChange={setValue}
           />
           <span className="hint">{where}</span>
         </label>

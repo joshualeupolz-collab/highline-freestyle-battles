@@ -10,6 +10,7 @@ import { partText } from '../battleHelpers';
 import { formatDate, t } from '../i18n';
 import { addLocalReservations, deviceCode, removeLocalReservation } from '../video/device';
 import { ErrorText } from './ErrorText';
+import { NumberInput } from './NumberInput';
 
 const ROUND = 1;
 
@@ -63,7 +64,13 @@ export function ReserveForm({
     }
   };
   return (
-    <div className="card notice">
+    <form
+      className="card notice"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+    >
       <h3 style={{ marginTop: 0 }}>{t('offline.prepareTitle')}</h3>
       <p>{t('offline.warning')}</p>
       {partTexts.map((text, i) => {
@@ -74,14 +81,11 @@ export function ReserveForm({
           <div key={i}>
             <label>
               {partTexts.length > 1 ? text : t('offline.howMany')}
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 max={99}
                 value={counts[i] ?? 1}
-                onChange={(e) =>
-                  setCounts(counts.map((c, k) => (k === i ? Number(e.target.value) || 1 : c)))
-                }
+                onChange={(n) => setCounts(counts.map((c, k) => (k === i ? n : c)))}
               />
             </label>
             <p className="muted" style={{ margin: 0 }}>
@@ -105,14 +109,14 @@ export function ReserveForm({
       })}
       <ErrorText error={error} />
       <div className="actions">
-        <button type="button" disabled={busy || !online} onClick={submit}>
+        <button type="submit" disabled={busy || !online}>
           {t('offline.reserve')}
         </button>
         <button type="button" className="secondary" onClick={onCancel}>
           {t('common.cancel')}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 
